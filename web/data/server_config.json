@@ -1,0 +1,44 @@
+{
+    "server": {
+        "name": "HelloMyWorld Web Game Server",
+        "version": "1.0.0",
+        "description": "Web-based voxel game server ported from minetest_sub_project (Luanti)",
+        "maxPlayers": 100,
+        "tickRate": 20,
+        "port": 5000
+    },
+    "world": {
+        "defaultGenerator": "noise",
+        "chunkSize": 16,
+        "renderDistance": 4,
+        "worldSeed": 12345,
+        "generators": ["noise", "flat"]
+    },
+    "player": {
+        "defaultHealth": 20,
+        "defaultBreath": 10,
+        "respawnHealth": 20,
+        "inventorySize": 32,
+        "hotbarSize": 8,
+        "startItems": ["wooden_pickaxe", "wooden_sword", "torch", "bread"]
+    },
+    "physics": {
+        "gravity": 20.0,
+        "jumpForce": 8.0,
+        "walkSpeed": 5.0,
+        "sprintSpeed": 8.0,
+        "flySpeed": 12.0
+    },
+    "dayNight": {
+        "cycleLength": 24000,
+        "dawnStart": 4500,
+        "dayStart": 6000,
+        "duskStart": 16500,
+        "nightStart": 18000
+    },
+    "network": {
+        "protocolVersion": 1,
+        "positionUpdateInterval": 50,
+        "chunkCompression": true
+    }
+}
