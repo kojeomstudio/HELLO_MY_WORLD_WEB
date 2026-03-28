@@ -19,4 +19,4 @@
 - 반드시 작업 완료 후에는 반드시 README.md 문서를 업데이트하고 코드 컴파일 테스트 완료 후 commit 합니다. 이후 origin에 push해서 반영하십시오.
 
 #data
-- text, confing, 상수등의 하드코딩 성격을 가지는 경우 별도의 *.json 파일로 분리하십시오. web/data 아래 위치하게 하십시오.
+- text, confing, 상수등의 하드코딩 성격을 가지는 경우 별도의 *.json 파일로 분리하십시오. web/data 아래 위치하게 하십시오. config 설정값이 중첩되지 않도록 하십시오.
