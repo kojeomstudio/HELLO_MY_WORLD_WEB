@@ -55,6 +55,9 @@ class App {
                 const debugInfo = document.getElementById('debug-info')!;
                 debugInfo.style.display = debugInfo.style.display === 'none' ? 'block' : 'none';
             }
+            if (e.key === 'Escape') {
+                this.uiManager.hideAllUIs();
+            }
         });
 
         document.addEventListener('respawnRequest', () => {

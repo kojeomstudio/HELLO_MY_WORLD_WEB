@@ -46,8 +46,59 @@ builder.Services.AddSingleton<SmeltingSystem>(sp =>
     smelting.LoadRecipes(dataPath);
     return smelting;
 });
-builder.Services.AddSingleton<PrivilegeSystem>();
-builder.Services.AddSingleton<ActiveBlockModifierSystem>();
+builder.Services.AddSingleton<PrivilegeSystem>(sp =>
+{
+    var privilegeSystem = new PrivilegeSystem();
+    var dataPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "data", "privileges.json");
+    if (!File.Exists(dataPath))
+        dataPath = Path.Combine(Directory.GetCurrentDirectory(), "data", "privileges.json");
+    privilegeSystem.LoadFromFile(dataPath);
+    return privilegeSystem;
+});
+builder.Services.AddSingleton<ActiveBlockModifierSystem>(sp =>
+{
+    var system = new ActiveBlockModifierSystem();
+
+    system.Register(new ActiveBlockModifier
+    {
+        Name = "sand_falling",
+        Interval = 2,
+        Chance = 1.0f,
+        Action = (blockDef, pos, world) =>
+        {
+            var below = new Vector3s(pos.X, (short)(pos.Y - 1), pos.Z);
+            if (world.GetBlock(below).Type == BlockType.Air)
+            {
+                var fallingBlock = new Block((BlockType)blockDef.Id);
+                world.SetBlock(below, fallingBlock);
+                world.SetBlock(pos, Block.Air);
+                return true;
+            }
+            return false;
+        }
+    });
+
+    system.Register(new ActiveBlockModifier
+    {
+        Name = "gravel_falling",
+        Interval = 2,
+        Chance = 1.0f,
+        Action = (blockDef, pos, world) =>
+        {
+            var below = new Vector3s(pos.X, (short)(pos.Y - 1), pos.Z);
+            if (world.GetBlock(below).Type == BlockType.Air)
+            {
+                var fallingBlock = new Block((BlockType)blockDef.Id);
+                world.SetBlock(below, fallingBlock);
+                world.SetBlock(pos, Block.Air);
+                return true;
+            }
+            return false;
+        }
+    });
+
+    return system;
+});
 builder.Services.AddSingleton<KnockbackSystem>();
 builder.Services.AddSingleton<GameServer>();
 builder.Services.AddSingleton<AuthenticationService>();
@@ -112,6 +163,16 @@ var hubContext = app.Services.GetRequiredService<IHubContext<GameHub, IGameClien
 gameServer.SetHubContext(hubContext);
 gameServer.Start();
 
-app.Lifetime.ApplicationStopping.Register(() => gameServer.Stop());
+var worldDataPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "data", "worlds", "default");
+if (!Directory.Exists(worldDataPath))
+    worldDataPath = Path.Combine(Directory.GetCurrentDirectory(), "data", "worlds", "default");
+Directory.CreateDirectory(worldDataPath);
+gameServer.DefaultWorld.Load(worldDataPath);
+
+app.Lifetime.ApplicationStopping.Register(() =>
+{
+    gameServer.DefaultWorld.Save(worldDataPath);
+    gameServer.Stop();
+});
 
 app.Run();

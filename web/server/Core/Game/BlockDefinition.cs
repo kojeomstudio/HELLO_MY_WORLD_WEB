@@ -175,4 +175,24 @@ public class BlockDefinition
     public int MaxLevel { get; set; } = 8;
     public Dictionary<string, int> Groups { get; set; } = new();
     public string SoundGroup { get; set; } = "default";
+
+    public string? TextureName => Name switch
+    {
+        "stone" => "default_stone",
+        "dirt" => "default_dirt",
+        "grass" => "default_grass",
+        "water" => "default_water",
+        "sand" => "default_sand",
+        "wood" => "default_tree",
+        "leaves" => "default_leaves",
+        "snow" => "default_snow",
+        "ice" => "default_ice",
+        "lava" => "default_lava",
+        "cobblestone" => "default_cobble",
+        "gravel" => "default_gravel",
+        "water_flowing" => "default_water_flowing",
+        "lava_flowing" => "default_lava_flowing",
+        "mossy_cobblestone" => "default_mossycobble",
+        _ => null
+    };
 }

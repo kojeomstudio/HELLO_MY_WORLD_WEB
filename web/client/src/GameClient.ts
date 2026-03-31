@@ -148,7 +148,23 @@ export class GameClient {
         });
 
         this.connection.on('OnTeleported', (_x: number, _y: number, _z: number) => {
-            // Handled by position update
+        });
+
+        this.connection.on('OnCraftingRecipes', (recipes: any[]) => {
+            this.uiManager.populateCraftingRecipes(recipes);
+        });
+
+        this.connection.on('OnSmeltingRecipes', (recipes: any[]) => {
+            this.uiManager.populateSmeltingRecipes(recipes);
+        });
+
+        this.connection.on('OnChestInventory', (items: any[]) => {
+            this.uiManager.updateChestInventory(items);
+            this.uiManager.updateChestPlayerInventory(this.playerController.inventory);
+        });
+
+        this.connection.on('OnFurnaceUpdate', (input: string, fuel: string, output: string, progress: number) => {
+            this.uiManager.updateFurnaceState(input, fuel, output, progress);
         });
     }
 
@@ -168,6 +184,34 @@ export class GameClient {
 
     craft(): void {
         this.connection?.invoke('Craft', '');
+    }
+
+    getCraftingRecipes(): void {
+        this.connection?.invoke('GetCraftingRecipes');
+    }
+
+    craftRecipe(recipeIndex: number): void {
+        this.connection?.invoke('CraftRecipe', recipeIndex);
+    }
+
+    getSmeltingRecipes(): void {
+        this.connection?.invoke('GetSmeltingRecipes');
+    }
+
+    startSmelting(inputItemId: string, resultItemId: string, x: number, y: number, z: number): void {
+        this.connection?.invoke('StartSmelting', inputItemId, resultItemId, x, y, z);
+    }
+
+    getChestInventory(x: number, y: number, z: number): void {
+        this.connection?.invoke('GetChestInventory', x, y, z);
+    }
+
+    moveItemToChest(slotIndex: number, chestSlot: number, x: number, y: number, z: number): void {
+        this.connection?.invoke('MoveItemToChest', slotIndex, chestSlot, x, y, z);
+    }
+
+    takeItemFromChest(chestSlot: number, slotIndex: number, x: number, y: number, z: number): void {
+        this.connection?.invoke('TakeItemFromChest', chestSlot, slotIndex, x, y, z);
     }
 
     getPrivileges(): void {

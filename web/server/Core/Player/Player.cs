@@ -24,6 +24,7 @@ public class Player
     public bool IsSprinting { get; set; } = false;
     public bool IsSneaking { get; set; } = false;
     public bool IsOnGround { get; set; } = true;
+    public bool IsInLiquid { get; set; }
     public bool IsDead { get; set; }
 
     public int SelectedHotbarSlot { get; set; } = 0;

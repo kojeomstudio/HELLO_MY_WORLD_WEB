@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace WebGameServer.Core.Auth;
 
 public record Privilege(string Name, string Description, bool Default);
@@ -24,6 +26,26 @@ public class PrivilegeSystem
         RegisterBuiltIn("password", "Can change own password", false);
         RegisterBuiltIn("fly", "Can fly", false);
         RegisterBuiltIn("fast", "Can move fast", false);
+    }
+
+    public void LoadFromFile(string filePath)
+    {
+        if (!File.Exists(filePath)) return;
+
+        var json = File.ReadAllText(filePath);
+        var doc = JsonDocument.Parse(json);
+
+        if (!doc.RootElement.TryGetProperty("privileges", out var privilegesElement))
+            return;
+
+        _privileges.Clear();
+
+        foreach (var prop in privilegesElement.EnumerateObject())
+        {
+            var description = prop.Value.GetProperty("description").GetString() ?? string.Empty;
+            var defaultVal = prop.Value.GetProperty("default").GetBoolean();
+            _privileges[prop.Name] = new Privilege(prop.Name, description, defaultVal);
+        }
     }
 
     public bool HasPrivilege(string playerName, string privilege)

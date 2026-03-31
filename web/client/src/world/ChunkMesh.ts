@@ -3,6 +3,12 @@ import * as THREE from 'three';
 const CHUNK_SIZE = 16;
 const BYTES_PER_BLOCK = 4;
 
+export interface TextureAtlas {
+    texture: THREE.CanvasTexture;
+    getUV(blockId: number): [number, number, number, number];
+    hasTexture(blockId: number): boolean;
+}
+
 export class ChunkMesh {
     public mesh: THREE.Mesh | null = null;
     public transparentMesh: THREE.Mesh | null = null;
@@ -29,17 +35,22 @@ export class ChunkMesh {
 
     buildMesh(
         blockRegistry: any,
-        getNeighborBlock: (wx: number, wy: number, wz: number) => number
+        getNeighborBlock: (wx: number, wy: number, wz: number) => number,
+        textureAtlas: TextureAtlas | null = null
     ): void {
+        const hasAtlas = textureAtlas !== null;
+
         const solidPositions: number[] = [];
         const solidNormals: number[] = [];
         const solidColors: number[] = [];
+        const solidUVs: number[] = [];
         const solidIndices: number[] = [];
         let solidVertexCount = 0;
 
         const transPositions: number[] = [];
         const transNormals: number[] = [];
         const transColors: number[] = [];
+        const transUVs: number[] = [];
         const transIndices: number[] = [];
         let transVertexCount = 0;
 
@@ -71,7 +82,22 @@ export class ChunkMesh {
                     const positions = isTransparent ? transPositions : solidPositions;
                     const normals = isTransparent ? transNormals : solidNormals;
                     const colors = isTransparent ? transColors : solidColors;
+                    const uvs = isTransparent ? transUVs : solidUVs;
                     const indices = isTransparent ? transIndices : solidIndices;
+
+                    let blockUV: [number, number, number, number] | null = null;
+                    let useWhiteColor = false;
+                    if (hasAtlas) {
+                        blockUV = textureAtlas!.getUV(blockId);
+                        useWhiteColor = textureAtlas!.hasTexture(blockId);
+                    }
+
+                    const cornerUVs: [number, number][] = blockUV !== null ? [
+                        [blockUV[0], blockUV[1]],
+                        [blockUV[2], blockUV[1]],
+                        [blockUV[2], blockUV[3]],
+                        [blockUV[0], blockUV[3]]
+                    ] : [];
 
                     for (const face of faceData) {
                         const neighborX = worldX + face.dir[0];
@@ -93,14 +119,22 @@ export class ChunkMesh {
                         if (face.dir[1] === 1) faceColor = color.clone().multiplyScalar(1.1);
                         if (face.dir[1] === -1) faceColor = color.clone().multiplyScalar(0.7);
 
-                        for (const corner of face.corners) {
+                        const cr = useWhiteColor ? 1 : faceColor.r;
+                        const cg = useWhiteColor ? 1 : faceColor.g;
+                        const cb = useWhiteColor ? 1 : faceColor.b;
+
+                        for (let ci = 0; ci < 4; ci++) {
+                            const corner = face.corners[ci];
                             positions.push(
                                 worldX + corner[0],
                                 worldY + corner[1],
                                 worldZ + corner[2]
                             );
                             normals.push(face.normal[0], face.normal[1], face.normal[2]);
-                            colors.push(faceColor.r, faceColor.g, faceColor.b);
+                            colors.push(cr, cg, cb);
+                            if (hasAtlas && blockUV !== null) {
+                                uvs.push(cornerUVs[ci][0], cornerUVs[ci][1]);
+                            }
                         }
 
                         const vc = isTransparent ? transVertexCount : solidVertexCount;
@@ -118,13 +152,15 @@ export class ChunkMesh {
             }
         }
 
-        this.mesh = this.buildGeometry(solidPositions, solidNormals, solidColors, solidIndices, solidVertexCount, false);
-        this.transparentMesh = this.buildGeometry(transPositions, transNormals, transColors, transIndices, transVertexCount, true);
+        const atlasTexture = hasAtlas ? textureAtlas!.texture : null;
+        this.mesh = this.buildGeometry(solidPositions, solidNormals, solidColors, solidUVs, solidIndices, solidVertexCount, false, atlasTexture);
+        this.transparentMesh = this.buildGeometry(transPositions, transNormals, transColors, transUVs, transIndices, transVertexCount, true, atlasTexture);
     }
 
     private buildGeometry(
-        positions: number[], normals: number[], colors: number[],
-        indices: number[], vertexCount: number, transparent: boolean
+        positions: number[], normals: number[], colors: number[], uvs: number[],
+        indices: number[], vertexCount: number, transparent: boolean,
+        atlasTexture: THREE.CanvasTexture | null
     ): THREE.Mesh | null {
         if (vertexCount === 0) return null;
 
@@ -132,9 +168,13 @@ export class ChunkMesh {
         geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
         geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
         geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+        if (uvs.length > 0) {
+            geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+        }
         geometry.setIndex(indices);
 
         const material = new THREE.MeshLambertMaterial({
+            map: atlasTexture,
             vertexColors: true,
             transparent: transparent,
             opacity: transparent ? 0.6 : 1.0,

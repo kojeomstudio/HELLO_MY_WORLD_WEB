@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.SignalR;
 using WebGameServer.Core;
 using WebGameServer.Core.Entities;
+using WebGameServer.Core.Player;
 using WebGameServer.Core.World;
+using PlayerEnt = WebGameServer.Core.Player.Player;
 
 namespace WebGameServer.Services;
 
@@ -19,6 +21,8 @@ public class GameLoopService : BackgroundService
     private float _currentTps;
 
     private const int TimeBroadcastInterval = 100;
+    private const float PickupRange = 2.0f;
+    private const int AutoSaveIntervalSeconds = 300;
 
     public GameLoopService(
         GameServer gameServer,
@@ -46,6 +50,8 @@ public class GameLoopService : BackgroundService
             _gameServer.Update();
             _entityManager.UpdateAll(1.0f / _gameServer.TickRate);
 
+            await ProcessItemPickups();
+
             _tickCount++;
 
             if (_tickCount % TimeBroadcastInterval == 0)
@@ -65,9 +71,51 @@ public class GameLoopService : BackgroundService
 
             await BroadcastEntityEvents();
 
+            CheckAutoSave();
+
             TrackTps(now);
 
             await Task.Delay(interval, stoppingToken);
+        }
+    }
+
+    private async Task ProcessItemPickups()
+    {
+        var itemEntities = _entityManager.GetByType<ItemEntity>()
+            .Where(e => e.IsAlive)
+            .ToList();
+
+        var players = _gameServer.OnlinePlayers.ToList();
+
+        foreach (var item in itemEntities)
+        {
+            foreach (var player in players)
+            {
+                if (player.IsDead) continue;
+
+                var distance = Vector3.Distance(item.Position, player.Position);
+                if (distance > PickupRange) continue;
+
+                var stack = new ItemStack(item.ItemId, item.Count, item.Metadata);
+                if (!player.Inventory.AddItem(stack)) continue;
+
+                _entityManager.Remove(item.Id);
+
+                try
+                {
+                    await _hub.Clients.Client(player.ConnectionId).OnEntityDespawned(item.Id);
+                    await _hub.Clients.Client(player.ConnectionId).OnInventoryUpdate(
+                        player.Inventory.GetAll()
+                            .Select(i => i == null ? null : (object)new { itemId = i.ItemId, count = i.Count, metadata = i.Metadata })
+                            .ToArray()!);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to send pickup update to player {PlayerName}", player.Name);
+                }
+
+                break;
+            }
         }
     }
 
@@ -128,6 +176,26 @@ public class GameLoopService : BackgroundService
         }
 
         _previousEntityCount = currentCount;
+    }
+
+    private void CheckAutoSave()
+    {
+        var world = _gameServer.DefaultWorld;
+        if (world.NeedsSave && DateTime.UtcNow - world.LastSaveTime > TimeSpan.FromSeconds(AutoSaveIntervalSeconds))
+        {
+            try
+            {
+                var worldDataPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "data", "worlds", "default");
+                if (!Directory.Exists(worldDataPath))
+                    worldDataPath = Path.Combine(Directory.GetCurrentDirectory(), "data", "worlds", "default");
+                world.Save(worldDataPath);
+                _logger.LogInformation("World auto-saved successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to auto-save world");
+            }
+        }
     }
 
     private void TrackTps(DateTime now)

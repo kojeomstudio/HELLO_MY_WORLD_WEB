@@ -103,9 +103,27 @@ export class PlayerController {
 
     private onPlace(): void {
         const ray = this.castRay();
-        if (ray) {
-            this.emitBlockEvent('place', ray.placeX, ray.placeY, ray.placeZ);
+        if (!ray) return;
+
+        if (this._worldManager) {
+            const blockId = this._worldManager.getBlock(ray.blockX, ray.blockY, ray.blockZ);
+            const blockDef = this._worldManager.getBlockRegistry().get(blockId);
+            if (blockDef && blockDef.interactive) {
+                const event = new CustomEvent('interactBlock', {
+                    detail: {
+                        x: ray.blockX,
+                        y: ray.blockY,
+                        z: ray.blockZ,
+                        blockId: blockId,
+                        blockName: blockDef.name
+                    }
+                });
+                document.dispatchEvent(event);
+                return;
+            }
         }
+
+        this.emitBlockEvent('place', ray.placeX, ray.placeY, ray.placeZ);
     }
 
     private emitBlockEvent(type: string, x: number, y: number, z: number): void {

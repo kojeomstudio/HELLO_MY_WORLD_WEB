@@ -7,12 +7,18 @@ public class NoiseWorldGenerator : IWorldGenerator
     public string Name => "noise";
     private int _seed;
     private int[] _permutationTable = new int[512];
+    private bool _generateTrees = true;
 
     private const int GroundBase = 32;
     private const int TerrainHeight = 20;
     private const int WaterLevel = 28;
     private const int CaveThreshold = 45;
     private const int TreeMinHeight = 5;
+
+    public void ConfigureTrees(bool generateTrees)
+    {
+        _generateTrees = generateTrees;
+    }
 
     public void Initialize(int seed)
     {
@@ -56,7 +62,103 @@ public class NoiseWorldGenerator : IWorldGenerator
             }
         }
 
+        if (_generateTrees)
+        {
+            GenerateTrees(blocks, baseX, baseY, baseZ);
+        }
+
         return blocks;
+    }
+
+    private void GenerateTrees(ushort[,,] blocks, int baseX, int baseY, int baseZ)
+    {
+        for (int x = 0; x < Chunk.Size; x++)
+        {
+            for (int z = 0; z < Chunk.Size; z++)
+            {
+                var worldX = baseX + x;
+                var worldZ = baseZ + z;
+                var surfaceHeight = GetGroundHeight(worldX, worldZ);
+                var localSurfaceY = surfaceHeight - baseY;
+
+                if (localSurfaceY < 0 || localSurfaceY >= Chunk.Size)
+                {
+                    continue;
+                }
+
+                if (blocks[x, localSurfaceY, z] != (ushort)BlockType.Grass)
+                {
+                    continue;
+                }
+
+                if (surfaceHeight <= WaterLevel)
+                {
+                    continue;
+                }
+
+                var biomeNoise = PerlinNoise2D(worldX * 0.005f + 1000, worldZ * 0.005f + 1000);
+                if (biomeNoise > 0.3f)
+                {
+                    continue;
+                }
+
+                var treeNoise = PerlinNoise2D(worldX * 0.5f + 5000, worldZ * 0.5f + 5000);
+                if (treeNoise <= 0.35f)
+                {
+                    continue;
+                }
+
+                var trunkHeight = ((surfaceHeight * 7 + worldX * 13 + worldZ * 19) & 0x7FFFFFFF) % 3 + 4;
+
+                for (int ty = 1; ty <= trunkHeight; ty++)
+                {
+                    var ly = localSurfaceY + ty;
+                    if (ly < Chunk.Size)
+                    {
+                        blocks[x, ly, z] = (ushort)BlockType.Wood;
+                    }
+                }
+
+                var canopyBase = localSurfaceY + trunkHeight - 1;
+                for (int dy = 0; dy <= 2; dy++)
+                {
+                    var ly = canopyBase + dy;
+                    if (ly < 0 || ly >= Chunk.Size)
+                    {
+                        continue;
+                    }
+
+                    var radius = dy == 2 ? 1 : 2;
+                    for (int dx = -radius; dx <= radius; dx++)
+                    {
+                        for (int dz = -radius; dz <= radius; dz++)
+                        {
+                            if (dx == 0 && dz == 0 && dy < 2)
+                            {
+                                continue;
+                            }
+
+                            if (dx * dx + dy * dy + dz * dz > 5)
+                            {
+                                continue;
+                            }
+
+                            var lx = x + dx;
+                            var lz = z + dz;
+                            if (lx < 0 || lx >= Chunk.Size || lz < 0 || lz >= Chunk.Size)
+                            {
+                                continue;
+                            }
+
+                            if (blocks[lx, ly, lz] == (ushort)BlockType.Air)
+                            {
+                                blocks[lx, ly, lz] = (ushort)BlockType.Leaves;
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private ushort GetBlockAt(int x, int y, int z, int surfaceHeight)

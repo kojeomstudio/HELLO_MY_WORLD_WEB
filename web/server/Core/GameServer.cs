@@ -21,6 +21,8 @@ public class GameServer
     private readonly ConcurrentDictionary<string, PlayerEnt> _players = new();
     private readonly ConcurrentDictionary<string, string> _connectionToPlayer = new();
     private readonly ConcurrentDictionary<string, string> _connectionToPlayerId = new();
+    private readonly ConcurrentDictionary<string, ItemStack?[]> _chestInventories = new();
+    private readonly ConcurrentDictionary<string, FurnaceOperation> _activeFurnaces = new();
 
     private readonly ServerConfig _config;
     private readonly BlockDefinitionManager _blockDefinitionManager;
@@ -29,6 +31,8 @@ public class GameServer
     private readonly PrivilegeSystem _privilegeSystem;
     private readonly ActiveBlockModifierSystem _abmSystem;
     private readonly KnockbackSystem _knockbackSystem;
+    private readonly PhysicsEngine _physicsEngine;
+    private readonly EntityManager _entityManager;
 
     private IHubContext<GameHub, IGameClient>? _hubContext;
     private int _tickCount;
@@ -56,7 +60,9 @@ public class GameServer
         SmeltingSystem smeltingSystem,
         PrivilegeSystem privilegeSystem,
         ActiveBlockModifierSystem abmSystem,
-        KnockbackSystem knockbackSystem)
+        KnockbackSystem knockbackSystem,
+        PhysicsEngine physicsEngine,
+        EntityManager entityManager)
     {
         _config = config;
         _blockDefinitionManager = blockDefinitionManager;
@@ -65,6 +71,8 @@ public class GameServer
         _privilegeSystem = privilegeSystem;
         _abmSystem = abmSystem;
         _knockbackSystem = knockbackSystem;
+        _physicsEngine = physicsEngine;
+        _entityManager = entityManager;
 
         MaxPlayers = config.Server.MaxPlayers;
         TickRate = config.Server.TickRate;
@@ -86,6 +94,17 @@ public class GameServer
     public void Start()
     {
         if (IsRunning) return;
+
+        MobEntity.FindNearestPlayer = (pos, range) =>
+        {
+            var nearest = _players.Values
+                .Where(p => p.State == PlayerState.Playing && !p.IsDead)
+                .OrderBy(p => Vector3.Distance(p.Position, pos))
+                .FirstOrDefault(p => Vector3.Distance(p.Position, pos) <= range);
+            return nearest;
+        };
+        MobEntity.DamagePlayer = (player, damage) => { DamagePlayer(player, damage, "mob"); };
+
         IsRunning = true;
         StartTime = DateTime.UtcNow;
     }
@@ -181,6 +200,24 @@ public class GameServer
             .ToList();
     }
 
+    public bool PickupItem(Guid playerId, Guid entityId)
+    {
+        var player = _players.Values.FirstOrDefault(p => p.Id == playerId);
+        if (player == null || player.IsDead) return false;
+
+        var entity = _entityManager.Get(entityId);
+        if (entity == null || entity is not ItemEntity itemEntity || !itemEntity.IsAlive) return false;
+
+        var distance = Vector3.Distance(itemEntity.Position, player.Position);
+        if (distance > 2.0f) return false;
+
+        var stack = new ItemStack(itemEntity.ItemId, itemEntity.Count, itemEntity.Metadata);
+        if (!player.Inventory.AddItem(stack)) return false;
+
+        _entityManager.Remove(entityId);
+        return true;
+    }
+
     public void Update()
     {
         if (!IsRunning) return;
@@ -192,13 +229,18 @@ public class GameServer
         {
             if (player.State != PlayerState.Playing) continue;
             UpdatePlayer(player);
+            ValidatePlayerPosition(player, 1f / TickRate);
         }
+
+        _entityManager.UpdateAll(1f / TickRate);
 
         _tickCount++;
 
         DefaultWorld.UpdateLiquids(_tickCount);
 
         _abmSystem.Process(DefaultWorld, _tickCount, _blockDefinitionManager);
+
+        UpdateFurnaces(1f / TickRate);
 
         if (_tickCount % _config.Network.TimeBroadcastInterval == 0 && _hubContext != null)
         {
@@ -260,6 +302,27 @@ public class GameServer
         else if (player.FoodLevel <= 0)
         {
             DamagePlayer(player, 0.5f, "starvation");
+        }
+
+        var headBlockPos = new Vector3s(
+            (short)Math.Floor(player.Position.X),
+            (short)Math.Floor(player.Position.Y + 0.6f),
+            (short)Math.Floor(player.Position.Z));
+        var headBlock = DefaultWorld.GetBlock(headBlockPos);
+        var headDef = _blockDefinitionManager.Get(headBlock.ToUInt16());
+
+        if (headDef != null && headDef.Drowning)
+        {
+            player.Breath -= 0.05f;
+            if (player.Breath <= 0)
+            {
+                player.Breath = 0;
+                DamagePlayer(player, 1f, "drowning");
+            }
+        }
+        else
+        {
+            player.Breath = Math.Min(player.MaxBreath, player.Breath + 0.2f);
         }
     }
 
@@ -329,6 +392,38 @@ public class GameServer
         return true;
     }
 
+    private void ValidatePlayerPosition(PlayerEnt player, float dt)
+    {
+        var maxSpeed = player.IsFlying
+            ? _physicsEngine.FlySpeed
+            : player.IsSprinting
+                ? _physicsEngine.SprintSpeed
+                : _physicsEngine.WalkSpeed;
+
+        var maxDistance = maxSpeed * dt * 1.5f;
+        var distance = Vector3.Distance(player.Position, player.Velocity);
+
+        if (distance > maxDistance && distance > 0)
+        {
+            var direction = (player.Position - player.Velocity).Normalized;
+            var correctedPos = player.Velocity + direction * maxDistance;
+            player.Position = correctedPos;
+        }
+
+        var feetBlockY = (short)Math.Floor(player.Position.Y - _physicsEngine.PlayerHeight);
+        var groundBlock = DefaultWorld.GetBlock(
+            new Vector3s((short)player.Position.X, feetBlockY, (short)player.Position.Z));
+        player.IsOnGround = groundBlock.Type != BlockType.Air &&
+                            groundBlock.Type != BlockType.Water &&
+                            groundBlock.Type != BlockType.Lava &&
+                            groundBlock.Type != BlockType.Ladder;
+
+        var liquidCheckY = (short)Math.Floor(player.Position.Y - _physicsEngine.PlayerHeight * 0.5);
+        var liquidBlock = DefaultWorld.GetBlock(
+            new Vector3s((short)player.Position.X, liquidCheckY, (short)player.Position.Z));
+        player.IsInLiquid = liquidBlock.Type is BlockType.Water or BlockType.Lava;
+    }
+
     public bool GiveItem(string playerName, string itemId, int count)
     {
         var player = GetPlayer(playerName);
@@ -336,4 +431,240 @@ public class GameServer
         player.Inventory.AddItem(new ItemStack(itemId, count));
         return true;
     }
+
+    public ItemStack?[] GetOrCreateChestInventory(string posKey)
+    {
+        return _chestInventories.GetOrAdd(posKey, _ => new ItemStack?[27]);
+    }
+
+    public ItemStack?[]? GetChestInventory(string posKey)
+    {
+        return _chestInventories.TryGetValue(posKey, out var inv) ? inv : null;
+    }
+
+    public FurnaceOperation? GetFurnaceOperation(string posKey)
+    {
+        return _activeFurnaces.TryGetValue(posKey, out var op) ? op : null;
+    }
+
+    public bool MoveItemToChest(PlayerEnt player, string posKey, int slotIndex, int chestSlot)
+    {
+        var item = player.Inventory[slotIndex];
+        if (item == null) return false;
+
+        var chestInv = GetOrCreateChestInventory(posKey);
+        var targetSlot = chestSlot >= 0 ? chestSlot : -1;
+
+        if (targetSlot < 0)
+        {
+            for (int i = 0; i < 27; i++)
+            {
+                if (chestInv[i] == null)
+                {
+                    targetSlot = i;
+                    break;
+                }
+                if (chestInv[i]!.ItemId == item.ItemId && chestInv[i]!.Count + item.Count <= 64)
+                {
+                    targetSlot = i;
+                    break;
+                }
+            }
+        }
+
+        if (targetSlot < 0 || targetSlot >= 27) return false;
+
+        if (chestInv[targetSlot] != null && chestInv[targetSlot]!.ItemId == item.ItemId)
+        {
+            var combined = Math.Min(64, chestInv[targetSlot]!.Count + item.Count);
+            var leftover = chestInv[targetSlot]!.Count + item.Count - combined;
+            chestInv[targetSlot] = chestInv[targetSlot]! with { Count = combined };
+            if (leftover > 0)
+            {
+                player.Inventory[slotIndex] = item with { Count = leftover };
+            }
+            else
+            {
+                player.Inventory[slotIndex] = null;
+            }
+        }
+        else if (chestInv[targetSlot] == null)
+        {
+            chestInv[targetSlot] = item;
+            player.Inventory[slotIndex] = null;
+        }
+        else
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    public bool TakeItemFromChest(PlayerEnt player, string posKey, int chestSlot, int slotIndex)
+    {
+        if (!_chestInventories.TryGetValue(posKey, out var chestInv)) return false;
+        if (chestSlot < 0 || chestSlot >= 27) return false;
+
+        var item = chestInv[chestSlot];
+        if (item == null) return false;
+
+        var targetSlot = slotIndex >= 0 ? slotIndex : -1;
+
+        if (targetSlot < 0)
+        {
+            for (int i = 0; i < player.Inventory.Size; i++)
+            {
+                if (player.Inventory[i] == null)
+                {
+                    targetSlot = i;
+                    break;
+                }
+                if (player.Inventory[i]!.ItemId == item.ItemId && player.Inventory[i]!.Count + item.Count <= 64)
+                {
+                    targetSlot = i;
+                    break;
+                }
+            }
+        }
+
+        if (targetSlot < 0) return false;
+
+        if (player.Inventory[targetSlot] != null && player.Inventory[targetSlot]!.ItemId == item.ItemId)
+        {
+            var combined = Math.Min(64, player.Inventory[targetSlot]!.Count + item.Count);
+            var leftover = player.Inventory[targetSlot]!.Count + item.Count - combined;
+            player.Inventory[targetSlot] = player.Inventory[targetSlot]! with { Count = combined };
+            if (leftover > 0)
+            {
+                chestInv[chestSlot] = item with { Count = leftover };
+            }
+            else
+            {
+                chestInv[chestSlot] = null;
+            }
+        }
+        else if (player.Inventory[targetSlot] == null)
+        {
+            player.Inventory[targetSlot] = item;
+            chestInv[chestSlot] = null;
+        }
+        else
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    public bool StartSmelting(PlayerEnt player, string posKey, string inputItemId, string resultItemId)
+    {
+        if (_activeFurnaces.ContainsKey(posKey)) return false;
+
+        var recipe = _smeltingSystem.GetRecipe(inputItemId);
+        if (recipe == null) return false;
+
+        var availableItems = player.Inventory.GetAll()
+            .Where(i => i != null)
+            .Select(i => (i!.ItemId, i.Count))
+            .ToList();
+
+        var hasInput = availableItems
+            .Where(i => i.ItemId.Equals(inputItemId, StringComparison.OrdinalIgnoreCase))
+            .Sum(i => i.Count) >= 1;
+
+        var hasFuel = availableItems
+            .Where(i => i.ItemId is "coal" or "charcoal")
+            .Sum(i => i.Count) >= 1;
+
+        if (!hasInput || !hasFuel) return false;
+
+        bool removedInput = false;
+        bool removedFuel = false;
+
+        for (int i = 0; i < player.Inventory.Size && !removedInput; i++)
+        {
+            if (player.Inventory[i] != null &&
+                player.Inventory[i]!.ItemId.Equals(inputItemId, StringComparison.OrdinalIgnoreCase))
+            {
+                var removed = player.Inventory.RemoveItem(i, 1);
+                removedInput = removed != null;
+            }
+        }
+
+        for (int i = 0; i < player.Inventory.Size && !removedFuel; i++)
+        {
+            if (player.Inventory[i] != null &&
+                (player.Inventory[i]!.ItemId == "coal" || player.Inventory[i]!.ItemId == "charcoal"))
+            {
+                var removed = player.Inventory.RemoveItem(i, 1);
+                removedFuel = removed != null;
+            }
+        }
+
+        if (!removedInput || !removedFuel) return false;
+
+        var operation = new FurnaceOperation(
+            inputItemId,
+            resultItemId,
+            recipe.CookTime,
+            0f,
+            player.ConnectionId);
+
+        _activeFurnaces[posKey] = operation;
+        return true;
+    }
+
+    public void UpdateFurnaces(float dt)
+    {
+        if (_hubContext == null) return;
+
+        var completed = new List<string>();
+
+        foreach (var kvp in _activeFurnaces)
+        {
+            var posKey = kvp.Key;
+            var op = kvp.Value;
+            var updated = op with { Progress = op.Progress + dt / op.CookTime };
+
+            if (updated.Progress >= 1.0f)
+            {
+                completed.Add(posKey);
+                var player = GetPlayerByConnection(op.ConnectionId);
+                if (player != null)
+                {
+                    player.Inventory.AddItem(new ItemStack(updated.ResultItemId, 1));
+                    _ = _hubContext.Clients.Client(op.ConnectionId)
+                        .OnInventoryUpdate(player.Inventory.GetAll()
+                            .Select(i => i == null ? null : (object)new { itemId = i.ItemId, count = i.Count, metadata = i.Metadata })
+                            .ToArray()!);
+                }
+                _ = _hubContext.Clients.Client(op.ConnectionId)
+                    .OnFurnaceUpdate(string.Empty, string.Empty, updated.ResultItemId, 1.0f);
+            }
+            else
+            {
+                _activeFurnaces[posKey] = updated;
+                if (_tickCount % 10 == 0)
+                {
+                    _ = _hubContext.Clients.Client(op.ConnectionId)
+                        .OnFurnaceUpdate(updated.InputItemId, "coal", string.Empty, updated.Progress);
+                }
+            }
+        }
+
+        foreach (var key in completed)
+        {
+            _activeFurnaces.TryRemove(key, out _);
+        }
+    }
+
+    public static string PositionKey(int x, int y, int z) => $"{x},{y},{z}";
 }
+
+public record FurnaceOperation(
+    string InputItemId,
+    string ResultItemId,
+    float CookTime,
+    float Progress,
+    string ConnectionId);

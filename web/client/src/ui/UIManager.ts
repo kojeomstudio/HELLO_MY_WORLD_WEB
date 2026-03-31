@@ -9,6 +9,10 @@ export class UIManager {
     private deathScreen: HTMLElement | null = null;
     private craftingUI: HTMLElement | null = null;
     private breathBar: HTMLElement | null = null;
+    private furnaceUI: HTMLElement | null = null;
+    private chestUI: HTMLElement | null = null;
+    private chestPosition: { x: number; y: number; z: number } | null = null;
+    private furnacePosition: { x: number; y: number; z: number } | null = null;
 
     constructor() {
         this.chatMessages = document.getElementById('chat-messages')!;
@@ -29,6 +33,27 @@ export class UIManager {
                 this._connection.invoke('PlaceBlock', x, y, z, blockType);
             }
         }) as EventListener);
+
+        document.addEventListener('interactBlock', ((e: CustomEvent) => {
+            if (!this._connection) return;
+            const { x, y, z, blockName } = e.detail;
+            if (blockName === 'chest') {
+                this.showChestUI(x, y, z);
+                this._connection.invoke('GetChestInventory', x, y, z);
+            } else if (blockName === 'furnace') {
+                this.showFurnaceUI(x, y, z);
+                this._connection.invoke('GetSmeltingRecipes');
+            } else if (blockName === 'crafting_table') {
+                this.showCraftingUI();
+                this._connection.invoke('GetCraftingRecipes');
+            }
+        }) as EventListener);
+
+        document.addEventListener('openCrafting', () => {
+            if (!this._connection) return;
+            this.showCraftingUI();
+            this._connection.invoke('GetCraftingRecipes');
+        });
     }
 
     private setupHotbar(): void {
@@ -164,10 +189,13 @@ export class UIManager {
 
     showCraftingUI(): void {
         this.hideCraftingUI();
+        this.hideFurnaceUI();
+        this.hideChestUI();
+        document.exitPointerLock();
 
         this.craftingUI = document.createElement('div');
         this.craftingUI.id = 'crafting-ui';
-        this.craftingUI.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(60,40,20,0.95);color:white;padding:20px;border-radius:8px;z-index:500;min-width:300px;';
+        this.craftingUI.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(60,40,20,0.95);color:white;padding:20px;border-radius:8px;z-index:500;width:420px;max-height:80vh;display:flex;flex-direction:column;';
 
         const header = document.createElement('div');
         header.style.cssText = 'font-size:20px;font-weight:bold;margin-bottom:12px;text-align:center;';
@@ -176,24 +204,418 @@ export class UIManager {
         const closeBtn = document.createElement('button');
         closeBtn.style.cssText = 'position:absolute;top:8px;right:12px;cursor:pointer;background:none;border:none;color:white;font-size:20px;';
         closeBtn.textContent = 'X';
-        closeBtn.addEventListener('click', () => this.hideCraftingUI());
+        closeBtn.addEventListener('click', () => {
+            this.hideCraftingUI();
+        });
 
         const body = document.createElement('div');
         body.id = 'crafting-body';
-        body.style.cssText = 'font-size:14px;';
-        body.textContent = 'Crafting recipes loaded from server.';
+        body.style.cssText = 'font-size:13px;overflow-y:auto;flex:1;';
+        body.textContent = 'Loading recipes...';
+
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:499;';
+        overlay.addEventListener('click', () => {
+            this.hideCraftingUI();
+        });
 
         this.craftingUI.appendChild(closeBtn);
         this.craftingUI.appendChild(header);
         this.craftingUI.appendChild(body);
+        document.body.appendChild(overlay);
         document.body.appendChild(this.craftingUI);
     }
 
     hideCraftingUI(): void {
         if (this.craftingUI && this.craftingUI.parentNode) {
+            const overlay = this.craftingUI.previousElementSibling as HTMLElement | null;
+            if (overlay && overlay.style?.zIndex === '499') {
+                overlay.parentNode?.removeChild(overlay);
+            }
             this.craftingUI.parentNode.removeChild(this.craftingUI);
             this.craftingUI = null;
         }
+    }
+
+    populateCraftingRecipes(recipes: any[]): void {
+        if (!this.craftingUI) return;
+        const body = document.getElementById('crafting-body');
+        if (!body) return;
+
+        body.innerHTML = '';
+        if (recipes.length === 0) {
+            body.textContent = 'No crafting recipes available.';
+            return;
+        }
+
+        for (let i = 0; i < recipes.length; i++) {
+            const recipe = recipes[i];
+            const row = document.createElement('div');
+            row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:6px 8px;margin:3px 0;background:rgba(0,0,0,0.3);border-radius:4px;cursor:pointer;';
+            row.addEventListener('mouseenter', () => {
+                row.style.background = 'rgba(100,80,40,0.6)';
+            });
+            row.addEventListener('mouseleave', () => {
+                row.style.background = 'rgba(0,0,0,0.3)';
+            });
+
+            const info = document.createElement('div');
+            info.style.cssText = 'flex:1;';
+
+            const resultLine = document.createElement('div');
+            resultLine.style.cssText = 'font-weight:bold;color:#ffdd44;';
+            const count = recipe.resultCount > 1 ? ` x${recipe.resultCount}` : '';
+            resultLine.textContent = `${this.formatItemName(recipe.result)}${count}`;
+
+            const ingLine = document.createElement('div');
+            ingLine.style.cssText = 'font-size:11px;color:#aaa;margin-top:2px;';
+            const ings = (recipe.ingredients as [string, number][]).map(
+                ([id, cnt]) => `${cnt}x ${this.formatItemName(id)}`
+            ).join(', ');
+            ingLine.textContent = ings;
+
+            info.appendChild(resultLine);
+            info.appendChild(ingLine);
+
+            const craftBtn = document.createElement('button');
+            craftBtn.style.cssText = 'padding:4px 12px;cursor:pointer;background:#556b2f;color:white;border:1px solid #6b8e23;border-radius:3px;font-size:12px;';
+            craftBtn.textContent = 'Craft';
+            const recipeIndex = i;
+            craftBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._connection?.invoke('CraftRecipe', recipeIndex);
+            });
+
+            row.appendChild(info);
+            row.appendChild(craftBtn);
+            body.appendChild(row);
+        }
+    }
+
+    showFurnaceUI(x: number, y: number, z: number): void {
+        this.hideCraftingUI();
+        this.hideFurnaceUI();
+        this.hideChestUI();
+        document.exitPointerLock();
+
+        this.furnacePosition = { x, y, z };
+
+        this.furnaceUI = document.createElement('div');
+        this.furnaceUI.id = 'furnace-ui';
+        this.furnaceUI.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(50,50,50,0.95);color:white;padding:20px;border-radius:8px;z-index:500;width:400px;max-height:80vh;display:flex;flex-direction:column;';
+
+        const header = document.createElement('div');
+        header.style.cssText = 'font-size:20px;font-weight:bold;margin-bottom:12px;text-align:center;';
+        header.textContent = 'Furnace';
+
+        const closeBtn = document.createElement('button');
+        closeBtn.style.cssText = 'position:absolute;top:8px;right:12px;cursor:pointer;background:none;border:none;color:white;font-size:20px;';
+        closeBtn.textContent = 'X';
+        closeBtn.addEventListener('click', () => {
+            this.hideFurnaceUI();
+        });
+
+        const slotsArea = document.createElement('div');
+        slotsArea.style.cssText = 'display:flex;gap:16px;justify-content:center;margin-bottom:12px;align-items:center;';
+
+        const inputSlot = document.createElement('div');
+        inputSlot.id = 'furnace-input-slot';
+        inputSlot.style.cssText = 'width:50px;height:50px;background:rgba(0,0,0,0.4);border:2px solid #555;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#aaa;text-align:center;';
+        inputSlot.textContent = 'Input';
+
+        const arrow = document.createElement('div');
+        arrow.style.cssText = 'font-size:20px;color:#ff8800;';
+        arrow.textContent = '\u2192';
+
+        const fuelSlot = document.createElement('div');
+        fuelSlot.id = 'furnace-fuel-slot';
+        fuelSlot.style.cssText = 'width:50px;height:50px;background:rgba(0,0,0,0.4);border:2px solid #555;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#aaa;text-align:center;';
+        fuelSlot.textContent = 'Fuel';
+
+        const arrow2 = document.createElement('div');
+        arrow2.style.cssText = 'font-size:20px;color:#ff8800;';
+        arrow2.textContent = '\u2192';
+
+        const outputSlot = document.createElement('div');
+        outputSlot.id = 'furnace-output-slot';
+        outputSlot.style.cssText = 'width:50px;height:50px;background:rgba(0,0,0,0.4);border:2px solid #555;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#aaa;text-align:center;';
+        outputSlot.textContent = 'Output';
+
+        slotsArea.appendChild(inputSlot);
+        slotsArea.appendChild(arrow);
+        slotsArea.appendChild(fuelSlot);
+        slotsArea.appendChild(arrow2);
+        slotsArea.appendChild(outputSlot);
+
+        const progressBar = document.createElement('div');
+        progressBar.style.cssText = 'width:100%;height:16px;background:rgba(0,0,0,0.4);border-radius:8px;margin-bottom:12px;overflow:hidden;';
+        const progressFill = document.createElement('div');
+        progressFill.id = 'furnace-progress-fill';
+        progressFill.style.cssText = 'width:0%;height:100%;background:linear-gradient(90deg,#ff4400,#ff8800);border-radius:8px;transition:width 0.5s;';
+        progressBar.appendChild(progressFill);
+
+        const recipesHeader = document.createElement('div');
+        recipesHeader.style.cssText = 'font-size:14px;font-weight:bold;margin-bottom:6px;color:#ccc;';
+        recipesHeader.textContent = 'Smelting Recipes';
+
+        const recipesList = document.createElement('div');
+        recipesList.id = 'smelting-recipes-list';
+        recipesList.style.cssText = 'font-size:12px;overflow-y:auto;flex:1;';
+        recipesList.textContent = 'Loading recipes...';
+
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:499;';
+        overlay.addEventListener('click', () => {
+            this.hideFurnaceUI();
+        });
+
+        this.furnaceUI.appendChild(closeBtn);
+        this.furnaceUI.appendChild(header);
+        this.furnaceUI.appendChild(slotsArea);
+        this.furnaceUI.appendChild(progressBar);
+        this.furnaceUI.appendChild(recipesHeader);
+        this.furnaceUI.appendChild(recipesList);
+        document.body.appendChild(overlay);
+        document.body.appendChild(this.furnaceUI);
+    }
+
+    hideFurnaceUI(): void {
+        if (this.furnaceUI && this.furnaceUI.parentNode) {
+            this.furnaceUI.parentNode.removeChild(this.furnaceUI);
+            this.furnaceUI = null;
+        }
+        this.furnacePosition = null;
+    }
+
+    populateSmeltingRecipes(recipes: any[]): void {
+        if (!this.furnaceUI) return;
+        const list = document.getElementById('smelting-recipes-list');
+        if (!list) return;
+
+        list.innerHTML = '';
+        if (recipes.length === 0) {
+            list.textContent = 'No smelting recipes available.';
+            return;
+        }
+
+        for (let i = 0; i < recipes.length; i++) {
+            const recipe = recipes[i];
+            const row = document.createElement('div');
+            row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:5px 8px;margin:2px 0;background:rgba(0,0,0,0.3);border-radius:4px;';
+
+            const info = document.createElement('div');
+            info.style.cssText = 'flex:1;font-size:12px;';
+            info.textContent = `${this.formatItemName(recipe.input)} \u2192 ${this.formatItemName(recipe.result)} (${recipe.cookTime}s)`;
+
+            const smeltBtn = document.createElement('button');
+            smeltBtn.style.cssText = 'padding:3px 10px;cursor:pointer;background:#8b4513;color:white;border:1px solid #a0522d;border-radius:3px;font-size:11px;';
+            smeltBtn.textContent = 'Smelt';
+            smeltBtn.addEventListener('click', () => {
+                if (!this.furnacePosition) return;
+                this._connection?.invoke(
+                    'StartSmelting',
+                    recipe.input,
+                    recipe.result,
+                    this.furnacePosition.x,
+                    this.furnacePosition.y,
+                    this.furnacePosition.z
+                );
+                smeltBtn.textContent = '...';
+                smeltBtn.disabled = true;
+            });
+
+            row.appendChild(info);
+            row.appendChild(smeltBtn);
+            list.appendChild(row);
+        }
+    }
+
+    updateFurnaceState(input: string, fuel: string, output: string, progress: number): void {
+        if (!this.furnaceUI) return;
+
+        const inputSlot = document.getElementById('furnace-input-slot');
+        const fuelSlot = document.getElementById('furnace-fuel-slot');
+        const outputSlot = document.getElementById('furnace-output-slot');
+        const progressFill = document.getElementById('furnace-progress-fill');
+
+        if (inputSlot) {
+            inputSlot.textContent = input ? this.formatItemName(input) : 'Input';
+            inputSlot.style.color = input ? '#ffdd44' : '#aaa';
+        }
+        if (fuelSlot) {
+            fuelSlot.textContent = fuel ? this.formatItemName(fuel) : 'Fuel';
+            fuelSlot.style.color = fuel ? '#44dd44' : '#aaa';
+        }
+        if (outputSlot) {
+            outputSlot.textContent = output ? this.formatItemName(output) : 'Output';
+            outputSlot.style.color = output ? '#44aaff' : '#aaa';
+        }
+        if (progressFill) {
+            progressFill.style.width = `${Math.round(progress * 100)}%`;
+        }
+    }
+
+    showChestUI(x: number, y: number, z: number): void {
+        this.hideCraftingUI();
+        this.hideFurnaceUI();
+        this.hideChestUI();
+        document.exitPointerLock();
+
+        this.chestPosition = { x, y, z };
+
+        this.chestUI = document.createElement('div');
+        this.chestUI.id = 'chest-ui';
+        this.chestUI.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(101,67,33,0.95);color:white;padding:20px;border-radius:8px;z-index:500;width:380px;max-height:80vh;display:flex;flex-direction:column;';
+
+        const header = document.createElement('div');
+        header.style.cssText = 'font-size:20px;font-weight:bold;margin-bottom:12px;text-align:center;';
+        header.textContent = 'Chest';
+
+        const closeBtn = document.createElement('button');
+        closeBtn.style.cssText = 'position:absolute;top:8px;right:12px;cursor:pointer;background:none;border:none;color:white;font-size:20px;';
+        closeBtn.textContent = 'X';
+        closeBtn.addEventListener('click', () => {
+            this.hideChestUI();
+        });
+
+        const chestLabel = document.createElement('div');
+        chestLabel.style.cssText = 'font-size:12px;color:#ccc;margin-bottom:6px;';
+        chestLabel.textContent = 'Chest Inventory';
+
+        const chestGrid = document.createElement('div');
+        chestGrid.id = 'chest-grid';
+        chestGrid.style.cssText = 'display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:16px;';
+        for (let i = 0; i < 27; i++) {
+            const slot = document.createElement('div');
+            slot.className = 'chest-slot';
+            slot.dataset.slot = String(i);
+            slot.style.cssText = 'width:36px;height:36px;background:rgba(0,0,0,0.4);border:1px solid #555;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#aaa;text-align:center;cursor:pointer;position:relative;';
+            slot.textContent = '';
+            const slotIndex = i;
+            slot.addEventListener('click', () => {
+                if (!this.chestPosition) return;
+                this._connection?.invoke(
+                    'TakeItemFromChest',
+                    slotIndex,
+                    0,
+                    this.chestPosition.x,
+                    this.chestPosition.y,
+                    this.chestPosition.z
+                );
+            });
+            chestGrid.appendChild(slot);
+        }
+
+        const invLabel = document.createElement('div');
+        invLabel.style.cssText = 'font-size:12px;color:#ccc;margin-bottom:6px;';
+        invLabel.textContent = 'Your Inventory (click to store)';
+
+        const invGrid = document.createElement('div');
+        invGrid.id = 'chest-inv-grid';
+        invGrid.style.cssText = 'display:grid;grid-template-columns:repeat(8,1fr);gap:3px;';
+        for (let i = 0; i < 8; i++) {
+            const slot = document.createElement('div');
+            slot.className = 'chest-inv-slot';
+            slot.dataset.slot = String(i);
+            slot.style.cssText = 'width:36px;height:36px;background:rgba(0,0,0,0.4);border:1px solid #555;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#aaa;text-align:center;cursor:pointer;position:relative;';
+            slot.textContent = '';
+            const slotIndex = i;
+            slot.addEventListener('click', () => {
+                if (!this.chestPosition) return;
+                this._connection?.invoke(
+                    'MoveItemToChest',
+                    slotIndex,
+                    -1,
+                    this.chestPosition.x,
+                    this.chestPosition.y,
+                    this.chestPosition.z
+                );
+            });
+            invGrid.appendChild(slot);
+        }
+
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:499;';
+        overlay.addEventListener('click', () => {
+            this.hideChestUI();
+        });
+
+        this.chestUI.appendChild(closeBtn);
+        this.chestUI.appendChild(header);
+        this.chestUI.appendChild(chestLabel);
+        this.chestUI.appendChild(chestGrid);
+        this.chestUI.appendChild(invLabel);
+        this.chestUI.appendChild(invGrid);
+        document.body.appendChild(overlay);
+        document.body.appendChild(this.chestUI);
+    }
+
+    hideChestUI(): void {
+        if (this.chestUI && this.chestUI.parentNode) {
+            this.chestUI.parentNode.removeChild(this.chestUI);
+            this.chestUI = null;
+        }
+        this.chestPosition = null;
+    }
+
+    updateChestInventory(items: any[]): void {
+        if (!this.chestUI) return;
+        const grid = document.getElementById('chest-grid');
+        if (!grid) return;
+
+        const slots = grid.children;
+        for (let i = 0; i < 27; i++) {
+            const slot = slots[i] as HTMLElement;
+            if (items[i] && items[i].itemId) {
+                const item = items[i];
+                slot.textContent = this.formatItemName(item.itemId);
+                slot.style.color = '#ffdd44';
+                slot.style.fontSize = '8px';
+                if (item.count > 1) {
+                    const countBadge = document.createElement('span');
+                    countBadge.style.cssText = 'position:absolute;bottom:1px;right:2px;font-size:9px;color:white;text-shadow:1px 1px 1px black;';
+                    countBadge.textContent = String(item.count);
+                    slot.appendChild(countBadge);
+                }
+            } else {
+                slot.textContent = '';
+                slot.style.color = '#aaa';
+                slot.style.fontSize = '9px';
+            }
+        }
+    }
+
+    updateChestPlayerInventory(items: any[]): void {
+        if (!this.chestUI) return;
+        const grid = document.getElementById('chest-inv-grid');
+        if (!grid) return;
+
+        const slots = grid.children;
+        for (let i = 0; i < 8; i++) {
+            const slot = slots[i] as HTMLElement;
+            if (items[i] && items[i].itemId) {
+                const item = items[i];
+                slot.textContent = this.formatItemName(item.itemId);
+                slot.style.color = '#44ddff';
+                slot.style.fontSize = '8px';
+                if (item.count > 1) {
+                    const countBadge = document.createElement('span');
+                    countBadge.style.cssText = 'position:absolute;bottom:1px;right:2px;font-size:9px;color:white;text-shadow:1px 1px 1px black;';
+                    countBadge.textContent = String(item.count);
+                    slot.appendChild(countBadge);
+                }
+            } else {
+                slot.textContent = '';
+                slot.style.color = '#aaa';
+                slot.style.fontSize = '9px';
+            }
+        }
+    }
+
+    hideAllUIs(): void {
+        this.hideCraftingUI();
+        this.hideFurnaceUI();
+        this.hideChestUI();
     }
 
     updateBreath(breath: number, maxBreath: number): void {
@@ -232,5 +654,9 @@ export class UIManager {
             <div>Chunks: ${chunkCount}</div>
             <div>Memory: N/A</div>
         `;
+    }
+
+    private formatItemName(itemId: string): string {
+        return itemId.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
     }
 }

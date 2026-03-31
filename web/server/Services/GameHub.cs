@@ -38,10 +38,16 @@ public interface IGameClient
     Task OnGameModeChanged(string mode);
     Task OnTeleported(float x, float y, float z);
     Task OnBreathUpdate(float breath, float maxBreath);
+    Task OnCraftingRecipes(object[] recipes);
+    Task OnSmeltingRecipes(object[] recipes);
+    Task OnChestInventory(object[] items);
+    Task OnFurnaceUpdate(string input, string fuel, string output, float progress);
 }
 
 public class GameHub : Hub<IGameClient>
 {
+    private static readonly Dictionary<string, DateTime> _lastActionTimes = new();
+
     private readonly GameServer _gameServer;
     private readonly ILogger<GameHub> _logger;
     private readonly ChatCommandManager _chatCommands;
@@ -160,6 +166,8 @@ public class GameHub : Hub<IGameClient>
 
     public async Task SendChat(string message)
     {
+        if (!CheckRateLimit(Context.ConnectionId, "chat", 500)) return;
+
         var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
         if (player == null) return;
 
@@ -178,6 +186,8 @@ public class GameHub : Hub<IGameClient>
 
     public async Task PlaceBlock(int x, int y, int z, ushort blockType)
     {
+        if (!CheckRateLimit(Context.ConnectionId, "place", 250)) return;
+
         var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
         if (player == null) return;
 
@@ -194,6 +204,8 @@ public class GameHub : Hub<IGameClient>
 
     public async Task DigBlock(int x, int y, int z)
     {
+        if (!CheckRateLimit(Context.ConnectionId, "dig", 250)) return;
+
         var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
         if (player == null) return;
 
@@ -345,30 +357,52 @@ public class GameHub : Hub<IGameClient>
         if (blockDef == null) return;
         if (blockDef.Climbable)
         {
-            // Ladder interaction - handled client-side via physics
         }
         if (blockDef.Interactive)
         {
             var blockName = blockDef.Name;
             if (blockName == "chest")
             {
-                await Clients.Caller.OnChatMessage("Server", "Chest opened (inventory system placeholder)");
+                var posKey = GameServer.PositionKey(x, y, z);
+                var chestInv = _gameServer.GetOrCreateChestInventory(posKey);
+                var items = chestInv
+                    .Select(i => i == null ? null : (object)new { itemId = i.ItemId, count = i.Count, metadata = i.Metadata })
+                    .ToArray();
+                await Clients.Caller.OnChestInventory(items!);
             }
             else if (blockName == "furnace")
             {
-                var recipe = _smeltingSystem.GetAllRecipes().FirstOrDefault();
-                if (recipe != null)
+                var recipes = _smeltingSystem.GetAllRecipes();
+                var recipeDtos = recipes.Select(r => new
                 {
-                    await Clients.Caller.OnChatMessage("Server", $"Furnace opened. Available recipe: {recipe.InputItemId} -> {recipe.ResultItemId}");
-                }
-                else
+                    input = r.InputItemId,
+                    result = r.ResultItemId,
+                    cookTime = r.CookTime,
+                    experience = r.Experience
+                }).ToArray();
+                await Clients.Caller.OnSmeltingRecipes(recipeDtos!);
+
+                var posKey = GameServer.PositionKey(x, y, z);
+                var existingOp = _gameServer.GetFurnaceOperation(posKey);
+                if (existingOp != null)
                 {
-                    await Clients.Caller.OnChatMessage("Server", "Furnace opened. No smelting recipes available.");
+                    await Clients.Caller.OnFurnaceUpdate(
+                        existingOp.InputItemId,
+                        "coal",
+                        string.Empty,
+                        existingOp.Progress);
                 }
             }
             else if (blockName == "crafting_table")
             {
-                await Clients.Caller.OnChatMessage("Server", "Crafting table opened. Press E to craft.");
+                var recipes = _craftingSystem.GetAllRecipes();
+                var recipeDtos = recipes.Select((r, idx) => new
+                {
+                    result = r.ResultItemId,
+                    resultCount = r.ResultCount,
+                    ingredients = r.Ingredients.Select(ing => new object[] { ing.ItemId, ing.Count }).ToArray()
+                }).ToArray();
+                await Clients.Caller.OnCraftingRecipes(recipeDtos!);
             }
         }
     }
@@ -381,7 +415,6 @@ public class GameHub : Hub<IGameClient>
         if (target == null || target.IsDead) return;
         var toolItem = attacker.GetSelectedHotbarItem();
         var damage = 1.0f;
-        // Check if tool is a weapon - simple name matching
         if (toolItem != null)
         {
             var toolName = toolItem.ItemId.ToLowerInvariant();
@@ -432,6 +465,141 @@ public class GameHub : Hub<IGameClient>
 
         await SendInventoryUpdate(player);
         await Clients.Caller.OnCraftResult(recipe.ResultItemId, recipe.ResultCount);
+    }
+
+    public async Task GetCraftingRecipes()
+    {
+        var recipes = _craftingSystem.GetAllRecipes();
+        var recipeDtos = recipes.Select(r => new
+        {
+            result = r.ResultItemId,
+            resultCount = r.ResultCount,
+            ingredients = r.Ingredients.Select(ing => new object[] { ing.ItemId, ing.Count }).ToArray()
+        }).ToArray();
+        await Clients.Caller.OnCraftingRecipes(recipeDtos!);
+    }
+
+    public async Task CraftRecipe(int recipeIndex)
+    {
+        var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        if (player == null) return;
+
+        var recipes = _craftingSystem.GetAllRecipes();
+        if (recipeIndex < 0 || recipeIndex >= recipes.Count)
+        {
+            await Clients.Caller.OnChatMessage("Server", "Invalid recipe index.");
+            return;
+        }
+
+        var recipe = recipes[recipeIndex];
+        var availableItems = player.Inventory.GetAll()
+            .Where(i => i != null)
+            .Select(i => (i!.ItemId, i.Count))
+            .ToList();
+
+        if (!_craftingSystem.CanCraft(recipe, availableItems))
+        {
+            await Clients.Caller.OnChatMessage("Server", $"Missing ingredients for {recipe.ResultItemId}.");
+            return;
+        }
+
+        var result = _craftingSystem.Craft(recipe, availableItems);
+        player.Inventory.Clear();
+        foreach (var (itemId, count) in result)
+        {
+            player.Inventory.AddItem(new ItemStack(itemId, count));
+        }
+        player.Inventory.AddItem(new ItemStack(recipe.ResultItemId, recipe.ResultCount));
+
+        await SendInventoryUpdate(player);
+        await Clients.Caller.OnCraftResult(recipe.ResultItemId, recipe.ResultCount);
+    }
+
+    public async Task GetSmeltingRecipes()
+    {
+        var recipes = _smeltingSystem.GetAllRecipes();
+        var recipeDtos = recipes.Select(r => new
+        {
+            input = r.InputItemId,
+            result = r.ResultItemId,
+            cookTime = r.CookTime,
+            experience = r.Experience
+        }).ToArray();
+        await Clients.Caller.OnSmeltingRecipes(recipeDtos!);
+    }
+
+    public async Task StartSmelting(string inputItemId, string resultItemId, int x, int y, int z)
+    {
+        var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        if (player == null) return;
+
+        var posKey = GameServer.PositionKey(x, y, z);
+        var started = _gameServer.StartSmelting(player, posKey, inputItemId, resultItemId);
+
+        if (started)
+        {
+            await SendInventoryUpdate(player);
+            await Clients.Caller.OnFurnaceUpdate(inputItemId, "coal", string.Empty, 0f);
+            await Clients.Caller.OnChatMessage("Server", $"Smelting {inputItemId}...");
+        }
+        else
+        {
+            await Clients.Caller.OnChatMessage("Server", "Cannot start smelting. Check you have the input item and fuel (coal/charcoal).");
+        }
+    }
+
+    public async Task GetChestInventory(int x, int y, int z)
+    {
+        var posKey = GameServer.PositionKey(x, y, z);
+        var chestInv = _gameServer.GetOrCreateChestInventory(posKey);
+        var items = chestInv
+            .Select(i => i == null ? null : (object)new { itemId = i.ItemId, count = i.Count, metadata = i.Metadata })
+            .ToArray();
+        await Clients.Caller.OnChestInventory(items!);
+    }
+
+    public async Task MoveItemToChest(int slotIndex, int chestSlot, int x, int y, int z)
+    {
+        var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        if (player == null) return;
+
+        var posKey = GameServer.PositionKey(x, y, z);
+        var moved = _gameServer.MoveItemToChest(player, posKey, slotIndex, chestSlot);
+
+        if (moved)
+        {
+            await SendInventoryUpdate(player);
+            var chestInv = _gameServer.GetChestInventory(posKey);
+            if (chestInv != null)
+            {
+                var items = chestInv
+                    .Select(i => i == null ? null : (object)new { itemId = i.ItemId, count = i.Count, metadata = i.Metadata })
+                    .ToArray();
+                await Clients.Caller.OnChestInventory(items!);
+            }
+        }
+    }
+
+    public async Task TakeItemFromChest(int chestSlot, int slotIndex, int x, int y, int z)
+    {
+        var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        if (player == null) return;
+
+        var posKey = GameServer.PositionKey(x, y, z);
+        var taken = _gameServer.TakeItemFromChest(player, posKey, chestSlot, slotIndex);
+
+        if (taken)
+        {
+            await SendInventoryUpdate(player);
+            var chestInv = _gameServer.GetChestInventory(posKey);
+            if (chestInv != null)
+            {
+                var items = chestInv
+                    .Select(i => i == null ? null : (object)new { itemId = i.ItemId, count = i.Count, metadata = i.Metadata })
+                    .ToArray();
+                await Clients.Caller.OnChestInventory(items!);
+            }
+        }
     }
 
     public async Task RequestInventory()
@@ -514,9 +682,25 @@ public class GameHub : Hub<IGameClient>
             drawType = kvp.Value.DrawType,
             hardness = kvp.Value.Hardness,
             drops = kvp.Value.Drops,
-            climbable = kvp.Value.Climbable
+            climbable = kvp.Value.Climbable,
+            textureName = kvp.Value.TextureName
         });
         var json = JsonSerializer.Serialize(dto);
         await Clients.Caller.OnBlockDefinitions(json);
+    }
+
+    private static bool CheckRateLimit(string connectionId, string action, int cooldownMs)
+    {
+        var key = $"{connectionId}:{action}";
+        var now = DateTime.UtcNow;
+
+        if (_lastActionTimes.TryGetValue(key, out var lastTime))
+        {
+            if ((now - lastTime).TotalMilliseconds < cooldownMs)
+                return false;
+        }
+
+        _lastActionTimes[key] = now;
+        return true;
     }
 }

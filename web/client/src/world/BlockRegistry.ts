@@ -4,6 +4,7 @@ export interface BlockDefinition {
     solid: boolean;
     transparent: boolean;
     color: string;
+    textureName?: string;
     liquid?: boolean;
     light?: number;
     hardness?: number;
@@ -33,21 +34,21 @@ export class BlockRegistry {
     private loadDefaults(): void {
         const defaultBlocks: BlockDefinition[] = [
             { id: 0, name: 'air', solid: false, transparent: true, color: '#000000' },
-            { id: 1, name: 'stone', solid: true, transparent: false, color: '#808080', hardness: 1.5, drops: 'cobblestone' },
-            { id: 2, name: 'dirt', solid: true, transparent: false, color: '#8B4513', hardness: 0.5 },
-            { id: 3, name: 'grass', solid: true, transparent: false, color: '#228B22', hardness: 0.6 },
-            { id: 4, name: 'water', solid: false, transparent: true, color: '#4169E1', liquid: true },
-            { id: 5, name: 'sand', solid: true, transparent: false, color: '#F4A460', hardness: 0.5 },
-            { id: 6, name: 'wood', solid: true, transparent: false, color: '#DEB887', hardness: 2.0 },
-            { id: 7, name: 'leaves', solid: true, transparent: true, color: '#32CD32', hardness: 0.2 },
+            { id: 1, name: 'stone', solid: true, transparent: false, color: '#808080', hardness: 1.5, drops: 'cobblestone', textureName: 'default_stone' },
+            { id: 2, name: 'dirt', solid: true, transparent: false, color: '#8B4513', hardness: 0.5, textureName: 'default_dirt' },
+            { id: 3, name: 'grass', solid: true, transparent: false, color: '#228B22', hardness: 0.6, textureName: 'default_grass' },
+            { id: 4, name: 'water', solid: false, transparent: true, color: '#4169E1', liquid: true, textureName: 'default_water' },
+            { id: 5, name: 'sand', solid: true, transparent: false, color: '#F4A460', hardness: 0.5, textureName: 'default_sand' },
+            { id: 6, name: 'wood', solid: true, transparent: false, color: '#DEB887', hardness: 2.0, textureName: 'default_tree' },
+            { id: 7, name: 'leaves', solid: true, transparent: true, color: '#32CD32', hardness: 0.2, textureName: 'default_leaves' },
             { id: 8, name: 'glass', solid: true, transparent: true, color: '#ADD8E6', hardness: 0.3 },
             { id: 9, name: 'brick', solid: true, transparent: false, color: '#B22222', hardness: 2.0 },
             { id: 10, name: 'ore_iron', solid: true, transparent: false, color: '#C4A882', hardness: 3.0, drops: 'iron_ingot' },
             { id: 11, name: 'coal', solid: true, transparent: false, color: '#2F4F4F', hardness: 3.0 },
             { id: 12, name: 'bedrock', solid: true, transparent: false, color: '#1C1C1C', breakable: false },
-            { id: 13, name: 'snow', solid: true, transparent: false, color: '#FFFAFA', hardness: 0.2 },
-            { id: 14, name: 'ice', solid: true, transparent: true, color: '#B0E0E6', hardness: 0.5 },
-            { id: 15, name: 'lava', solid: false, transparent: true, color: '#FF4500', liquid: true, damage: 4 },
+            { id: 13, name: 'snow', solid: true, transparent: false, color: '#FFFAFA', hardness: 0.2, textureName: 'default_snow' },
+            { id: 14, name: 'ice', solid: true, transparent: true, color: '#B0E0E6', hardness: 0.5, textureName: 'default_ice' },
+            { id: 15, name: 'lava', solid: false, transparent: true, color: '#FF4500', liquid: true, damage: 4, textureName: 'default_lava' },
             { id: 16, name: 'torch', solid: false, transparent: true, color: '#FFD700', light: 14 },
             { id: 17, name: 'ladder', solid: false, transparent: true, color: '#8B4513', climbable: true },
             { id: 18, name: 'fence', solid: true, transparent: true, color: '#8B4513', hardness: 2.0 },
@@ -58,14 +59,14 @@ export class BlockRegistry {
             { id: 23, name: 'ore_gold', solid: true, transparent: false, color: '#FFD700', hardness: 3.0, drops: 'gold_ingot' },
             { id: 24, name: 'ore_diamond', solid: true, transparent: false, color: '#00FFFF', hardness: 3.0, drops: 'diamond' },
             { id: 25, name: 'planks', solid: true, transparent: false, color: '#BC8F5A', hardness: 2.0 },
-            { id: 26, name: 'cobblestone', solid: true, transparent: false, color: '#6B6B6B', hardness: 2.0 },
+            { id: 26, name: 'cobblestone', solid: true, transparent: false, color: '#6B6B6B', hardness: 2.0, textureName: 'default_cobble' },
             { id: 27, name: 'stone_brick', solid: true, transparent: false, color: '#777777', hardness: 1.5 },
             { id: 28, name: 'wool_white', solid: true, transparent: false, color: '#EEEEEE', hardness: 0.8 },
             { id: 29, name: 'wool_red', solid: true, transparent: false, color: '#CC2222', hardness: 0.8 },
             { id: 30, name: 'wool_blue', solid: true, transparent: false, color: '#2222CC', hardness: 0.8 },
             { id: 31, name: 'wool_green', solid: true, transparent: false, color: '#22CC22', hardness: 0.8 },
             { id: 32, name: 'bookshelf', solid: true, transparent: false, color: '#C4A050', hardness: 1.5 },
-            { id: 33, name: 'gravel', solid: true, transparent: false, color: '#888078', hardness: 0.6, falling: true, groups: { crumbly: 3 }, soundGroup: 'gravel' },
+            { id: 33, name: 'gravel', solid: true, transparent: false, color: '#888078', hardness: 0.6, falling: true, groups: { crumbly: 3 }, soundGroup: 'gravel', textureName: 'default_gravel' },
             { id: 34, name: 'clay', solid: true, transparent: false, color: '#9BA5B0', hardness: 0.6, groups: { crumbly: 3 }, soundGroup: 'dirt' },
             { id: 35, name: 'sandstone', solid: true, transparent: false, color: '#E8D5A3', hardness: 0.8, groups: { cracky: 3 }, soundGroup: 'sand' },
             { id: 36, name: 'obsidian', solid: true, transparent: false, color: '#1A0A2E', hardness: 50.0, groups: { cracky: 5 }, soundGroup: 'stone' },
@@ -75,10 +76,10 @@ export class BlockRegistry {
             { id: 40, name: 'melon', solid: true, transparent: false, color: '#5C8A1E', hardness: 1.0, drops: 'melon_slice', groups: { choppy: 2 }, soundGroup: 'wood' },
             { id: 41, name: 'mycelium', solid: true, transparent: false, color: '#6B5A8A', hardness: 0.6, drops: 'dirt', groups: { crumbly: 3 }, soundGroup: 'dirt' },
             { id: 42, name: 'farmland', solid: true, transparent: false, color: '#6B4E2A', hardness: 0.6, groups: { crumbly: 3 }, soundGroup: 'dirt' },
-            { id: 43, name: 'water_flowing', solid: false, transparent: true, color: '#4169E1', liquid: true, drowning: true, soundGroup: 'water' },
-            { id: 44, name: 'lava_flowing', solid: false, transparent: true, color: '#FF4500', liquid: true, damage: 4, postEffectColor: '#FF4400', soundGroup: 'lava' },
+            { id: 43, name: 'water_flowing', solid: false, transparent: true, color: '#4169E1', liquid: true, drowning: true, soundGroup: 'water', textureName: 'default_water_flowing' },
+            { id: 44, name: 'lava_flowing', solid: false, transparent: true, color: '#FF4500', liquid: true, damage: 4, postEffectColor: '#FF4400', soundGroup: 'lava', textureName: 'default_lava_flowing' },
             { id: 45, name: 'coal_ore', solid: true, transparent: false, color: '#3A3A3A', hardness: 3.0, drops: 'coal', groups: { cracky: 3 }, soundGroup: 'stone' },
-            { id: 46, name: 'mossy_cobblestone', solid: true, transparent: false, color: '#5E6E5E', hardness: 2.0, groups: { cracky: 3 }, soundGroup: 'stone' },
+            { id: 46, name: 'mossy_cobblestone', solid: true, transparent: false, color: '#5E6E5E', hardness: 2.0, groups: { cracky: 3 }, soundGroup: 'stone', textureName: 'default_mossycobble' },
             { id: 47, name: 'iron_block', solid: true, transparent: false, color: '#D8D8D8', hardness: 5.0, groups: { cracky: 2 }, soundGroup: 'metal' },
             { id: 48, name: 'gold_block', solid: true, transparent: false, color: '#FFD700', hardness: 3.0, groups: { cracky: 2 }, soundGroup: 'metal' },
             { id: 49, name: 'diamond_block', solid: true, transparent: false, color: '#4AEDD9', hardness: 5.0, groups: { cracky: 2 }, soundGroup: 'metal' },
@@ -136,6 +137,7 @@ export class BlockRegistry {
             if (raw.postEffectColor !== undefined) block.postEffectColor = raw.postEffectColor;
             if (raw.groups !== undefined) block.groups = raw.groups;
             if (raw.soundGroup !== undefined) block.soundGroup = raw.soundGroup;
+            if (raw.textureName !== undefined) block.textureName = raw.textureName;
 
             this.blocks.set(id, block);
             this.byName.set(block.name, block);
@@ -150,6 +152,7 @@ export class BlockRegistry {
     isLiquid(id: number): boolean { return this.blocks.get(id)?.liquid ?? false; }
     isClimbable(id: number): boolean { return this.blocks.get(id)?.climbable ?? false; }
     isFalling(id: number): boolean { return this.blocks.get(id)?.falling ?? false; }
+    isInteractive(id: number): boolean { return this.blocks.get(id)?.interactive ?? false; }
     getGroups(id: number): Record<string, number> { return this.blocks.get(id)?.groups ?? {}; }
     getAll(): Map<number, BlockDefinition> { return this.blocks; }
 }

@@ -1,5 +1,6 @@
 using BlockType = WebGameServer.Core.World.BlockType;
 using WorldMap = WebGameServer.Core.World.World;
+using PlayerEnt = WebGameServer.Core.Player.Player;
 
 namespace WebGameServer.Core.Entities;
 
@@ -99,6 +100,9 @@ public class ItemEntity : Entity
 
 public class MobEntity : Entity
 {
+    public static Func<Vector3, float, PlayerEnt?>? FindNearestPlayer { get; set; }
+    public static Action<PlayerEnt, float>? DamagePlayer { get; set; }
+
     public string MobType { get; set; } = "";
     public float Speed { get; set; } = 2.0f;
     public float AttackDamage { get; set; } = 1.0f;
@@ -106,6 +110,8 @@ public class MobEntity : Entity
     public float DetectionRange { get; set; } = 16.0f;
     public Guid? TargetPlayerId { get; set; }
     private const float MobGravity = 20.0f;
+    private DateTime _lastAttackTime;
+    private const int AttackCooldownMs = 1000;
 
     public MobEntity(string mobType, Vector3 position)
         : base(EntityType.Mob)
@@ -119,16 +125,61 @@ public class MobEntity : Entity
         base.Update(dt);
         if (!IsAlive) return;
 
-        var moveDir = new Vector3(
-            (Random.Shared.NextSingle() - 0.5f) * Speed,
-            Velocity.Y,
-            (Random.Shared.NextSingle() - 0.5f) * Speed);
+        var target = FindNearestPlayer?.Invoke(Position, DetectionRange);
 
-        moveDir = new Vector3(moveDir.X, moveDir.Y - MobGravity * dt, moveDir.Z);
+        if (target != null)
+        {
+            var direction = target.Position - Position;
+            var distance = direction.Length;
+            direction = direction.Normalized;
 
-        Velocity = moveDir;
+            if (distance > AttackRange)
+            {
+                Velocity = new Vector3(
+                    direction.X * Speed,
+                    Velocity.Y,
+                    direction.Z * Speed);
+            }
+            else
+            {
+                Velocity = new Vector3(0, Velocity.Y, 0);
 
-        Position = Position + Velocity * dt;
+                if (DateTime.UtcNow - _lastAttackTime > TimeSpan.FromMilliseconds(AttackCooldownMs))
+                {
+                    DamagePlayer?.Invoke(target, AttackDamage);
+                    _lastAttackTime = DateTime.UtcNow;
+                }
+            }
+        }
+        else
+        {
+            var moveDir = new Vector3(
+                (Random.Shared.NextSingle() - 0.5f) * Speed,
+                Velocity.Y,
+                (Random.Shared.NextSingle() - 0.5f) * Speed);
+            Velocity = moveDir;
+        }
+
+        Velocity = new Vector3(Velocity.X, Velocity.Y - MobGravity * dt, Velocity.Z);
+
+        var newPos = Position + Velocity * dt;
+
+        var groundBlock = WorldReference?.GetBlock(new Vector3s(
+            (short)Math.Floor(newPos.X),
+            (short)Math.Floor(newPos.Y - 0.1),
+            (short)Math.Floor(newPos.Z)));
+
+        if (groundBlock != null
+            && groundBlock.Type != BlockType.Air
+            && groundBlock.Type != BlockType.Water
+            && groundBlock.Type != BlockType.Lava)
+        {
+            var groundY = (float)Math.Floor(newPos.Y - 0.1) + 1.0f;
+            newPos = new Vector3(newPos.X, groundY, newPos.Z);
+            Velocity = new Vector3(Velocity.X, 0, Velocity.Z);
+        }
+
+        Position = newPos;
 
         if (Position.Y < 1)
         {

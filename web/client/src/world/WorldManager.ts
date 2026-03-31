@@ -1,8 +1,24 @@
 import * as THREE from 'three';
 import * as HubConnection from '@microsoft/signalr';
 import { Renderer } from '../rendering/Renderer';
-import { ChunkMesh } from './ChunkMesh';
+import { ChunkMesh, TextureAtlas } from './ChunkMesh';
 import { BlockRegistry } from './BlockRegistry';
+
+const ATLAS_COLS = 8;
+const TILE_SIZE = 16;
+
+const TEXTURE_NAMES: string[] = [
+    'default_stone', 'default_dirt', 'default_grass', 'default_water',
+    'default_sand', 'default_tree', 'default_leaves', 'default_snow',
+    'default_snow_side', 'default_ice', 'default_lava', 'default_lava_flowing',
+    'default_water_flowing', 'default_cobble', 'default_gravel', 'default_mossycobble',
+    'default_desert_sand', 'default_desert_stone', 'default_tree_top',
+    'default_pine_tree', 'default_pine_tree_top', 'default_pine_needles',
+    'default_jungletree', 'default_jungletree_top', 'default_jungleleaves',
+    'default_junglegrass', 'default_river_water', 'default_river_water_flowing',
+    'default_apple', 'basenodes_snow_sheet', 'basenodes_dirt_with_snow',
+    'basenodes_dirt_with_snow_bottom', 'basenodes_dirt_with_grass_bottom'
+];
 
 export interface PlayerInfo {
     mesh: THREE.Mesh;
@@ -17,10 +33,12 @@ export class WorldManager {
     private entityMeshes: Map<string, THREE.Mesh> = new Map();
     private pendingChunks: Set<string> = new Set();
     private connection: HubConnection.HubConnection | null = null;
+    private textureAtlas: TextureAtlas | null = null;
 
     constructor(renderer: Renderer) {
         this.renderer = renderer;
         this.blockRegistry = new BlockRegistry();
+        this.loadTextureAtlas();
     }
 
     setConnection(connection: HubConnection.HubConnection): void {
@@ -28,6 +46,84 @@ export class WorldManager {
     }
 
     getBlockRegistry(): BlockRegistry { return this.blockRegistry; }
+
+    private loadTextureAtlas(): void {
+        const loadedImages: Map<string, HTMLImageElement> = new Map();
+        const loadPromises = TEXTURE_NAMES.map(name => {
+            return new Promise<void>((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    loadedImages.set(name, img);
+                    resolve();
+                };
+                img.onerror = () => resolve();
+                img.src = `/textures/blocks/${name}.png`;
+            });
+        });
+
+        Promise.all(loadPromises).then(() => {
+            if (loadedImages.size === 0) return;
+
+            const totalTiles = loadedImages.size + 1;
+            const atlasRows = Math.ceil(totalTiles / ATLAS_COLS);
+            const canvas = document.createElement('canvas');
+            canvas.width = ATLAS_COLS * TILE_SIZE;
+            canvas.height = atlasRows * TILE_SIZE;
+            const ctx = canvas.getContext('2d')!;
+
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
+
+            const tilePositions: Map<string, { col: number; row: number }> = new Map();
+            let index = 1;
+            for (const name of TEXTURE_NAMES) {
+                const img = loadedImages.get(name);
+                if (!img) continue;
+                const col = index % ATLAS_COLS;
+                const row = Math.floor(index / ATLAS_COLS);
+                ctx.drawImage(img, col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                tilePositions.set(name, { col, row });
+                index++;
+            }
+
+            const canvasTexture = new THREE.CanvasTexture(canvas);
+            canvasTexture.magFilter = THREE.NearestFilter;
+            canvasTexture.minFilter = THREE.NearestFilter;
+
+            const whiteTileUV: [number, number, number, number] = [
+                0, 1 - 1 / atlasRows, 1 / ATLAS_COLS, 1
+            ];
+
+            this.textureAtlas = {
+                texture: canvasTexture,
+                getUV: (blockId: number): [number, number, number, number] => {
+                    const blockDef = this.blockRegistry.get(blockId);
+                    const textureName = blockDef?.textureName;
+                    if (textureName) {
+                        const pos = tilePositions.get(textureName);
+                        if (pos) {
+                            return [
+                                pos.col / ATLAS_COLS,
+                                1 - (pos.row + 1) / atlasRows,
+                                (pos.col + 1) / ATLAS_COLS,
+                                1 - pos.row / atlasRows
+                            ];
+                        }
+                    }
+                    return whiteTileUV;
+                },
+                hasTexture: (blockId: number): boolean => {
+                    const blockDef = this.blockRegistry.get(blockId);
+                    const textureName = blockDef?.textureName;
+                    return textureName !== undefined && textureName !== null && tilePositions.has(textureName);
+                }
+            };
+
+            for (const [key] of this.chunks) {
+                this.rebuildChunkMesh(key);
+            }
+        });
+    }
 
     loadChunk(chunkX: number, chunkY: number, chunkZ: number, data: Uint8Array): void {
         const key = `${chunkX},${chunkY},${chunkZ}`;
@@ -41,7 +137,7 @@ export class WorldManager {
         }
 
         const chunk = ChunkMesh.fromServerData(chunkX, chunkY, chunkZ, data);
-        chunk.buildMesh(this.blockRegistry, (wx, wy, wz) => this.getBlock(wx, wy, wz));
+        chunk.buildMesh(this.blockRegistry, (wx, wy, wz) => this.getBlock(wx, wy, wz), this.textureAtlas);
 
         if (chunk.mesh) {
             this.renderer.addToScene(chunk.mesh);
@@ -85,7 +181,7 @@ export class WorldManager {
             this.renderer.removeFromScene(chunk.transparentMesh);
         }
 
-        chunk.buildMesh(this.blockRegistry, (wx, wy, wz) => this.getBlock(wx, wy, wz));
+        chunk.buildMesh(this.blockRegistry, (wx, wy, wz) => this.getBlock(wx, wy, wz), this.textureAtlas);
 
         if (chunk.mesh) {
             this.renderer.addToScene(chunk.mesh);
