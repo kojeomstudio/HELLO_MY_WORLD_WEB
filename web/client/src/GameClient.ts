@@ -4,6 +4,7 @@ import { Renderer } from './rendering/Renderer';
 import { PlayerController } from './player/PlayerController';
 import { WorldManager } from './world/WorldManager';
 import { InputManager } from './input/InputManager';
+import { AudioManager } from './audio/AudioManager';
 
 export class GameClient {
     private connection: HubConnection.HubConnection | null = null;
@@ -12,6 +13,7 @@ export class GameClient {
     private worldManager: WorldManager;
     private inputManager: InputManager;
     private uiManager: UIManager;
+    private audioManager: AudioManager;
     private isRunning: boolean = false;
     private lastTime: number = 0;
     private frameCount: number = 0;
@@ -24,6 +26,7 @@ export class GameClient {
         this.renderer = new Renderer(document.getElementById('game-container')!);
         this.worldManager = new WorldManager(this.renderer);
         this.inputManager = new InputManager();
+        this.audioManager = new AudioManager();
         this.playerController = new PlayerController(this.renderer.getCamera(), this.inputManager);
         this.playerController.setWorldManager(this.worldManager);
     }
@@ -125,6 +128,28 @@ export class GameClient {
         this.connection.on('OnBreathUpdate', (breath: number, maxBreath: number) => {
             this.uiManager.updateBreath(breath, maxBreath);
         });
+
+        this.connection.on('OnKnockback', (vx: number, vy: number, vz: number) => {
+            this.playerController.applyKnockback(vx, vy, vz);
+            this.audioManager.play('hurt');
+        });
+
+        this.connection.on('OnPrivilegeList', (_privileges: string[]) => {
+            this.uiManager.addChatMessage('Server', `Your privileges: ${_privileges.join(', ')}`);
+        });
+
+        this.connection.on('OnGameModeChanged', (mode: string) => {
+            this.uiManager.addChatMessage('Server', `Game mode changed to: ${mode}`);
+            if (mode === 'creative' || mode === 'spectator') {
+                this.playerController.setFlying(true);
+            } else {
+                this.playerController.setFlying(false);
+            }
+        });
+
+        this.connection.on('OnTeleported', (_x: number, _y: number, _z: number) => {
+            // Handled by position update
+        });
     }
 
     sendChat(message: string): void {
@@ -139,6 +164,14 @@ export class GameClient {
 
     useItem(slotIndex: number): void {
         this.connection?.invoke('UseItem', slotIndex);
+    }
+
+    craft(): void {
+        this.connection?.invoke('Craft', '');
+    }
+
+    getPrivileges(): void {
+        this.connection?.invoke('GetPrivileges');
     }
 
     private gameLoop(): void {

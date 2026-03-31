@@ -23,6 +23,7 @@ export class PlayerController {
     private _selectedBlockType: number = 1;
     private _worldManager: WorldManager | null = null;
     private _onGround: boolean = false;
+    private _knockbackVelocity: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
     health: number = 20;
     maxHealth: number = 20;
     inventory: any[] = [];
@@ -68,6 +69,10 @@ export class PlayerController {
             switch (e.code) {
                 case 'KeyF':
                     this._isFlying = !this._isFlying;
+                    break;
+                case 'KeyE':
+                    const event = new CustomEvent('openCrafting');
+                    document.dispatchEvent(event);
                     break;
                 case 'Digit1': case 'Digit2': case 'Digit3': case 'Digit4':
                 case 'Digit5': case 'Digit6': case 'Digit7': case 'Digit8':
@@ -173,6 +178,18 @@ export class PlayerController {
 
             if (this._input.isKeyDown('Space')) this._velocity.y = speed;
             else if (this._input.isKeyDown('ShiftLeft')) this._velocity.y = -speed;
+        } else if (this.isClimbing()) {
+            this._velocity.x = moveDir.x * WALK_SPEED * 0.5;
+            this._velocity.z = moveDir.z * WALK_SPEED * 0.5;
+            this._velocity.y *= 0.9;
+            if (this._input.isKeyDown('Space')) {
+                this._velocity.y = 2.0;
+            } else if (this._input.isKeyDown('ShiftLeft')) {
+                this._velocity.y = -2.0;
+            } else {
+                this._velocity.y = 0;
+            }
+            this._onGround = true;
         } else {
             this._velocity.x = moveDir.x * speed;
             this._velocity.z = moveDir.z * speed;
@@ -213,6 +230,9 @@ export class PlayerController {
             this._position.z = newZ;
         }
 
+        this._position.add(this._knockbackVelocity.clone().multiplyScalar(dt));
+        this._knockbackVelocity.multiplyScalar(0.85);
+
         if (this._position.y < -20) {
             this._position.set(0, 50, 0);
             this._velocity.set(0, 0, 0);
@@ -241,6 +261,22 @@ export class PlayerController {
         return false;
     }
 
+    private isClimbing(): boolean {
+        if (!this._worldManager) return false;
+        const px = Math.floor(this._position.x);
+        const py = Math.floor(this._position.y);
+        const pz = Math.floor(this._position.z);
+        for (let dx = -1; dx <= 1; dx++) {
+            for (let dz = -1; dz <= 1; dz++) {
+                const blockId = this._worldManager.getBlock(px + dx, py, pz + dz);
+                if (this._worldManager.getBlockRegistry().isClimbable(blockId)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     private updateCamera(): void {
         this._camera.position.copy(this._position);
         this._camera.position.y += PLAYER_HEIGHT;
@@ -254,6 +290,14 @@ export class PlayerController {
     getYaw(): number { return this._yaw * 180 / Math.PI; }
     getPitch(): number { return this._pitch * 180 / Math.PI; }
     getOnGround(): boolean { return this._onGround; }
+
+    applyKnockback(vx: number, vy: number, vz: number): void {
+        this._knockbackVelocity.set(vx, vy, vz);
+    }
+
+    setFlying(flying: boolean): void {
+        this._isFlying = flying;
+    }
 
     setHealth(health: number, maxHealth?: number): void {
         this.health = health;

@@ -71,12 +71,17 @@ export class UIManager {
             const slot = this.hotbar.children[i] as HTMLElement;
             if (items[i] && items[i].itemId) {
                 const item = items[i];
-                slot.innerHTML = `<span style="font-size:11px">${item.itemId.replace(/_/g, ' ')}</span>`;
+                let html = `<span style="font-size:11px;color:white">${item.itemId.replace(/_/g, ' ')}</span>`;
                 if (item.count > 1) {
-                    slot.innerHTML += `<span style="position:absolute;bottom:2px;right:4px;font-size:10px;color:white">${item.count}</span>`;
+                    html += `<span style="position:absolute;bottom:2px;right:4px;font-size:10px;color:white">${item.count}</span>`;
+                }
+                slot.innerHTML = html;
+                if (item.metadata) {
+                    slot.style.borderBottom = '2px solid #00ff00';
                 }
             } else {
                 slot.innerHTML = `<span style="font-size:12px;color:#aaa">${i + 1}</span>`;
+                slot.style.borderBottom = '';
             }
         }
     }
@@ -101,6 +106,13 @@ export class UIManager {
             const row = document.createElement('div');
             row.textContent = name;
             panel.appendChild(row);
+        }
+    }
+
+    setSelectedSlot(slot: number): void {
+        const children = this.hotbar.children;
+        for (let i = 0; i < children.length; i++) {
+            children[i].classList.toggle('selected', i === slot);
         }
     }
 

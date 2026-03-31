@@ -12,6 +12,14 @@ export interface BlockDefinition {
     damage?: number;
     breakable?: boolean;
     interactive?: boolean;
+    drowning?: boolean;
+    falling?: boolean;
+    bouncy?: number;
+    slippery?: boolean;
+    moveResistance?: number;
+    postEffectColor?: string;
+    groups?: Record<string, number>;
+    soundGroup?: string;
 }
 
 export class BlockRegistry {
@@ -56,7 +64,38 @@ export class BlockRegistry {
             { id: 29, name: 'wool_red', solid: true, transparent: false, color: '#CC2222', hardness: 0.8 },
             { id: 30, name: 'wool_blue', solid: true, transparent: false, color: '#2222CC', hardness: 0.8 },
             { id: 31, name: 'wool_green', solid: true, transparent: false, color: '#22CC22', hardness: 0.8 },
-            { id: 32, name: 'bookshelf', solid: true, transparent: false, color: '#C4A050', hardness: 1.5 }
+            { id: 32, name: 'bookshelf', solid: true, transparent: false, color: '#C4A050', hardness: 1.5 },
+            { id: 33, name: 'gravel', solid: true, transparent: false, color: '#888078', hardness: 0.6, falling: true, groups: { crumbly: 3 }, soundGroup: 'gravel' },
+            { id: 34, name: 'clay', solid: true, transparent: false, color: '#9BA5B0', hardness: 0.6, groups: { crumbly: 3 }, soundGroup: 'dirt' },
+            { id: 35, name: 'sandstone', solid: true, transparent: false, color: '#E8D5A3', hardness: 0.8, groups: { cracky: 3 }, soundGroup: 'sand' },
+            { id: 36, name: 'obsidian', solid: true, transparent: false, color: '#1A0A2E', hardness: 50.0, groups: { cracky: 5 }, soundGroup: 'stone' },
+            { id: 37, name: 'cactus', solid: true, transparent: false, color: '#0A5C0A', hardness: 0.4, damage: 1, groups: { choppy: 2 }, soundGroup: 'wood' },
+            { id: 38, name: 'sugar_cane', solid: false, transparent: true, color: '#90EE90', hardness: 0.2, soundGroup: 'grass' },
+            { id: 39, name: 'pumpkin', solid: true, transparent: false, color: '#FF8C00', hardness: 1.0, groups: { choppy: 2 }, soundGroup: 'wood' },
+            { id: 40, name: 'melon', solid: true, transparent: false, color: '#5C8A1E', hardness: 1.0, drops: 'melon_slice', groups: { choppy: 2 }, soundGroup: 'wood' },
+            { id: 41, name: 'mycelium', solid: true, transparent: false, color: '#6B5A8A', hardness: 0.6, drops: 'dirt', groups: { crumbly: 3 }, soundGroup: 'dirt' },
+            { id: 42, name: 'farmland', solid: true, transparent: false, color: '#6B4E2A', hardness: 0.6, groups: { crumbly: 3 }, soundGroup: 'dirt' },
+            { id: 43, name: 'water_flowing', solid: false, transparent: true, color: '#4169E1', liquid: true, drowning: true, soundGroup: 'water' },
+            { id: 44, name: 'lava_flowing', solid: false, transparent: true, color: '#FF4500', liquid: true, damage: 4, postEffectColor: '#FF4400', soundGroup: 'lava' },
+            { id: 45, name: 'coal_ore', solid: true, transparent: false, color: '#3A3A3A', hardness: 3.0, drops: 'coal', groups: { cracky: 3 }, soundGroup: 'stone' },
+            { id: 46, name: 'mossy_cobblestone', solid: true, transparent: false, color: '#5E6E5E', hardness: 2.0, groups: { cracky: 3 }, soundGroup: 'stone' },
+            { id: 47, name: 'iron_block', solid: true, transparent: false, color: '#D8D8D8', hardness: 5.0, groups: { cracky: 2 }, soundGroup: 'metal' },
+            { id: 48, name: 'gold_block', solid: true, transparent: false, color: '#FFD700', hardness: 3.0, groups: { cracky: 2 }, soundGroup: 'metal' },
+            { id: 49, name: 'diamond_block', solid: true, transparent: false, color: '#4AEDD9', hardness: 5.0, groups: { cracky: 2 }, soundGroup: 'metal' },
+            { id: 50, name: 'wool_orange', solid: true, transparent: false, color: '#E8821C', hardness: 0.8, groups: { snappy: 2 }, soundGroup: 'cloth' },
+            { id: 51, name: 'wool_yellow', solid: true, transparent: false, color: '#F2E63C', hardness: 0.8, groups: { snappy: 2 }, soundGroup: 'cloth' },
+            { id: 52, name: 'wool_cyan', solid: true, transparent: false, color: '#2CC4AD', hardness: 0.8, groups: { snappy: 2 }, soundGroup: 'cloth' },
+            { id: 53, name: 'wool_purple', solid: true, transparent: false, color: '#7B2FBE', hardness: 0.8, groups: { snappy: 2 }, soundGroup: 'cloth' },
+            { id: 54, name: 'wool_black', solid: true, transparent: false, color: '#1D1D1D', hardness: 0.8, groups: { snappy: 2 }, soundGroup: 'cloth' },
+            { id: 55, name: 'wool_brown', solid: true, transparent: false, color: '#724528', hardness: 0.8, groups: { snappy: 2 }, soundGroup: 'cloth' },
+            { id: 56, name: 'wool_pink', solid: true, transparent: false, color: '#F2A5C4', hardness: 0.8, groups: { snappy: 2 }, soundGroup: 'cloth' },
+            { id: 57, name: 'wool_lime', solid: true, transparent: false, color: '#52B248', hardness: 0.8, groups: { snappy: 2 }, soundGroup: 'cloth' },
+            { id: 58, name: 'wool_light_blue', solid: true, transparent: false, color: '#6689D3', hardness: 0.8, groups: { snappy: 2 }, soundGroup: 'cloth' },
+            { id: 59, name: 'wool_magenta', solid: true, transparent: false, color: '#B24CBF', hardness: 0.8, groups: { snappy: 2 }, soundGroup: 'cloth' },
+            { id: 60, name: 'wool_gray', solid: true, transparent: false, color: '#6B6B6B', hardness: 0.8, groups: { snappy: 2 }, soundGroup: 'cloth' },
+            { id: 61, name: 'wool_light_gray', solid: true, transparent: false, color: '#A0A0A0', hardness: 0.8, groups: { snappy: 2 }, soundGroup: 'cloth' },
+            { id: 62, name: 'glowing_obsidian', solid: true, transparent: false, color: '#3A1A5E', hardness: 50.0, light: 14, groups: { cracky: 5 }, soundGroup: 'stone' },
+            { id: 63, name: 'apple_block', solid: true, transparent: false, color: '#CC2222', hardness: 0.8, drops: 'apple', groups: { snappy: 3 }, soundGroup: 'grass' }
         ];
 
         for (const block of defaultBlocks) {
@@ -89,6 +128,14 @@ export class BlockRegistry {
             if (raw.damage !== undefined) block.damage = raw.damage;
             if (raw.breakable !== undefined) block.breakable = raw.breakable;
             if (raw.interactive !== undefined) block.interactive = raw.interactive;
+            if (raw.drowning !== undefined) block.drowning = raw.drowning;
+            if (raw.falling !== undefined) block.falling = raw.falling;
+            if (raw.bouncy !== undefined) block.bouncy = raw.bouncy;
+            if (raw.slippery !== undefined) block.slippery = raw.slippery;
+            if (raw.moveResistance !== undefined) block.moveResistance = raw.moveResistance;
+            if (raw.postEffectColor !== undefined) block.postEffectColor = raw.postEffectColor;
+            if (raw.groups !== undefined) block.groups = raw.groups;
+            if (raw.soundGroup !== undefined) block.soundGroup = raw.soundGroup;
 
             this.blocks.set(id, block);
             this.byName.set(block.name, block);
@@ -100,5 +147,9 @@ export class BlockRegistry {
     getByName(name: string): BlockDefinition | undefined { return this.byName.get(name); }
     isSolid(id: number): boolean { return this.blocks.get(id)?.solid ?? false; }
     isTransparent(id: number): boolean { return this.blocks.get(id)?.transparent ?? true; }
+    isLiquid(id: number): boolean { return this.blocks.get(id)?.liquid ?? false; }
+    isClimbable(id: number): boolean { return this.blocks.get(id)?.climbable ?? false; }
+    isFalling(id: number): boolean { return this.blocks.get(id)?.falling ?? false; }
+    getGroups(id: number): Record<string, number> { return this.blocks.get(id)?.groups ?? {}; }
     getAll(): Map<number, BlockDefinition> { return this.blocks; }
 }

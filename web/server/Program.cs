@@ -6,6 +6,7 @@ using WebGameServer.Core.Chat;
 using WebGameServer.Core.Crafting;
 using WebGameServer.Core.Entities;
 using WebGameServer.Core.Game;
+using WebGameServer.Core.Physics;
 using WebGameServer.Core.Smelting;
 using WebGameServer.Core.World;
 using WebGameServer.Services;
@@ -45,6 +46,9 @@ builder.Services.AddSingleton<SmeltingSystem>(sp =>
     smelting.LoadRecipes(dataPath);
     return smelting;
 });
+builder.Services.AddSingleton<PrivilegeSystem>();
+builder.Services.AddSingleton<ActiveBlockModifierSystem>();
+builder.Services.AddSingleton<KnockbackSystem>();
 builder.Services.AddSingleton<GameServer>();
 builder.Services.AddSingleton<AuthenticationService>();
 builder.Services.AddSingleton<ChatCommandManager>(sp =>
@@ -53,9 +57,9 @@ builder.Services.AddSingleton<ChatCommandManager>(sp =>
     return new ChatCommandManager(
         () => gameServer.GameTime,
         () => gameServer.TickRate,
-        null,
-        null,
-        null);
+        (playerName, mode) => { gameServer.SetGameMode(playerName, mode); },
+        (playerName, pos) => { gameServer.TeleportPlayer(playerName, pos); },
+        (playerName, targetPlayer, itemId, count) => { gameServer.GiveItem(targetPlayer, itemId, count); });
 });
 builder.Services.AddSingleton<CraftingSystem>(sp =>
 {

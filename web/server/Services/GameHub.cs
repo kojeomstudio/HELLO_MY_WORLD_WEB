@@ -33,6 +33,11 @@ public interface IGameClient
     Task OnCraftResult(string itemId, int count);
     Task OnBlockDefinitions(string definitionsJson);
     Task OnDeath(string message);
+    Task OnKnockback(float vx, float vy, float vz);
+    Task OnPrivilegeList(string[] privileges);
+    Task OnGameModeChanged(string mode);
+    Task OnTeleported(float x, float y, float z);
+    Task OnBreathUpdate(float breath, float maxBreath);
 }
 
 public class GameHub : Hub<IGameClient>
@@ -210,6 +215,58 @@ public class GameHub : Hub<IGameClient>
         var dropName = blockDef?.Drops ?? blockDef?.Name ?? ((BlockType)(blockData & 0xFF)).ToString().ToLowerInvariant();
         var itemEntity = new ItemEntity(dropName, 1, new Vector3(x + 0.5f, y + 0.5f, z + 0.5f));
         _entityManager.Add(itemEntity);
+
+        var toolItem = player.GetSelectedHotbarItem();
+        if (toolItem != null)
+        {
+            var toolName = toolItem.ItemId.ToLowerInvariant();
+            var isTool = toolName.Contains("sword") || toolName.Contains("pickaxe") ||
+                toolName.Contains("axe") || toolName.Contains("shovel") || toolName.Contains("hoe");
+
+            if (isTool)
+            {
+                var durabilityStr = toolItem.Metadata;
+                int maxDurability = toolName switch
+                {
+                    var n when n.StartsWith("wooden_") => 59,
+                    var n when n.StartsWith("stone_") => 131,
+                    var n when n.StartsWith("iron_") => 250,
+                    var n when n.StartsWith("diamond_") => 1561,
+                    _ => 60
+                };
+                int currentDurability = maxDurability;
+                if (int.TryParse(durabilityStr, out var parsed))
+                {
+                    currentDurability = parsed;
+                }
+                currentDurability--;
+
+                if (currentDurability <= 0)
+                {
+                    player.Inventory.RemoveItem(player.SelectedHotbarSlot, 1);
+                    await Clients.Caller.OnChatMessage("Server", $"Your {toolName} broke!");
+                }
+                else
+                {
+                    player.Inventory[player.SelectedHotbarSlot] = toolItem with { Metadata = currentDurability.ToString() };
+                }
+
+                await SendInventoryUpdate(player);
+            }
+        }
+    }
+
+    public async Task<bool> DigBlockStart(int x, int y, int z)
+    {
+        var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        if (player == null) return false;
+        var blockPos = new Vector3s((short)x, (short)y, (short)z);
+        var block = _gameServer.DefaultWorld.GetBlock(blockPos);
+        var blockData = block.ToUInt16();
+        if (blockData == 0) return false;
+        var blockDef = _blockDefinitionManager.Get(blockData);
+        if (blockDef != null && !blockDef.Breakable) return false;
+        return true;
     }
 
     public async Task UseItem(int slotIndex)
@@ -276,6 +333,76 @@ public class GameHub : Hub<IGameClient>
     {
         var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
         if (player == null) return;
+    }
+
+    public async Task InteractWithBlock(int x, int y, int z)
+    {
+        var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        if (player == null) return;
+        var blockPos = new Vector3s((short)x, (short)y, (short)z);
+        var block = _gameServer.DefaultWorld.GetBlock(blockPos);
+        var blockDef = _blockDefinitionManager.Get(block.ToUInt16());
+        if (blockDef == null) return;
+        if (blockDef.Climbable)
+        {
+            // Ladder interaction - handled client-side via physics
+        }
+        if (blockDef.Interactive)
+        {
+            var blockName = blockDef.Name;
+            if (blockName == "chest")
+            {
+                await Clients.Caller.OnChatMessage("Server", "Chest opened (inventory system placeholder)");
+            }
+            else if (blockName == "furnace")
+            {
+                var recipe = _smeltingSystem.GetAllRecipes().FirstOrDefault();
+                if (recipe != null)
+                {
+                    await Clients.Caller.OnChatMessage("Server", $"Furnace opened. Available recipe: {recipe.InputItemId} -> {recipe.ResultItemId}");
+                }
+                else
+                {
+                    await Clients.Caller.OnChatMessage("Server", "Furnace opened. No smelting recipes available.");
+                }
+            }
+            else if (blockName == "crafting_table")
+            {
+                await Clients.Caller.OnChatMessage("Server", "Crafting table opened. Press E to craft.");
+            }
+        }
+    }
+
+    public async Task PunchPlayer(string targetName)
+    {
+        var attacker = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        if (attacker == null) return;
+        var target = _gameServer.GetPlayer(targetName);
+        if (target == null || target.IsDead) return;
+        var toolItem = attacker.GetSelectedHotbarItem();
+        var damage = 1.0f;
+        // Check if tool is a weapon - simple name matching
+        if (toolItem != null)
+        {
+            var toolName = toolItem.ItemId.ToLowerInvariant();
+            damage = toolName switch
+            {
+                "wooden_sword" => 4, "stone_sword" => 5, "iron_sword" => 6, "diamond_sword" => 7,
+                "wooden_axe" => 3, "stone_axe" => 4, "iron_axe" => 5, "diamond_axe" => 6,
+                "wooden_pickaxe" => 2, "stone_pickaxe" => 3, "iron_pickaxe" => 4, "diamond_pickaxe" => 5,
+                _ => 1
+            };
+        }
+        var knockback = _gameServer.DamagePlayerWithKnockback(target, damage, attacker.Position, "player");
+        await Clients.Client(target.ConnectionId).OnKnockback(knockback.X, knockback.Y, knockback.Z);
+    }
+
+    public async Task GetPrivileges()
+    {
+        var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        if (player == null) return;
+        var privs = _gameServer.Privileges.GetPlayerPrivileges(player.Name);
+        await Clients.Caller.OnPrivilegeList(privs);
     }
 
     public async Task Craft(string recipeId)

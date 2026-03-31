@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.SignalR;
 using WebGameServer.Core;
 using WebGameServer.Core.Entities;
+using WebGameServer.Core.World;
 
 namespace WebGameServer.Services;
 
@@ -34,6 +35,7 @@ public class GameLoopService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("Game loop service started");
+        Entity.WorldReference = _gameServer.DefaultWorld;
         var interval = TimeSpan.FromMilliseconds(1000.0 / _gameServer.TickRate);
         _lastTickTime = DateTime.UtcNow;
 

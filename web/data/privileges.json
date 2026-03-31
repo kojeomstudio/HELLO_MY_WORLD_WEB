@@ -1,0 +1,19 @@
+{
+    "privileges": {
+        "interact": { "description": "Can interact with the world (dig/place blocks)", "default": true },
+        "shout": { "description": "Can send messages in chat", "default": true },
+        "basic_privs": { "description": "Can grant 'interact' and 'shout' privileges", "default": false },
+        "privs": { "description": "Can grant any privilege", "default": false },
+        "teleport": { "description": "Can teleport self to other players", "default": false },
+        "bring": { "description": "Can teleport other players to self", "default": false },
+        "settime": { "description": "Can set the time of day", "default": false },
+        "server": { "description": "Can perform server administration tasks", "default": false },
+        "protection_bypass": { "description": "Can bypass area protection", "default": false },
+        "ban": { "description": "Can ban and unban players", "default": false },
+        "kick": { "description": "Can kick players", "default": false },
+        "give": { "description": "Can give items to self and others", "default": false },
+        "password": { "description": "Can change own password", "default": false },
+        "fly": { "description": "Can fly in survival mode", "default": false },
+        "fast": { "description": "Can move faster than normal speed", "default": false }
+    }
+}

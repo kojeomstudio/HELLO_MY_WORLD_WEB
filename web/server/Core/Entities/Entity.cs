@@ -1,3 +1,6 @@
+using BlockType = WebGameServer.Core.World.BlockType;
+using WorldMap = WebGameServer.Core.World.World;
+
 namespace WebGameServer.Core.Entities;
 
 public enum EntityType
@@ -11,6 +14,8 @@ public enum EntityType
 
 public class Entity
 {
+    public static WorldMap? WorldReference { get; set; }
+
     public Guid Id { get; } = Guid.NewGuid();
     public EntityType Type { get; }
     public Vector3 Position { get; set; } = Vector3.Zero;
@@ -69,7 +74,26 @@ public class ItemEntity : Entity
         var dragFactor = 0.98f;
         Velocity = new Vector3(Velocity.X * dragFactor, Velocity.Y * dragFactor, Velocity.Z * dragFactor);
 
-        Position = Position + Velocity * dt;
+        var newPos = Position + Velocity * dt;
+
+        var groundBlock = WorldReference?.GetBlock(new Vector3s(
+            (short)Math.Floor(newPos.X),
+            (short)Math.Floor(newPos.Y - 0.1),
+            (short)Math.Floor(newPos.Z)));
+        if (groundBlock != null
+            && groundBlock.Type != BlockType.Air
+            && groundBlock.Type != BlockType.Water
+            && groundBlock.Type != BlockType.Lava)
+        {
+            newPos = new Vector3(newPos.X, (float)Math.Floor(newPos.Y - 0.1) + 0.15f, newPos.Z);
+            Velocity = new Vector3(Velocity.X * 0.5f, -Velocity.Y * 0.3f, Velocity.Z * 0.5f);
+            if (Math.Abs(Velocity.Y) < 0.5f)
+            {
+                Velocity = new Vector3(0, 0, 0);
+            }
+        }
+
+        Position = newPos;
     }
 }
 

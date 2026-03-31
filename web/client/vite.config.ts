@@ -5,7 +5,7 @@ export default defineConfig({
         port: 5173,
         proxy: {
             '/game': {
-                target: 'http://localhost:5000',
+                target: 'http://localhost:5266',
                 ws: true
             }
         }

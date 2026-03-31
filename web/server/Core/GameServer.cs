@@ -1,7 +1,9 @@
 using System.Collections.Concurrent;
 using Microsoft.AspNetCore.SignalR;
+using WebGameServer.Core.Auth;
 using WebGameServer.Core.Entities;
 using WebGameServer.Core.Game;
+using WebGameServer.Core.Physics;
 using WebGameServer.Core.Player;
 using WebGameServer.Core.Smelting;
 using WebGameServer.Core.World;
@@ -24,6 +26,9 @@ public class GameServer
     private readonly BlockDefinitionManager _blockDefinitionManager;
     private readonly WorldGeneratorFactory _generatorFactory;
     private readonly SmeltingSystem _smeltingSystem;
+    private readonly PrivilegeSystem _privilegeSystem;
+    private readonly ActiveBlockModifierSystem _abmSystem;
+    private readonly KnockbackSystem _knockbackSystem;
 
     private IHubContext<GameHub, IGameClient>? _hubContext;
     private int _tickCount;
@@ -31,6 +36,7 @@ public class GameServer
     public WorldMap DefaultWorld { get; }
     public BlockDefinitionManager BlockDefinitions => _blockDefinitionManager;
     public SmeltingSystem Smelting => _smeltingSystem;
+    public PrivilegeSystem Privileges => _privilegeSystem;
     public int MaxPlayers { get; private set; }
     public int TickRate { get; private set; }
     public bool IsRunning { get; private set; }
@@ -47,12 +53,18 @@ public class GameServer
         ServerConfig config,
         BlockDefinitionManager blockDefinitionManager,
         WorldGeneratorFactory generatorFactory,
-        SmeltingSystem smeltingSystem)
+        SmeltingSystem smeltingSystem,
+        PrivilegeSystem privilegeSystem,
+        ActiveBlockModifierSystem abmSystem,
+        KnockbackSystem knockbackSystem)
     {
         _config = config;
         _blockDefinitionManager = blockDefinitionManager;
         _generatorFactory = generatorFactory;
         _smeltingSystem = smeltingSystem;
+        _privilegeSystem = privilegeSystem;
+        _abmSystem = abmSystem;
+        _knockbackSystem = knockbackSystem;
 
         MaxPlayers = config.Server.MaxPlayers;
         TickRate = config.Server.TickRate;
@@ -134,6 +146,8 @@ public class GameServer
         _connectionToPlayer.TryAdd(connectionId, playerName);
         _connectionToPlayerId.TryAdd(playerName, connectionId);
 
+        _privilegeSystem.GrantDefaultPrivileges(playerName);
+
         return true;
     }
 
@@ -143,6 +157,7 @@ public class GameServer
         {
             _players.TryRemove(playerName, out _);
             _connectionToPlayerId.TryRemove(playerName, out _);
+            _privilegeSystem.RemovePlayer(playerName);
         }
     }
 
@@ -182,6 +197,8 @@ public class GameServer
         _tickCount++;
 
         DefaultWorld.UpdateLiquids(_tickCount);
+
+        _abmSystem.Process(DefaultWorld, _tickCount, _blockDefinitionManager);
 
         if (_tickCount % _config.Network.TimeBroadcastInterval == 0 && _hubContext != null)
         {
@@ -268,6 +285,13 @@ public class GameServer
         }
     }
 
+    public Vector3 DamagePlayerWithKnockback(PlayerEnt target, float amount, Vector3 attackerPosition, string source)
+    {
+        DamagePlayer(target, amount, source);
+        var distance = Vector3.Distance(attackerPosition, target.Position);
+        return _knockbackSystem.CalculateKnockback(attackerPosition, target.Position, amount, distance);
+    }
+
     public void HealPlayer(PlayerEnt player, float amount)
     {
         if (player.IsDead) return;
@@ -284,5 +308,32 @@ public class GameServer
     {
         if (player.IsDead) return;
         player.ConsumeFood(amount);
+    }
+
+    public bool SetGameMode(string playerName, GameMode mode)
+    {
+        var player = GetPlayer(playerName);
+        if (player == null) return false;
+        player.Mode = mode;
+        return true;
+    }
+
+    public bool TeleportPlayer(string playerName, Vector3 position)
+    {
+        var player = GetPlayer(playerName);
+        if (player == null) return false;
+        player.Position = position;
+        player.Velocity = Vector3.Zero;
+        player.FallDistance = 0;
+        player.LastGroundY = position.Y;
+        return true;
+    }
+
+    public bool GiveItem(string playerName, string itemId, int count)
+    {
+        var player = GetPlayer(playerName);
+        if (player == null) return false;
+        player.Inventory.AddItem(new ItemStack(itemId, count));
+        return true;
     }
 }
