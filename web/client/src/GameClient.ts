@@ -17,6 +17,7 @@ export class GameClient {
     private frameCount: number = 0;
     private fps: number = 0;
     private fpsTimer: number = 0;
+    private chunkRequestTimer: number = 0;
 
     constructor(uiManager: UIManager) {
         this.uiManager = uiManager;
@@ -24,6 +25,7 @@ export class GameClient {
         this.worldManager = new WorldManager(this.renderer);
         this.inputManager = new InputManager();
         this.playerController = new PlayerController(this.renderer.getCamera(), this.inputManager);
+        this.playerController.setWorldManager(this.worldManager);
     }
 
     async connect(playerName: string): Promise<void> {
@@ -33,6 +35,7 @@ export class GameClient {
             .configureLogging(HubConnection.LogLevel.Information)
             .build();
 
+        this.worldManager.setConnection(this.connection);
         this.setupServerHandlers();
         this.uiManager.setConnection(this.connection);
 
@@ -82,7 +85,7 @@ export class GameClient {
 
         this.connection.on('OnHealthUpdate', (health: number, maxHealth: number) => {
             this.uiManager.updateHealth(health, maxHealth);
-            this.playerController.setHealth(health);
+            this.playerController.setHealth(health, maxHealth);
         });
 
         this.connection.on('OnInventoryUpdate', (items: any[]) => {
@@ -111,12 +114,31 @@ export class GameClient {
         });
 
         this.connection.on('OnDeath', (message: string) => {
-            this.uiManager.addChatMessage('Server', message);
+            this.uiManager.showDeathScreen(message);
+            this.playerController.handleDeath();
+        });
+
+        this.connection.on('OnBlockDefinitions', (json: string) => {
+            this.worldManager.getBlockRegistry().loadFromServer(json);
+        });
+
+        this.connection.on('OnBreathUpdate', (breath: number, maxBreath: number) => {
+            this.uiManager.updateBreath(breath, maxBreath);
         });
     }
 
     sendChat(message: string): void {
         this.connection?.invoke('SendChat', message);
+    }
+
+    respawn(): void {
+        this.connection?.invoke('Respawn');
+        this.playerController.respawn();
+        this.uiManager.hideDeathScreen();
+    }
+
+    useItem(slotIndex: number): void {
+        this.connection?.invoke('UseItem', slotIndex);
     }
 
     private gameLoop(): void {
@@ -135,7 +157,16 @@ export class GameClient {
             this.fpsTimer = 0;
         }
 
-        this.playerController.update(dt);
+        if (!this.playerController.isDead) {
+            this.playerController.update(dt);
+        }
+
+        this.chunkRequestTimer += dt;
+        if (this.chunkRequestTimer >= 2.0) {
+            this.chunkRequestTimer = 0;
+            this.worldManager.requestChunksAroundPlayer(this.playerController.getPosition());
+        }
+
         this.worldManager.update(dt);
         this.renderer.render();
         this.uiManager.updateDebugInfo(

@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HelloMyWorld Web Game</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { overflow: hidden; font-family: Arial, sans-serif; }
+        #game-container { width: 100vw; height: 100vh; }
+        #ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+        }
+        #crosshair::before, #crosshair::after {
+            content: '';
+            position: absolute;
+            background: white;
+            opacity: 0.7;
+        }
+        #crosshair::before {
+            width: 2px;
+            height: 20px;
+            left: 9px;
+        }
+        #crosshair::after {
+            width: 20px;
+            height: 2px;
+            top: 9px;
+        }
+        #hotbar {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 4px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 4px;
+            border-radius: 4px;
+        }
+        .hotbar-slot {
+            width: 50px;
+            height: 50px;
+            background: rgba(139, 139, 139, 0.5);
+            border: 2px solid #555;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+        .hotbar-slot.selected {
+            border-color: white;
+            background: rgba(255, 255, 255, 0.3);
+        }
+        #health-bar {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            display: flex;
+            gap: 2px;
+        }
+        .heart {
+            width: 18px;
+            height: 18px;
+            background: #ff0000;
+            clip-path: path('M9 16.5L7.695 15.315C3.18 11.298 0 8.418 0 4.905C0 2.187 2.178 0 4.905 0C6.435 0 7.902 0.711 9 1.827C10.098 0.711 11.565 0 13.095 0C15.822 0 18 2.187 18 4.905C18 8.418 14.82 11.298 10.305 15.315L9 16.5Z');
+        }
+        .heart.empty {
+            background: #555;
+        }
+        #breath-bar {
+            position: absolute;
+            top: 50px;
+            left: 20px;
+            display: flex;
+            gap: 2px;
+        }
+        .breath-bubble {
+            width: 18px;
+            height: 18px;
+            background: #4488ff;
+            clip-path: ellipse(50% 50% at 50% 50%);
+        }
+        .breath-bubble.empty {
+            background: #555;
+        }
+        .breath-bubble.bursting {
+            background: #224488;
+        }
+        #debug-info {
+            position: absolute;
+            top: 80px;
+            left: 20px;
+            color: white;
+            font-size: 14px;
+            font-family: monospace;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+        #chat {
+            position: absolute;
+            bottom: 100px;
+            left: 20px;
+            width: 400px;
+            max-height: 200px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 4px;
+        }
+        #chat-messages {
+            color: white;
+            font-size: 14px;
+        }
+        .chat-message {
+            margin-bottom: 4px;
+        }
+        .chat-message .sender {
+            color: #ffff00;
+        }
+        #chat-input {
+            width: 100%;
+            padding: 5px;
+            margin-top: 5px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #555;
+            color: white;
+            display: none;
+        }
+        #login-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: auto;
+        }
+        #login-screen h1 {
+            color: white;
+            font-size: 48px;
+            margin-bottom: 40px;
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+        }
+        #login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            align-items: center;
+        }
+        #player-name-input {
+            padding: 15px 30px;
+            font-size: 18px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            outline: none;
+        }
+        #player-name-input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+        #join-button {
+            padding: 15px 50px;
+            font-size: 18px;
+            border: none;
+            border-radius: 8px;
+            background: #4CAF50;
+            color: white;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        #join-button:hover {
+            background: #45a049;
+        }
+    </style>
+  <script type="module" crossorigin src="/assets/index-ZUeK_PQv.js"></script>
+</head>
+<body>
+    <div id="game-container"></div>
+    <div id="ui-overlay">
+        <div id="crosshair"></div>
+        <div id="health-bar"></div>
+        <div id="breath-bar"></div>
+        <div id="hotbar"></div>
+        <div id="debug-info"></div>
+        <div id="chat">
+            <div id="chat-messages"></div>
+            <input type="text" id="chat-input" placeholder="Press Enter to send..." />
+        </div>
+        <div id="player-list" style="position:absolute; top:20px; right:20px; color:white; font-size:14px; background:rgba(0,0,0,0.5); padding:10px; border-radius:4px; display:none; max-height:300px; overflow-y:auto;">
+            <div style="font-weight:bold; margin-bottom:5px;">Players Online</div>
+            <div id="player-list-names"></div>
+        </div>
+        <div id="login-screen">
+            <h1>HelloMyWorld</h1>
+            <form id="login-form">
+                <input type="text" id="player-name-input" placeholder="Enter your name" maxlength="20" required>
+                <button type="submit" id="join-button">Join Game</button>
+            </form>
+        </div>
+        <div id="death-screen" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(255,0,0,0.3); flex-direction:column; align-items:center; justify-content:center; pointer-events:auto;">
+            <h2 style="color:white; font-size:36px; margin-bottom:20px; text-shadow:0 0 10px rgba(0,0,0,0.8);" id="death-message">You died!</h2>
+            <button id="respawn-button" style="padding:15px 50px; font-size:18px; border:none; border-radius:8px; background:#4CAF50; color:white; cursor:pointer;">Respawn</button>
+        </div>
+    </div>
+</body>
+</html>

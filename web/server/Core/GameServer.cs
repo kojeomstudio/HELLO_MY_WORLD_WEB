@@ -1,8 +1,15 @@
 using System.Collections.Concurrent;
+using Microsoft.AspNetCore.SignalR;
+using WebGameServer.Core.Entities;
+using WebGameServer.Core.Game;
+using WebGameServer.Core.Player;
+using WebGameServer.Core.Smelting;
+using WebGameServer.Core.World;
+using WebGameServer.Core.World.Generators;
+using WebGameServer.Services;
 using WorldMap = WebGameServer.Core.World.World;
 using PlayerEnt = WebGameServer.Core.Player.Player;
 using PlayerState = WebGameServer.Core.Player.PlayerState;
-using WebGameServer.Core.World;
 
 namespace WebGameServer.Core;
 
@@ -11,31 +18,57 @@ public class GameServer
     private readonly ConcurrentDictionary<string, WorldMap> _worlds = new();
     private readonly ConcurrentDictionary<string, PlayerEnt> _players = new();
     private readonly ConcurrentDictionary<string, string> _connectionToPlayer = new();
-    private readonly System.Timers.Timer _gameLoopTimer;
+    private readonly ConcurrentDictionary<string, string> _connectionToPlayerId = new();
+
+    private readonly ServerConfig _config;
+    private readonly BlockDefinitionManager _blockDefinitionManager;
+    private readonly WorldGeneratorFactory _generatorFactory;
+    private readonly SmeltingSystem _smeltingSystem;
+
+    private IHubContext<GameHub, IGameClient>? _hubContext;
+    private int _tickCount;
 
     public WorldMap DefaultWorld { get; }
-    public int MaxPlayers { get; set; } = 100;
-    public int TickRate { get; set; } = 20;
+    public BlockDefinitionManager BlockDefinitions => _blockDefinitionManager;
+    public SmeltingSystem Smelting => _smeltingSystem;
+    public int MaxPlayers { get; private set; }
+    public int TickRate { get; private set; }
     public bool IsRunning { get; private set; }
     public DateTime StartTime { get; private set; }
     public long GameTime { get; private set; }
     public float TimeSpeed { get; set; } = 1.0f;
-    public DayNightCycle DayNight { get; } = new();
+    public DayNightCycle DayNight { get; }
+    public ServerConfig Config => _config;
 
     public int OnlinePlayerCount => _players.Count;
     public IEnumerable<PlayerEnt> OnlinePlayers => _players.Values;
 
-    public GameServer(int seed = 0)
+    public GameServer(
+        ServerConfig config,
+        BlockDefinitionManager blockDefinitionManager,
+        WorldGeneratorFactory generatorFactory,
+        SmeltingSystem smeltingSystem)
     {
-        DefaultWorld = new WorldMap("default", seed == 0 ? Random.Shared.Next() : seed, new World.Generators.NoiseWorldGenerator());
-        _worlds.TryAdd("default", DefaultWorld);
+        _config = config;
+        _blockDefinitionManager = blockDefinitionManager;
+        _generatorFactory = generatorFactory;
+        _smeltingSystem = smeltingSystem;
 
-        _gameLoopTimer = new System.Timers.Timer(1000.0 / TickRate)
-        {
-            AutoReset = true,
-            Enabled = false
-        };
-        _gameLoopTimer.Elapsed += OnGameTick;
+        MaxPlayers = config.Server.MaxPlayers;
+        TickRate = config.Server.TickRate;
+        TimeSpeed = 1.0f;
+
+        DayNight = new DayNightCycle();
+
+        var generator = generatorFactory.Create(config.World.DefaultGenerator);
+        var seed = config.World.WorldSeed == 0 ? Random.Shared.Next() : config.World.WorldSeed;
+        DefaultWorld = new WorldMap("default", seed, generator);
+        _worlds.TryAdd("default", DefaultWorld);
+    }
+
+    public void SetHubContext(IHubContext<GameHub, IGameClient> hubContext)
+    {
+        _hubContext = hubContext;
     }
 
     public void Start()
@@ -43,18 +76,11 @@ public class GameServer
         if (IsRunning) return;
         IsRunning = true;
         StartTime = DateTime.UtcNow;
-        _gameLoopTimer.Start();
     }
 
     public void Stop()
     {
         IsRunning = false;
-        _gameLoopTimer.Stop();
-    }
-
-    private void OnGameTick(object? sender, System.Timers.ElapsedEventArgs e)
-    {
-        Update();
     }
 
     public PlayerEnt? GetPlayer(string name)
@@ -66,6 +92,26 @@ public class GameServer
     {
         if (!_connectionToPlayer.TryGetValue(connectionId, out var playerName)) return null;
         return GetPlayer(playerName);
+    }
+
+    public string? GetConnectionId(string playerName)
+    {
+        foreach (var kvp in _connectionToPlayer)
+        {
+            if (kvp.Value == playerName)
+                return kvp.Key;
+        }
+        return null;
+    }
+
+    public string? GetPlayerConnectionId(string playerName)
+    {
+        return GetConnectionId(playerName);
+    }
+
+    public BlockDefinition? GetBlockDefinition(ushort blockType)
+    {
+        return _blockDefinitionManager.Get(blockType);
     }
 
     public bool PlayerJoin(string connectionId, string playerName)
@@ -82,9 +128,11 @@ public class GameServer
 
         var spawnY = DefaultWorld.GetGroundHeight(0, 0) + 2;
         player.Position = new Vector3(0, spawnY, 0);
+        player.LastGroundY = spawnY;
 
         _players.TryAdd(playerName, player);
         _connectionToPlayer.TryAdd(connectionId, playerName);
+        _connectionToPlayerId.TryAdd(playerName, connectionId);
 
         return true;
     }
@@ -94,6 +142,7 @@ public class GameServer
         if (_connectionToPlayer.TryRemove(connectionId, out var playerName))
         {
             _players.TryRemove(playerName, out _);
+            _connectionToPlayerId.TryRemove(playerName, out _);
         }
     }
 
@@ -129,15 +178,111 @@ public class GameServer
             if (player.State != PlayerState.Playing) continue;
             UpdatePlayer(player);
         }
+
+        _tickCount++;
+
+        DefaultWorld.UpdateLiquids(_tickCount);
+
+        if (_tickCount % _config.Network.TimeBroadcastInterval == 0 && _hubContext != null)
+        {
+            _ = _hubContext.Clients.All.OnTimeUpdate(GameTime, TimeSpeed, DayNight.SkyBrightness);
+        }
     }
 
     private void UpdatePlayer(PlayerEnt player)
     {
-        if (player.Health <= 0)
+        if (player.IsDead)
         {
-            player.Respawn();
-            var spawnY = DefaultWorld.GetGroundHeight(0, 0) + 2;
-            player.Position = new Vector3(0, spawnY, 0);
+            return;
         }
+
+        var playerBlockPos = new Vector3s(
+            (short)Math.Floor(player.Position.X),
+            (short)Math.Floor(player.Position.Y),
+            (short)Math.Floor(player.Position.Z));
+        var standingBlock = DefaultWorld.GetBlock(playerBlockPos);
+        var standingDef = _blockDefinitionManager.Get(standingBlock.ToUInt16());
+
+        if (standingBlock.Type == BlockType.Lava)
+        {
+            var lavaDamage = standingDef?.Damage ?? 4;
+            DamagePlayer(player, lavaDamage, "lava");
+        }
+        else if (standingBlock.Type == BlockType.Water)
+        {
+            player.Velocity = new Vector3(player.Velocity.X, player.Velocity.Y * 0.8f, player.Velocity.Z);
+        }
+
+        if (!player.IsOnGround)
+        {
+            var fallDist = player.LastGroundY - player.Position.Y;
+            if (fallDist > _config.Player.FallDamageThreshold)
+            {
+                var damage = (fallDist - _config.Player.FallDamageThreshold) * _config.Player.FallDamageMultiplier;
+                DamagePlayer(player, damage, "fall");
+                player.LastGroundY = player.Position.Y;
+                player.FallDistance = 0;
+            }
+        }
+        else
+        {
+            if (player.FallDistance > _config.Player.FallDamageThreshold)
+            {
+                var damage = (player.FallDistance - _config.Player.FallDamageThreshold) * _config.Player.FallDamageMultiplier;
+                DamagePlayer(player, damage, "fall");
+            }
+            player.LastGroundY = player.Position.Y;
+            player.FallDistance = 0;
+        }
+
+        if (player.FoodLevel > 18 && player.Health < player.MaxHealth && player.Health > 0)
+        {
+            HealPlayer(player, 0.2f);
+            player.FoodSaturation = Math.Max(0, player.FoodSaturation - 0.5f);
+        }
+        else if (player.FoodLevel <= 0)
+        {
+            DamagePlayer(player, 0.5f, "starvation");
+        }
+    }
+
+    public void DamagePlayer(PlayerEnt player, float amount, string source)
+    {
+        if (player.IsDead || player.Mode == GameMode.Creative) return;
+
+        player.TakeDamage(amount);
+
+        if (_hubContext != null)
+        {
+            _ = _hubContext.Clients.Client(player.ConnectionId)
+                .OnHealthUpdate(player.Health, player.MaxHealth);
+        }
+
+        if (player.IsDead)
+        {
+            var deathMessage = $"{player.Name} died from {source}";
+            if (_hubContext != null)
+            {
+                _ = _hubContext.Clients.All.OnDeath(deathMessage);
+            }
+        }
+    }
+
+    public void HealPlayer(PlayerEnt player, float amount)
+    {
+        if (player.IsDead) return;
+        player.Heal(amount);
+
+        if (_hubContext != null)
+        {
+            _ = _hubContext.Clients.Client(player.ConnectionId)
+                .OnHealthUpdate(player.Health, player.MaxHealth);
+        }
+    }
+
+    public void FeedPlayer(PlayerEnt player, float amount)
+    {
+        if (player.IsDead) return;
+        player.ConsumeFood(amount);
     }
 }

@@ -1,16 +1,62 @@
+using Microsoft.AspNetCore.SignalR;
+using System.Text.Json;
 using WebGameServer.Core;
 using WebGameServer.Core.Auth;
 using WebGameServer.Core.Chat;
 using WebGameServer.Core.Crafting;
 using WebGameServer.Core.Entities;
+using WebGameServer.Core.Game;
+using WebGameServer.Core.Smelting;
+using WebGameServer.Core.World;
 using WebGameServer.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var configPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "data", "server_config.json");
+if (!File.Exists(configPath))
+    configPath = Path.Combine(Directory.GetCurrentDirectory(), "data", "server_config.json");
+
+var serverConfig = new ServerConfig();
+if (File.Exists(configPath))
+{
+    var configJson = File.ReadAllText(configPath);
+    serverConfig = JsonSerializer.Deserialize<ServerConfig>(configJson) ?? new ServerConfig();
+}
+
+builder.Services.AddSingleton(serverConfig);
+
 builder.Services.AddSignalR();
+builder.Services.AddSingleton<BlockDefinitionManager>(sp =>
+{
+    var manager = new BlockDefinitionManager();
+    var dataPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "data", "blocks.json");
+    if (!File.Exists(dataPath))
+        dataPath = Path.Combine(Directory.GetCurrentDirectory(), "data", "blocks.json");
+    manager.LoadFromFile(dataPath);
+    return manager;
+});
+builder.Services.AddSingleton<WorldGeneratorFactory>();
+builder.Services.AddSingleton<SmeltingSystem>(sp =>
+{
+    var smelting = new SmeltingSystem();
+    var dataPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "data", "smelting.json");
+    if (!File.Exists(dataPath))
+        dataPath = Path.Combine(Directory.GetCurrentDirectory(), "data", "smelting.json");
+    smelting.LoadRecipes(dataPath);
+    return smelting;
+});
 builder.Services.AddSingleton<GameServer>();
 builder.Services.AddSingleton<AuthenticationService>();
-builder.Services.AddSingleton<ChatCommandManager>();
+builder.Services.AddSingleton<ChatCommandManager>(sp =>
+{
+    var gameServer = sp.GetRequiredService<GameServer>();
+    return new ChatCommandManager(
+        () => gameServer.GameTime,
+        () => gameServer.TickRate,
+        null,
+        null,
+        null);
+});
 builder.Services.AddSingleton<CraftingSystem>(sp =>
 {
     var crafting = new CraftingSystem();
@@ -58,6 +104,8 @@ app.MapGet("/api/status", (GameServer server) => new
 });
 
 var gameServer = app.Services.GetRequiredService<GameServer>();
+var hubContext = app.Services.GetRequiredService<IHubContext<GameHub, IGameClient>>();
+gameServer.SetHubContext(hubContext);
 gameServer.Start();
 
 app.Lifetime.ApplicationStopping.Register(() => gameServer.Stop());

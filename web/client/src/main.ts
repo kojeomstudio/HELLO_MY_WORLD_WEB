@@ -56,6 +56,16 @@ class App {
                 debugInfo.style.display = debugInfo.style.display === 'none' ? 'block' : 'none';
             }
         });
+
+        document.addEventListener('respawnRequest', () => {
+            this.gameClient.respawn();
+        });
+
+        document.addEventListener('contextmenu', (e) => {
+            if (document.pointerLockElement) {
+                e.preventDefault();
+            }
+        });
     }
 }
 

@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Text.Json;
 
 namespace WebGameServer.Core.Crafting;
@@ -27,11 +28,33 @@ public class CraftingSystem
                 }
             }
 
+            string[]? pattern = null;
+            Dictionary<string, string>? keys = null;
+
+            if (recipeEl.TryGetProperty("shaped", out var s) && s.GetBoolean())
+            {
+                if (recipeEl.TryGetProperty("pattern", out var patternEl))
+                {
+                    pattern = patternEl.EnumerateArray().Select(p => p.GetString() ?? "").ToArray();
+                }
+
+                keys = new Dictionary<string, string>();
+                if (recipeEl.TryGetProperty("keys", out var keysEl))
+                {
+                    foreach (var keyProp in keysEl.EnumerateObject())
+                    {
+                        keys[keyProp.Name] = keyProp.Value.GetString() ?? "";
+                    }
+                }
+            }
+
             _recipes.Add(new CraftingRecipe(
                 recipeEl.GetProperty("result").GetString() ?? "",
                 recipeEl.TryGetProperty("resultCount", out var rc) ? rc.GetInt32() : 1,
                 ingredients,
-                recipeEl.TryGetProperty("shaped", out var s) && s.GetBoolean()));
+                recipeEl.TryGetProperty("shaped", out var sh) && sh.GetBoolean(),
+                pattern,
+                keys));
         }
     }
 
@@ -39,10 +62,48 @@ public class CraftingSystem
     {
         foreach (var recipe in _recipes)
         {
-            if (CanCraft(recipe, availableItems))
-                return recipe;
+            if (recipe.Shaped && recipe.Pattern != null && recipe.Keys != null)
+            {
+                if (ShapedMatches(recipe, availableItems))
+                    return recipe;
+            }
+            else
+            {
+                if (CanCraft(recipe, availableItems))
+                    return recipe;
+            }
         }
         return null;
+    }
+
+    private bool ShapedMatches(CraftingRecipe recipe, List<(string ItemId, int Count)> availableItems)
+    {
+        if (recipe.Pattern == null || recipe.Keys == null) return false;
+
+        var requiredCounts = new Dictionary<string, int>();
+
+        foreach (var row in recipe.Pattern)
+        {
+            foreach (var ch in row)
+            {
+                if (ch == ' ') continue;
+                if (!recipe.Keys.TryGetValue(ch.ToString(), out var itemId)) return false;
+                if (!requiredCounts.ContainsKey(itemId))
+                    requiredCounts[itemId] = 0;
+                requiredCounts[itemId]++;
+            }
+        }
+
+        foreach (var (itemId, count) in requiredCounts)
+        {
+            var available = availableItems
+                .Where(i => i.ItemId == itemId)
+                .Sum(i => i.Count);
+
+            if (available < count) return false;
+        }
+
+        return true;
     }
 
     public bool CanCraft(CraftingRecipe recipe, List<(string ItemId, int Count)> availableItems)
@@ -86,4 +147,6 @@ public record CraftingRecipe(
     string ResultItemId,
     int ResultCount,
     List<(string ItemId, int Count)> Ingredients,
-    bool Shaped = false);
+    bool Shaped = false,
+    string[]? Pattern = null,
+    Dictionary<string, string>? Keys = null);

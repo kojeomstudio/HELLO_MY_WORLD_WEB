@@ -21,6 +21,7 @@ public class Entity
     public float MaxHealth { get; set; } = 20f;
     public bool IsAlive => Health > 0;
     public DateTime LastUpdate { get; set; } = DateTime.UtcNow;
+    public bool IsInLiquid { get; set; }
 
     public Entity(EntityType type)
     {
@@ -59,7 +60,16 @@ public class ItemEntity : Entity
         if (DateTime.UtcNow - SpawnTime > Lifespan)
         {
             Health = 0;
+            return;
         }
+
+        var gravity = 6.0f;
+        Velocity = new Vector3(Velocity.X, Velocity.Y - gravity * dt, Velocity.Z);
+
+        var dragFactor = 0.98f;
+        Velocity = new Vector3(Velocity.X * dragFactor, Velocity.Y * dragFactor, Velocity.Z * dragFactor);
+
+        Position = Position + Velocity * dt;
     }
 }
 
@@ -71,6 +81,7 @@ public class MobEntity : Entity
     public float AttackRange { get; set; } = 2.0f;
     public float DetectionRange { get; set; } = 16.0f;
     public Guid? TargetPlayerId { get; set; }
+    private const float MobGravity = 20.0f;
 
     public MobEntity(string mobType, Vector3 position)
         : base(EntityType.Mob)
@@ -86,10 +97,19 @@ public class MobEntity : Entity
 
         var moveDir = new Vector3(
             (Random.Shared.NextSingle() - 0.5f) * Speed,
-            0,
+            Velocity.Y,
             (Random.Shared.NextSingle() - 0.5f) * Speed);
 
+        moveDir = new Vector3(moveDir.X, moveDir.Y - MobGravity * dt, moveDir.Z);
+
         Velocity = moveDir;
+
         Position = Position + Velocity * dt;
+
+        if (Position.Y < 1)
+        {
+            Position = new Vector3(Position.X, 1, Position.Z);
+            Velocity = new Vector3(Velocity.X, 0, Velocity.Z);
+        }
     }
 }

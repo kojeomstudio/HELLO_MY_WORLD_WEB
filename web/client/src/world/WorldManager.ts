@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import * as HubConnection from '@microsoft/signalr';
 import { Renderer } from '../rendering/Renderer';
 import { ChunkMesh } from './ChunkMesh';
 import { BlockRegistry } from './BlockRegistry';
@@ -15,11 +16,18 @@ export class WorldManager {
     private playerMeshes: Map<string, PlayerInfo> = new Map();
     private entityMeshes: Map<string, THREE.Mesh> = new Map();
     private pendingChunks: Set<string> = new Set();
+    private connection: HubConnection.HubConnection | null = null;
 
     constructor(renderer: Renderer) {
         this.renderer = renderer;
         this.blockRegistry = new BlockRegistry();
     }
+
+    setConnection(connection: HubConnection.HubConnection): void {
+        this.connection = connection;
+    }
+
+    getBlockRegistry(): BlockRegistry { return this.blockRegistry; }
 
     loadChunk(chunkX: number, chunkY: number, chunkZ: number, data: Uint8Array): void {
         const key = `${chunkX},${chunkY},${chunkZ}`;
@@ -28,16 +36,63 @@ export class WorldManager {
         if (existing && existing.mesh) {
             this.renderer.removeFromScene(existing.mesh);
         }
+        if (existing && existing.transparentMesh) {
+            this.renderer.removeFromScene(existing.transparentMesh);
+        }
 
         const chunk = ChunkMesh.fromServerData(chunkX, chunkY, chunkZ, data);
-        chunk.buildMesh(this.blockRegistry);
+        chunk.buildMesh(this.blockRegistry, (wx, wy, wz) => this.getBlock(wx, wy, wz));
 
         if (chunk.mesh) {
             this.renderer.addToScene(chunk.mesh);
         }
+        if (chunk.transparentMesh) {
+            this.renderer.addToScene(chunk.transparentMesh);
+        }
 
         this.chunks.set(key, chunk);
         this.pendingChunks.delete(key);
+
+        this.rebuildNeighborChunks(chunkX, chunkY, chunkZ);
+    }
+
+    private rebuildNeighborChunks(chunkX: number, chunkY: number, chunkZ: number): void {
+        const neighbors = [
+            [chunkX - 1, chunkY, chunkZ],
+            [chunkX + 1, chunkY, chunkZ],
+            [chunkX, chunkY - 1, chunkZ],
+            [chunkX, chunkY + 1, chunkZ],
+            [chunkX, chunkY, chunkZ - 1],
+            [chunkX, chunkY, chunkZ + 1],
+        ];
+
+        for (const [nx, ny, nz] of neighbors) {
+            const neighborKey = `${nx},${ny},${nz}`;
+            if (this.chunks.has(neighborKey)) {
+                this.rebuildChunkMesh(neighborKey);
+            }
+        }
+    }
+
+    rebuildChunkMesh(key: string): void {
+        const chunk = this.chunks.get(key);
+        if (!chunk) return;
+
+        if (chunk.mesh) {
+            this.renderer.removeFromScene(chunk.mesh);
+        }
+        if (chunk.transparentMesh) {
+            this.renderer.removeFromScene(chunk.transparentMesh);
+        }
+
+        chunk.buildMesh(this.blockRegistry, (wx, wy, wz) => this.getBlock(wx, wy, wz));
+
+        if (chunk.mesh) {
+            this.renderer.addToScene(chunk.mesh);
+        }
+        if (chunk.transparentMesh) {
+            this.renderer.addToScene(chunk.transparentMesh);
+        }
     }
 
     updateBlock(x: number, y: number, z: number, blockData: number): void {
@@ -55,13 +110,14 @@ export class WorldManager {
             chunk.blocks[index] = (blockData >> 8) & 0xFF;
             chunk.blocks[index + 1] = blockData & 0xFF;
 
-            if (chunk.mesh) {
-                this.renderer.removeFromScene(chunk.mesh);
-            }
-            chunk.buildMesh(this.blockRegistry);
-            if (chunk.mesh) {
-                this.renderer.addToScene(chunk.mesh);
-            }
+            this.rebuildChunkMesh(key);
+
+            if (localX === 0) this.rebuildChunkMesh(`${chunkX - 1},${chunkY},${chunkZ}`);
+            if (localX === 15) this.rebuildChunkMesh(`${chunkX + 1},${chunkY},${chunkZ}`);
+            if (localY === 0) this.rebuildChunkMesh(`${chunkX},${chunkY - 1},${chunkZ}`);
+            if (localY === 15) this.rebuildChunkMesh(`${chunkX},${chunkY + 1},${chunkZ}`);
+            if (localZ === 0) this.rebuildChunkMesh(`${chunkX},${chunkY},${chunkZ - 1}`);
+            if (localZ === 15) this.rebuildChunkMesh(`${chunkX},${chunkY},${chunkZ + 1}`);
         }
     }
 
@@ -82,6 +138,10 @@ export class WorldManager {
                     if (!this.chunks.has(key) && !this.pendingChunks.has(key)) {
                         this.pendingChunks.add(key);
                         requests.push(key);
+
+                        if (this.connection) {
+                            this.connection.invoke('RequestChunk', playerChunkX + dx, playerChunkY + dy, playerChunkZ + dz);
+                        }
                     }
                 }
             }
@@ -89,6 +149,10 @@ export class WorldManager {
 
         return requests;
     }
+
+    hasChunk(key: string): boolean { return this.chunks.has(key); }
+
+    getChunk(key: string): ChunkMesh | undefined { return this.chunks.get(key); }
 
     addPlayer(name: string): void {
         if (this.playerMeshes.has(name)) return;

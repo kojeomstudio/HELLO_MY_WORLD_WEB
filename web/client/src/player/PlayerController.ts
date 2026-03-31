@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { InputManager } from '../input/InputManager';
+import { WorldManager } from '../world/WorldManager';
 
 const GRAVITY = 20.0;
 const WALK_SPEED = 5.0;
@@ -7,6 +8,8 @@ const SPRINT_SPEED = 8.0;
 const FLY_SPEED = 12.0;
 const MOUSE_SENSITIVITY = 0.002;
 const PLAYER_HEIGHT = 1.7;
+const PLAYER_WIDTH = 0.6;
+const PLAYER_FULL_HEIGHT = 1.8;
 
 export class PlayerController {
     private _camera: THREE.PerspectiveCamera;
@@ -18,6 +21,12 @@ export class PlayerController {
     private _isFlying: boolean = false;
     private _selectedSlot: number = 0;
     private _selectedBlockType: number = 1;
+    private _worldManager: WorldManager | null = null;
+    private _onGround: boolean = false;
+    health: number = 20;
+    maxHealth: number = 20;
+    inventory: any[] = [];
+    isDead: boolean = false;
 
     constructor(camera: THREE.PerspectiveCamera, input: InputManager) {
         this._camera = camera;
@@ -27,6 +36,10 @@ export class PlayerController {
 
         this.setupControls();
         this.requestPointerLock();
+    }
+
+    setWorldManager(worldManager: WorldManager): void {
+        this._worldManager = worldManager;
     }
 
     private requestPointerLock(): void {
@@ -65,6 +78,7 @@ export class PlayerController {
 
         document.addEventListener('mousedown', (e: MouseEvent) => {
             if (!this._input.isPointerLocked()) return;
+            if (this.isDead) return;
             if (e.button === 0) {
                 this.onDig();
             } else if (e.button === 2) {
@@ -133,6 +147,7 @@ export class PlayerController {
 
     update(dt: number): void {
         if (!this._input.isPointerLocked()) return;
+        if (this.isDead) return;
 
         this.updateMovement(dt);
         this.updateCamera();
@@ -166,14 +181,64 @@ export class PlayerController {
 
         this._velocity.y = Math.max(this._velocity.y, -50);
 
-        this._position.x += this._velocity.x * dt;
-        this._position.y += this._velocity.y * dt;
-        this._position.z += this._velocity.z * dt;
+        const newX = this._position.x + this._velocity.x * dt;
+        const newY = this._position.y + this._velocity.y * dt;
+        const newZ = this._position.z + this._velocity.z * dt;
+
+        if (this._worldManager) {
+            if (!this.checkCollision(newX, this._position.y, this._position.z)) {
+                this._position.x = newX;
+            } else {
+                this._velocity.x = 0;
+            }
+
+            if (!this.checkCollision(this._position.x, newY, this._position.z)) {
+                this._position.y = newY;
+                this._onGround = false;
+            } else {
+                if (this._velocity.y < 0) {
+                    this._onGround = true;
+                }
+                this._velocity.y = 0;
+            }
+
+            if (!this.checkCollision(this._position.x, this._position.y, newZ)) {
+                this._position.z = newZ;
+            } else {
+                this._velocity.z = 0;
+            }
+        } else {
+            this._position.x = newX;
+            this._position.y = newY;
+            this._position.z = newZ;
+        }
 
         if (this._position.y < -20) {
             this._position.set(0, 50, 0);
             this._velocity.set(0, 0, 0);
         }
+    }
+
+    private checkCollision(x: number, y: number, z: number): boolean {
+        const halfW = PLAYER_WIDTH / 2;
+        const minX = Math.floor(x - halfW);
+        const maxX = Math.floor(x + halfW);
+        const minY = Math.floor(y);
+        const maxY = Math.floor(y + PLAYER_FULL_HEIGHT - 0.01);
+        const minZ = Math.floor(z - halfW);
+        const maxZ = Math.floor(z + halfW);
+
+        for (let bx = minX; bx <= maxX; bx++) {
+            for (let by = minY; by <= maxY; by++) {
+                for (let bz = minZ; bz <= maxZ; bz++) {
+                    if (this._worldManager && this._worldManager.isSolid(bx, by, bz)) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 
     private updateCamera(): void {
@@ -188,8 +253,40 @@ export class PlayerController {
     getVelocity(): THREE.Vector3 { return this._velocity.clone(); }
     getYaw(): number { return this._yaw * 180 / Math.PI; }
     getPitch(): number { return this._pitch * 180 / Math.PI; }
+    getOnGround(): boolean { return this._onGround; }
 
-    setHealth(_health: number): void { }
-    setInventory(_items: any[]): void { }
+    setHealth(health: number, maxHealth?: number): void {
+        this.health = health;
+        if (maxHealth !== undefined) {
+            this.maxHealth = maxHealth;
+        }
+        if (this.health <= 0) {
+            this.isDead = true;
+        }
+    }
+
+    setInventory(items: any[]): void {
+        this.inventory = items;
+        for (let i = 0; i < Math.min(8, items.length); i++) {
+            if (items[i] && items[i].blockId) {
+                this._selectedBlockType = items[i].blockId;
+                break;
+            }
+        }
+    }
+
+    handleDeath(): void {
+        this.isDead = true;
+        this._velocity.set(0, 0, 0);
+    }
+
+    respawn(): void {
+        this._position.set(0, 50, 0);
+        this._velocity.set(0, 0, 0);
+        this.health = this.maxHealth;
+        this.isDead = false;
+    }
+
     getSelectedSlot(): number { return this._selectedSlot; }
+    getSelectedBlockType(): number { return this._selectedBlockType; }
 }

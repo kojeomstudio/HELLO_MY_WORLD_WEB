@@ -1,0 +1,13 @@
+{
+    "smeltingRecipes": [
+        { "input": "ore_iron", "result": "iron_ingot", "cookTime": 10.0, "experience": 0.7 },
+        { "input": "ore_gold", "result": "gold_ingot", "cookTime": 10.0, "experience": 1.0 },
+        { "input": "sand_block", "result": "glass", "cookTime": 10.0, "experience": 0.1 },
+        { "input": "cobblestone", "result": "stone_block", "cookTime": 10.0, "experience": 0.1 },
+        { "input": "raw_beef", "result": "cooked_porkchop", "cookTime": 10.0, "experience": 0.35 },
+        { "input": "wood", "result": "coal", "cookTime": 15.0, "experience": 0.15 },
+        { "input": "stone_brick", "result": "stone_block", "cookTime": 10.0, "experience": 0.1 },
+        { "input": "ore_iron", "result": "iron_ingot", "cookTime": 8.0, "experience": 0.7 },
+        { "input": "clay_block", "result": "brick", "cookTime": 10.0, "experience": 0.3 }
+    ]
+}

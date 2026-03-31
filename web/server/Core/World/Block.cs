@@ -31,6 +31,6 @@ public class Block
 
     public ushort ToUInt16()
     {
-        return (ushort)((ushort)Type << 8 | Param1);
+        return (ushort)((byte)Type | (ushort)(Param1 << 8));
     }
 }

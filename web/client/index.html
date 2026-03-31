@@ -81,9 +81,28 @@
         .heart.empty {
             background: #555;
         }
-        #debug-info {
+        #breath-bar {
             position: absolute;
             top: 50px;
+            left: 20px;
+            display: flex;
+            gap: 2px;
+        }
+        .breath-bubble {
+            width: 18px;
+            height: 18px;
+            background: #4488ff;
+            clip-path: ellipse(50% 50% at 50% 50%);
+        }
+        .breath-bubble.empty {
+            background: #555;
+        }
+        .breath-bubble.bursting {
+            background: #224488;
+        }
+        #debug-info {
+            position: absolute;
+            top: 80px;
             left: 20px;
             color: white;
             font-size: 14px;
@@ -180,11 +199,16 @@
     <div id="ui-overlay">
         <div id="crosshair"></div>
         <div id="health-bar"></div>
+        <div id="breath-bar"></div>
         <div id="hotbar"></div>
         <div id="debug-info"></div>
         <div id="chat">
             <div id="chat-messages"></div>
             <input type="text" id="chat-input" placeholder="Press Enter to send..." />
+        </div>
+        <div id="player-list" style="position:absolute; top:20px; right:20px; color:white; font-size:14px; background:rgba(0,0,0,0.5); padding:10px; border-radius:4px; display:none; max-height:300px; overflow-y:auto;">
+            <div style="font-weight:bold; margin-bottom:5px;">Players Online</div>
+            <div id="player-list-names"></div>
         </div>
         <div id="login-screen">
             <h1>HelloMyWorld</h1>
@@ -192,6 +216,10 @@
                 <input type="text" id="player-name-input" placeholder="Enter your name" maxlength="20" required>
                 <button type="submit" id="join-button">Join Game</button>
             </form>
+        </div>
+        <div id="death-screen" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(255,0,0,0.3); flex-direction:column; align-items:center; justify-content:center; pointer-events:auto;">
+            <h2 style="color:white; font-size:36px; margin-bottom:20px; text-shadow:0 0 10px rgba(0,0,0,0.8);" id="death-message">You died!</h2>
+            <button id="respawn-button" style="padding:15px 50px; font-size:18px; border:none; border-radius:8px; background:#4CAF50; color:white; cursor:pointer;">Respawn</button>
         </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
