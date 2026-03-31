@@ -66,4 +66,8 @@ public enum BlockType : ushort
     WoolLightGray = 61,
     GlowingObsidian = 62,
     Apple = 63,
+    WheatCrop = 64,
+    CarrotCrop = 65,
+    PotatoCrop = 66,
+    HayBale = 67,
 }

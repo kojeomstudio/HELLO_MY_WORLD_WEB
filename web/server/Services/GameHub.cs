@@ -43,6 +43,8 @@ public interface IGameClient
     Task OnChestInventory(object[] items);
     Task OnFurnaceUpdate(string input, string fuel, string output, float progress);
     Task OnFallingBlock(int fromX, int fromY, int fromZ, int toX, int toY, int toZ, ushort blockType);
+    Task OnArmorUpdate(object[] armorSlots);
+    Task OnExperienceUpdate(int level, int totalExp);
 }
 
 public class GameHub : Hub<IGameClient>
@@ -142,6 +144,7 @@ public class GameHub : Hub<IGameClient>
         await Clients.Caller.OnPlayerListUpdate(_gameServer.OnlinePlayers.Select(p => p.Name).ToArray());
         await Clients.Caller.OnHealthUpdate(player.Health, player.MaxHealth);
         await SendInventoryUpdate(player);
+        await SendArmorUpdate(player);
         await SendTimeUpdate();
         await SendBlockDefinitions();
         await SendInitialChunks(player);
@@ -358,6 +361,34 @@ public class GameHub : Hub<IGameClient>
                 await SendInventoryUpdate(player);
             }
         }
+        else if (itemId == "water_bucket")
+        {
+            var removed = player.Inventory.RemoveItem(slotIndex, 1);
+            if (removed != null)
+            {
+                player.Inventory.AddItem(new ItemStack("bucket", 1));
+                await SendInventoryUpdate(player);
+            }
+        }
+        else if (itemId == "lava_bucket")
+        {
+            var removed = player.Inventory.RemoveItem(slotIndex, 1);
+            if (removed != null)
+            {
+                player.Inventory.AddItem(new ItemStack("bucket", 1));
+                await SendInventoryUpdate(player);
+            }
+        }
+        else if (itemId == "milk_bucket")
+        {
+            var removed = player.Inventory.RemoveItem(slotIndex, 1);
+            if (removed != null)
+            {
+                player.Inventory.AddItem(new ItemStack("bucket", 1));
+                _gameServer.HealPlayer(player, 4.0f);
+                await SendInventoryUpdate(player);
+            }
+        }
     }
 
     public async Task Respawn()
@@ -446,6 +477,14 @@ public class GameHub : Hub<IGameClient>
                         existingOp.Progress);
                 }
             }
+            else if (blockName == "door_wood")
+            {
+                var doorBlock = _gameServer.DefaultWorld.GetBlock(blockPos);
+                var isOpen = (doorBlock.Param2 & 1) == 1;
+                var newBlock = new Block(doorBlock.Type, doorBlock.Param1, (byte)(isOpen ? 0 : 1), doorBlock.Light);
+                _gameServer.DefaultWorld.SetBlock(blockPos, newBlock);
+                await Clients.All.OnBlockUpdate(x, y, z, newBlock.ToUInt16());
+            }
             else if (blockName == "crafting_table")
             {
                 var recipes = _craftingSystem.GetAllRecipes();
@@ -456,6 +495,29 @@ public class GameHub : Hub<IGameClient>
                     ingredients = r.Ingredients.Select(ing => new object[] { ing.ItemId, ing.Count }).ToArray()
                 }).ToArray();
                 await Clients.Caller.OnCraftingRecipes(recipeDtos!);
+            }
+        }
+
+        var playerItem = player.GetSelectedHotbarItem();
+        if (playerItem != null)
+        {
+            var itemId = playerItem.ItemId.ToLowerInvariant();
+            if (itemId == "bucket")
+            {
+                if (block.Type is BlockType.Water or BlockType.WaterFlowing)
+                {
+                    player.Inventory[player.SelectedHotbarSlot] = playerItem with { ItemId = "water_bucket" };
+                    _gameServer.DefaultWorld.SetBlock(blockPos, Block.Air);
+                    await Clients.All.OnBlockUpdate(x, y, z, 0);
+                    await SendInventoryUpdate(player);
+                }
+                else if (block.Type is BlockType.Lava or BlockType.LavaFlowing)
+                {
+                    player.Inventory[player.SelectedHotbarSlot] = playerItem with { ItemId = "lava_bucket" };
+                    _gameServer.DefaultWorld.SetBlock(blockPos, Block.Air);
+                    await Clients.All.OnBlockUpdate(x, y, z, 0);
+                    await SendInventoryUpdate(player);
+                }
             }
         }
     }
@@ -740,6 +802,58 @@ public class GameHub : Hub<IGameClient>
         });
         var json = JsonSerializer.Serialize(dto);
         await Clients.Caller.OnBlockDefinitions(json);
+    }
+
+    private async Task SendArmorUpdate(PlayerEnt player)
+    {
+        var items = player.ArmorSlots
+            .Select(i => i == null ? null : (object)new { itemId = i.ItemId, count = i.Count, metadata = i.Metadata })
+            .ToArray();
+        await Clients.Caller.OnArmorUpdate(items!);
+    }
+
+    public async Task EquipArmor(int slotIndex, int armorSlot)
+    {
+        var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        if (player == null) return;
+        var item = player.Inventory[slotIndex];
+        if (item == null) return;
+        var itemId = item.ItemId.ToLowerInvariant();
+        bool isArmor = itemId.Contains("helmet") || itemId.Contains("chestplate") ||
+                       itemId.Contains("leggings") || itemId.Contains("boots");
+        if (!isArmor) return;
+
+        int targetSlot = itemId switch
+        {
+            var n when n.Contains("helmet") => 0,
+            var n when n.Contains("chestplate") => 1,
+            var n when n.Contains("leggings") => 2,
+            var n when n.Contains("boots") => 3,
+            _ => -1
+        };
+        if (targetSlot < 0) return;
+
+        var currentArmor = player.ArmorSlots[targetSlot];
+        player.ArmorSlots[targetSlot] = item;
+        player.Inventory[slotIndex] = currentArmor;
+
+        await SendInventoryUpdate(player);
+        await SendArmorUpdate(player);
+    }
+
+    public async Task UnequipArmor(int armorSlot)
+    {
+        var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        if (player == null) return;
+        var armor = player.ArmorSlots[armorSlot];
+        if (armor == null) return;
+
+        if (player.Inventory.AddItem(armor))
+        {
+            player.ArmorSlots[armorSlot] = null;
+            await SendInventoryUpdate(player);
+            await SendArmorUpdate(player);
+        }
     }
 
     private static bool CheckRateLimit(string connectionId, string action, int cooldownMs)

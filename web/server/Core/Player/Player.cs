@@ -11,6 +11,7 @@ public class Player
     public GameMode Mode { get; set; } = GameMode.Survival;
 
     public Vector3 Position { get; set; } = Vector3.Zero;
+    public Vector3 PreviousPosition { get; set; } = Vector3.Zero;
     public Vector3 Velocity { get; set; } = Vector3.Zero;
     public float Yaw { get; set; } = 0f;
     public float Pitch { get; set; } = 0f;
@@ -59,6 +60,7 @@ public class Player
 
     public void UpdatePosition(Vector3 position, Vector3 velocity, float yaw, float pitch)
     {
+        PreviousPosition = Position;
         Position = position;
         Velocity = velocity;
         Yaw = yaw;

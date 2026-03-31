@@ -20,23 +20,30 @@ web/client/
   package.json        - Dependencies and scripts
   src/
     main.ts           - Bootstrap, DOM event bridges
-    GameClient.ts     - Central orchestrator, 24 server event handlers
+    GameClient.ts     - Central orchestrator, 26 server event handlers
     rendering/
       Renderer.ts     - Three.js scene, camera, lighting, sky
+      CloudSystem.ts  - Procedural cloud layer
+      SelectionBox.ts - Block selection wireframe + dig progress
+      WieldItem.ts    - Hand-held item display (tools/blocks)
     world/
       WorldManager.ts - Chunk storage, texture atlas, player/entity meshes
-      BlockRegistry.ts- 64 block definitions with textureName field
+      BlockRegistry.ts- 68 block definitions with textureName field
       ChunkMesh.ts    - Chunk mesh builder with UV mapping support
+      WeatherSystem.ts- Rain particle system
+      ParticleSystem.ts- Dig/place/damage/smoke particles
     player/
       PlayerController.ts - FPS camera, physics, raycasting, interactive block detection
     input/
       InputManager.ts - Keyboard state, pointer lock
     ui/
-      UIManager.ts    - HUD, chat, hotbar, crafting UI, furnace UI, chest UI
+      UIManager.ts    - HUD, chat, hotbar, crafting/furnace/chest/armor UI
+      SettingsPanel.ts- Settings with localStorage persistence
+      Minimap.ts      - In-game minimap (3 modes)
     audio/
       AudioManager.ts - Procedural Web Audio API sounds
   public/
-    textures/blocks/  - 63 PNG textures from Minetest devtest
+    textures/blocks/  - 125 PNG textures (16x16)
 ```
 
 ## Build Configuration
@@ -79,6 +86,11 @@ Central orchestrator and composition root. Owns all subsystem references and the
 - `InputManager`
 - `AudioManager`
 - `PlayerController` (receives camera + InputManager)
+- `Minimap` (receives container + WorldManager)
+- `ParticleSystem` (receives Three.js scene)
+- `WieldItem` (receives scene + camera)
+- `SelectionBox` (receives scene)
+- `WeatherSystem` (receives scene)
 
 **Game Loop** (`requestAnimationFrame`):
 
@@ -86,14 +98,25 @@ Central orchestrator and composition root. Owns all subsystem references and the
 gameLoop(dt)
   |
   +-- playerController.update(dt)       // physics, camera, input
+  +-- minimap.update(dt)                // minimap rendering
+  +-- particleSystem.update(dt)         // particle animations
+  +-- wieldItem.update(dt, onGround)    // hand item bob/swing
   +-- worldManager.requestChunksAroundPlayer(pos)  // every 2s
-  +-- worldManager.update(dt)           // entity animation
+  +-- worldManager.update(dt)           // entity animation, waving
+  +-- renderer.updateClouds(dt)         // cloud drift
+  +-- renderer.updateEffects(dt)        // post-processing
+  +-- weatherSystem.update(dt, pos)     // rain particles
   +-- renderer.render()                 // Three.js draw
   +-- uiManager.updateDebugInfo(...)    // FPS, position, chunks
   +-- sendPositionUpdate()              // every frame
 ```
 
-**Server Event Handlers (24 total):**
+**Settings wiring:**
+- Settings loaded from `SettingsPanel` on construction via `applySettings()`
+- `SettingsPanel.setOnSettingsChanged()` callback applies FOV changes on settings panel close
+- Settings persisted to localStorage automatically by `SettingsPanel`
+
+**Server Event Handlers (26 total):**
 
 | Event | Action |
 |-------|--------|
@@ -111,7 +134,7 @@ gameLoop(dt)
 | `OnDeath` | `uiManager.showDeathScreen()` + `playerController.handleDeath()` |
 | `OnBlockDefinitions` | `worldManager.getBlockRegistry().loadFromServer()` |
 | `OnBreathUpdate` | `uiManager.updateBreath()` |
-| `OnKnockback` | `playerController.applyKnockback()` + `audioManager.play('hurt')` |
+| `OnKnockback` | `playerController.applyKnockback()` + `audioManager.play('hurt')` + `renderer.flashDamage()` |
 | `OnPrivilegeList` | Chat notification |
 | `OnGameModeChanged` | Chat notification + `playerController.setFlying()` |
 | `OnTeleported` | (position update handled on server) |
@@ -119,6 +142,9 @@ gameLoop(dt)
 | `OnSmeltingRecipes` | `uiManager.populateSmeltingRecipes()` |
 | `OnChestInventory` | `uiManager.updateChestInventory()` + `uiManager.updateChestPlayerInventory()` |
 | `OnFurnaceUpdate` | `uiManager.updateFurnaceState()` |
+| `OnFallingBlock` | `worldManager.onFallingBlock()` |
+| `OnArmorUpdate` | `uiManager.updateArmorSlots()` |
+| `OnExperienceUpdate` | `uiManager.updateExperienceBar()` |
 
 **FPS Counter:** Updates every second, tracks `frameCount` / `fpsTimer`.
 
@@ -126,7 +152,7 @@ gameLoop(dt)
 
 Three.js scene setup and rendering.
 
-**Camera:** PerspectiveCamera(70 FOV, 0.1 near, 500 far)
+**Camera:** PerspectiveCamera(70 FOV, 0.1 near, 500 far) — FOV configurable via settings.
 
 **Scene Setup:**
 - Background: `#87CEEB` (sky blue)
@@ -143,6 +169,13 @@ Three.js scene setup and rendering.
 - Sky dome material color
 - Sun visibility
 
+**Post-processing effects:**
+- `flashDamage(intensity)` — red fullscreen overlay, fades over 0.3s
+- `updateCaveDarkness(y, noSky)` — vignette + ambient dimming for Y < 30
+- `updateLavaEffect(nearLava)` — orange tint overlay
+- `updateClouds(dt)` — cloud drift animation
+- `updateEffects(dt)` — effect animation/update pass
+
 **Performance:** Antialias enabled, pixel ratio capped at 2.0, no shadow maps.
 
 ### WorldManager (world/WorldManager.ts)
@@ -158,7 +191,7 @@ Chunk storage, visual management, and texture atlas system.
 
 **Texture Atlas System:**
 
-The texture atlas loads 32 PNG textures from `public/textures/blocks/` and composites them into a single canvas texture at startup:
+The texture atlas loads 125 PNG textures from `public/textures/blocks/` and composites them into a single canvas texture at startup:
 
 1. Loads all textures in `TEXTURE_NAMES` array via `Image` elements
 2. Creates a canvas with `ATLAS_COLS = 8` columns, rows calculated dynamically
@@ -188,23 +221,25 @@ Each block face maps to a 4-corner quad: `(u_min, v_min)`, `(u_max, v_min)`, `(u
 - Called every 2 seconds in game loop
 - Skips already loaded and pending chunks
 
-**Player mesh:** Box geometry (0.6 x 1.8 x 0.6) + floating name label (Sprite).
+**Player mesh:** Box geometry (0.6 x 1.8 x 0.6) + floating name label (Sprite). Walk animation via limb swinging.
 
 **Entity mesh:** Item = small orange box (0.3), Mob = tall red box (0.8). Animated with floating sine wave + rotation.
 
+**Falling block animation:** `onFallingBlock()` creates temporary mesh at source, animates gravity-based fall to target over 0.5s.
+
 ### BlockRegistry (world/BlockRegistry.ts)
 
-64 default block type definitions. Dual-indexed lookup (by numeric ID and string name).
+68 default block type definitions. Dual-indexed lookup (by numeric ID and string name).
 
 **Key Fields:**
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `textureName` | `string?` | Name of texture in atlas (e.g. `"default_stone"`) |
-| `interactive` | `boolean?` | Block responds to right-click (chest, furnace, crafting_table) |
+| `interactive` | `boolean?` | Block responds to right-click (chest, furnace, crafting_table, door_wood) |
 
 **Texture-mapped blocks (server-side `TextureName` property):**
-stone, dirt, grass, water, sand, wood, leaves, snow, ice, lava, cobblestone, gravel, water_flowing, lava_flowing, mossy_cobblestone.
+stone, dirt, grass, water, sand, wood, leaves, snow, ice, lava, cobblestone, gravel, water_flowing, lava_flowing, mossy_cobblestone, planks, brick, glass, bookshelf, chest, furnace, crafting_table, fence, ladder, cactus, sandstone, obsidian, coal_ore, iron_ore, gold_ore, diamond_ore, iron_block, gold_block, diamond_block, farmland, melon, pumpkin, hay, apple, and more.
 
 **Query helpers:**
 - `isSolid(id)` — defaults to false
@@ -268,6 +303,7 @@ First-person player with physics, collision, raycasting, and interactive block d
 | `PLAYER_HEIGHT` | 1.7 | Eye level |
 | `PLAYER_WIDTH` | 0.6 | Collision width |
 | `PLAYER_FULL_HEIGHT` | 1.8 | Collision height |
+| `STEP_HEIGHT` | 0.6 | Max step-up height |
 
 **Movement modes:**
 
@@ -280,6 +316,7 @@ First-person player with physics, collision, raycasting, and interactive block d
 **Collision system:**
 - AABB with half-width 0.3, height 1.8
 - Per-axis independent resolution (X, Y, Z)
+- Step-up support (0.6 blocks) for smooth terrain traversal
 - Ground detection on Y collision when falling
 - Terminal velocity: -50
 - Safety teleport: Y < -20 -> (0, 50, 0)
@@ -298,6 +335,8 @@ First-person player with physics, collision, raycasting, and interactive block d
 5. If not interactive: proceed with normal block placement
 
 **Block actions:** Dispatches `CustomEvent('blockAction')` on `document` for dig/place. Dispatches `CustomEvent('interactBlock')` for interactive blocks. UIManager listens and forwards to server.
+
+**Footstep sounds:** Movement velocity squared checked against threshold (>0.5) in game loop, passed to `WorldManager.animatePlayer()` for walk animation triggering.
 
 ### InputManager (input/InputManager.ts)
 
@@ -323,8 +362,25 @@ All HUD and overlay management. The bridge between PlayerController and server.
 - Crafting panel
 - Furnace panel
 - Chest panel
+- Creative inventory panel
 - Player list panel
 - Breath bar (underwater)
+- Armor panel (P key)
+
+**Durability Display:**
+- Tools with metadata show a colored durability bar on hotbar slots
+- `borderBottom` style set on hotbar slots when item has metadata
+
+**Armor Equipment UI:**
+- Opened via P key
+- 4 armor slots: helmet, chestplate, leggings, boots
+- Click to equip from inventory / unequip to inventory
+- Sends `EquipArmor` / `UnequipArmor` via SignalR
+
+**Experience Bar:**
+- XP bar displayed below hotbar
+- Level display
+- Updated via `OnExperienceUpdate` server event
 
 **Crafting UI:**
 - Full-screen modal with recipe listing
@@ -368,6 +424,27 @@ document.addEventListener('interactBlock', (e) => {
 
 **Hotbar:** 8 slots with item name, count, and metadata indicator (durability bar).
 
+### SettingsPanel (ui/SettingsPanel.ts)
+
+Dedicated settings management with localStorage persistence.
+
+| Setting | Type | Range | Default |
+|---------|------|-------|---------|
+| Mouse Sensitivity | slider | 0.001 - 0.01 | 0.002 |
+| Render Distance | slider | 2 - 8 | 4 |
+| FOV | slider | 50 - 110 | 70 |
+| Music Volume | slider | 0 - 1 | 0.5 |
+| Sound Volume | slider | 0 - 1 | 0.5 |
+| Clouds | toggle | — | enabled |
+| Ambient Occlusion | toggle | — | enabled |
+
+**Behavior:**
+- Settings loaded from `localStorage` on construction (key: `helloworld_settings`)
+- Slider controls with real-time value display
+- Toggle controls with checkboxes
+- Settings applied on panel close via `onSettingsChanged` callback
+- Auto-saves to `localStorage` whenever panel is hidden
+
 ### AudioManager (audio/AudioManager.ts)
 
 Procedural sound effects using Web Audio API. No audio files.
@@ -383,7 +460,38 @@ Procedural sound effects using Web Audio API. No audio files.
 | `pickup` | `playPickup` | Sine 400->600 Hz step (0.15s) |
 | `death` | `playDeath` | Sawtooth sweep 440->55 Hz (0.5s) |
 
+**Volume parameter:** `play(soundName, volume)` accepts a volume argument (default 0.5).
+
 Auto-resumes suspended `AudioContext` (browser autoplay policy).
+
+### Minimap (ui/Minimap.ts)
+
+In-game minimap with 3 rendering modes.
+
+**Modes:** surface, radar, normal.
+
+Updated every frame with player position and yaw.
+
+### ParticleSystem (world/ParticleSystem.ts)
+
+Particle effects for game events.
+
+| Type | Description |
+|------|-------------|
+| `dig` | 8 block-colored particles |
+| `place` | 6 block-colored particles |
+| `damage` | Red particles at player position |
+| `smoke` | 4 gray particles |
+
+Triggered via `particleEmitter` callback from `PlayerController`.
+
+### WeatherSystem (world/WeatherSystem.ts)
+
+Rain particle system.
+
+- 800 particles with wind effect
+- Player-following cylinder (radius 60, height 40)
+- Toggled by `GameClient` based on time of day
 
 ## Event Communication
 
@@ -414,6 +522,8 @@ PlayerController          document (DOM)          UIManager              Server
      |                         |                      |   StartSmelting    |
      |                         |                      |   MoveItemToChest  |
      |                         |                      |   TakeItemFromChest|
+     |                         |                      |   EquipArmor       |
+     |                         |                      |   UnequipArmor     |
      |                         |                      |                    |
 UIManager -- dispatch -->  |                      |                    |
  'respawnRequest'       |                      |                    |
@@ -422,8 +532,22 @@ App (main.ts)             |                      |                    |
      |                         |-- gameClient.respawn() -->|
      |                         |                      |                    |
 App (main.ts)             |                      |                    |
-  'keydown' (T/F3)       |                      |                    |
-     |-- chat UI toggle ->|                      |                    |
-     |-- debug toggle --->|                      |                    |
-     |-- openCrafting ---->|                      |-- showCraftingUI()|
+  'keydown' (T/F3/E/I/O/P)                      |                    |
+     |-- chat UI toggle ->|                      |-- showCraftingUI()|
+     |-- debug toggle --->|                      |-- creative inv    |
+     |-- settings panel -->|                     |-- armor panel      |
 ```
+
+## Texture Assets
+
+125 procedurally generated 16x16 PNG textures in `public/textures/blocks/`, covering:
+
+- Natural blocks: stone, dirt, grass (side/top), sand, wood (side/top), leaves, snow, ice, gravel, clay, cobblestone, obsidian, mossy_cobblestone, sandstone
+- Ores: coal, iron, gold, diamond
+- Building blocks: brick, glass, planks, stone_brick, bookshelf, fence, ladder, chest (front/side/top), furnace (front/side), crafting_table (front/side/top), bedrock, hay
+- Liquids: water, water_flowing, lava, lava_flowing, river_water, river_water_flowing
+- Wool: 16 color variants
+- Trees: oak (side/top), pine (side/top, needles), jungle (side/top, leaves)
+- Plants: cactus, apple, melon (side/top), pumpkin (side/top)
+- Decorative: door_wood, default_apple, desert_sand, desert_stone, junglegrass, snow_sheet, dirt_with_snow, dirt_with_grass
+- Tool textures: basetools_wood* (sword, pick, shovel, axe, shears, dagger), basetools_stone*, basetools_steel*, basetools_mese*, basetools_special* (fire, ice, blood, heal, mesepick, etc.)

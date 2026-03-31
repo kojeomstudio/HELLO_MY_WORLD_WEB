@@ -102,6 +102,7 @@ public class MobEntity : Entity
 {
     public static Func<Vector3, float, PlayerEnt?>? FindNearestPlayer { get; set; }
     public static Action<PlayerEnt, float>? DamagePlayer { get; set; }
+    public static Action<MobEntity>? MobDeathDrops { get; set; }
 
     public string MobType { get; set; } = "";
     public float Speed { get; set; } = 2.0f;
@@ -124,6 +125,12 @@ public class MobEntity : Entity
     {
         base.Update(dt);
         if (!IsAlive) return;
+
+        if (Health <= 0)
+        {
+            MobDeathDrops?.Invoke(this);
+            return;
+        }
 
         var target = FindNearestPlayer?.Invoke(Position, DetectionRange);
 

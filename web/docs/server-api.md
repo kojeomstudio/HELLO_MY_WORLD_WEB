@@ -34,7 +34,11 @@ connection.invoke("Join", playerName: string): Promise<void>
 - `OnInventoryUpdate` to caller (starter items: wooden_pickaxe, wooden_sword, torch x16, bread x5)
 - `OnTimeUpdate` to caller
 - `OnBlockDefinitions` to caller
-- Initial chunk delivery (7x4x7 around spawn)
+- `OnArmorUpdate` to caller (if returning player with saved armor)
+- `OnExperienceUpdate` to caller (if returning player with saved XP)
+- Initial chunk delivery (7x4x7 around player position)
+
+**Behavior:** If player exists in SQLite database, loads saved position, inventory, armor, XP, and game mode. Otherwise spawns at world origin.
 
 ---
 
@@ -50,7 +54,7 @@ connection.invoke(
 ): Promise<void>
 ```
 
-**Server behavior:** Validates position via `ValidatePlayerPosition()` which caps distance per tick to `maxSpeed * dt * 1.5f`. Broadcasts to players within 64-block range.
+**Server behavior:** Stores position and previous position for speed validation via `ValidatePlayerPosition()`, which caps distance per tick to `maxSpeed * dt * 1.5f`. Broadcasts to players within 64-block range.
 
 ---
 
@@ -113,12 +117,12 @@ Validate that a block can be dug.
 connection.invoke("DigBlockStart", x: number, y: number, z: number): Promise<boolean>
 ```
 
-**Returns:** `true` if block is non-air and breakable, `false` otherwise.
+**Returns:** `true` if block is non-air and breakable (returns dig time as float), `false` (-1) otherwise.
 
 ---
 
 ### InteractWithBlock
-Open UI for interactive blocks.
+Open UI for interactive blocks or handle special interactions.
 
 ```typescript
 connection.invoke("InteractWithBlock", x: number, y: number, z: number): Promise<void>
@@ -131,6 +135,14 @@ connection.invoke("InteractWithBlock", x: number, y: number, z: number): Promise
 | `chest` | Sends `OnChestInventory` with 27-slot contents |
 | `furnace` | Sends `OnSmeltingRecipes` + existing `OnFurnaceUpdate` if active |
 | `crafting_table` | Sends `OnCraftingRecipes` with all recipes |
+| `door_wood` | Toggles open/close via Param2 bit 0, broadcasts `OnBlockUpdate` |
+
+**Fluid bucket interaction (by held item):**
+
+| Held Item | Target Block | Action |
+|-----------|-------------|--------|
+| `bucket` | water / water_flowing | Converts to `water_bucket`, removes block |
+| `bucket` | lava / lava_flowing | Converts to `lava_bucket`, removes block |
 
 ---
 
@@ -176,9 +188,15 @@ connection.invoke("PunchPlayer", targetName: string): Promise<void>
 | Stone axe | 4 |
 | Iron axe | 5 |
 | Diamond axe | 6 |
-| Other tool / bare hand | 1-2 |
+| Wooden pickaxe | 2 |
+| Stone pickaxe | 3 |
+| Iron pickaxe | 4 |
+| Diamond pickaxe | 5 |
+| Other tool / bare hand | 1 |
 
-**Triggers:** `OnKnockback` to target, `OnHealthUpdate` if killed.
+**Damage reduction:** Target's armor defense reduces damage: `finalDamage = max(0, damage - totalDefense * 0.04)`
+
+**Triggers:** `OnKnockback` to target, `OnHealthUpdate` if killed. On death, drops all inventory and armor as entities.
 
 ---
 
@@ -194,7 +212,7 @@ connection.invoke("GetPrivileges"): Promise<void>
 ---
 
 ### UseItem
-Consume a food item from inventory.
+Consume an item from inventory (food or bucket).
 
 ```typescript
 connection.invoke("UseItem", slotIndex: number): Promise<void>
@@ -202,7 +220,15 @@ connection.invoke("UseItem", slotIndex: number): Promise<void>
 
 **Food items:** bread, apple, cooked_beef, cooked_pork, raw_beef, raw_pork, carrot, potato, baked_potato, mushroom_stew, melon_slice, cookie, cake.
 
-**Effects:** Heals 2.0 HP, feeds 4.0 food.
+**Food effects:** Heals 2.0 HP, feeds 4.0 food.
+
+**Bucket items:**
+
+| Item | Effect |
+|------|--------|
+| `water_bucket` | Consumes, gives `bucket` |
+| `lava_bucket` | Consumes, gives `bucket` |
+| `milk_bucket` | Consumes, gives `bucket`, heals 4.0 HP |
 
 ---
 
@@ -288,7 +314,7 @@ Request contents of a chest at specific coordinates.
 connection.invoke("GetChestInventory", x: number, y: number, z: number): Promise<void>
 ```
 
-**Triggers:** `OnChestInventory` with 27-slot array to caller. Creates empty chest if none exists.
+**Triggers:** `OnChestInventory` with 27-slot array to caller. Creates empty chest if none exists (loads from SQLite if previously saved).
 
 ---
 
@@ -341,6 +367,50 @@ connection.invoke(
 - Stacks with existing items of same type when possible
 
 **Triggers:** `OnInventoryUpdate`, `OnChestInventory`.
+
+---
+
+### EquipArmor
+Move an item from inventory to an armor slot.
+
+```typescript
+connection.invoke(
+  "EquipArmor",
+  slotIndex: number,
+  armorSlot: number
+): Promise<void>
+```
+
+**Parameters:**
+- `slotIndex` — Player inventory slot (0-31)
+- `armorSlot` — Target armor slot: 0 (helmet), 1 (chestplate), 2 (leggings), 3 (boots)
+
+**Behavior:**
+- Swaps item from inventory into armor slot
+- If armor slot is occupied, moves existing armor item to inventory slot
+
+**Triggers:** `OnInventoryUpdate`, `OnArmorUpdate`.
+
+---
+
+### UnequipArmor
+Move an item from an armor slot to inventory.
+
+```typescript
+connection.invoke(
+  "UnequipArmor",
+  armorSlot: number
+): Promise<void>
+```
+
+**Parameters:**
+- `armorSlot` — Source armor slot: 0 (helmet), 1 (chestplate), 2 (leggings), 3 (boots)
+
+**Behavior:**
+- Moves armor item from armor slot to first available inventory slot
+- Clears armor slot
+
+**Triggers:** `OnInventoryUpdate`, `OnArmorUpdate`.
 
 ---
 
@@ -398,7 +468,7 @@ connection.on("OnChunkReceived", (
 |------|---------|
 | 0 | BlockType (enum) |
 | 1 | Param1 |
-| 2 | Param2 |
+| 2 | Param2 (used for crop growth stages 0-7, door open/close, liquid levels) |
 | 3 | Light level |
 
 ---
@@ -635,6 +705,41 @@ connection.on("OnFurnaceUpdate", (
 
 ---
 
+### OnArmorUpdate
+Player armor slot synchronization.
+
+```typescript
+connection.on("OnArmorUpdate", (
+  armorSlots: object[]
+) => void)
+```
+
+**Array length:** 4. Slots: 0=helmet, 1=chestplate, 2=leggings, 3=boots.
+
+**Item format:**
+```json
+{ "itemId": "iron_chestplate", "count": 1, "metadata": null }
+```
+
+Null entries = empty armor slot.
+
+---
+
+### OnExperienceUpdate
+Player experience and level synchronization.
+
+```typescript
+connection.on("OnExperienceUpdate", (
+  level: number,
+  totalExp: number
+) => void)
+```
+
+- `level`: Current experience level
+- `totalExp`: Total accumulated experience points
+
+---
+
 ### OnEntitySpawned
 New entity created in the world.
 
@@ -694,6 +799,19 @@ connection.on("OnBlockDefinitions", (definitionsJson: string) => void)
 
 ---
 
+### OnFallingBlock
+Falling block animation.
+
+```typescript
+connection.on("OnFallingBlock", (
+  fromX: number, fromY: number, fromZ: number,
+  toX: number, toY: number, toZ: number,
+  blockType: number  // ushort
+) => void)
+```
+
+---
+
 ## Connection Lifecycle
 
 ```
@@ -701,12 +819,14 @@ connection.on("OnBlockDefinitions", (definitionsJson: string) => void)
 │  Connect     │────>│    Join()    │────>│   Playing    │
 │  (WebSocket) │     │  (Register)  │     │   (Active)   │
 └──────────────┘     └──────────────┘     └──────────────┘
-                                                  │
-                                                  ▼
-                                           ┌──────────────┐
-                                           │ Disconnect   │
-                                           │ (Cleanup)    │
-                                           └──────────────┘
+                                                   │
+                                                   ▼
+                                            ┌──────────────┐
+                                            │ Disconnect   │
+                                            │ (Cleanup)    │
+                                            │ Save player  │
+                                            │ to SQLite    │
+                                            └──────────────┘
 ```
 
 ## Error Handling
@@ -716,3 +836,12 @@ connection.on("OnBlockDefinitions", (definitionsJson: string) => void)
 - **Rate Limited:** Silently ignored (no response)
 - **Craft Failure:** `OnChatMessage("Server", "No matching crafting recipe.")` or `"Missing ingredients for {item}."`
 - **Smelting Failure:** `OnChatMessage("Server", "Cannot start smelting...")`
+
+## Persistence
+
+Player data and block metadata are persisted to SQLite databases in `data/worlds/default/`:
+
+| Database | Tables | Save Triggers |
+|----------|--------|---------------|
+| `players.db` | `players` | On disconnect (`PlayerLeave`) |
+| `blockmeta.db` | `chest_inventories`, `furnace_operations`, `node_timers` | Auto-save (300s) + server shutdown |

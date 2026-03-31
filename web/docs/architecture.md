@@ -8,6 +8,8 @@
 |                    TypeScript + Three.js                         |
 |  +-----------------------------------------------------------+  |
 |  |  Texture Atlas System | Crafting UI | Furnace UI | Chest  |  |
+|  |  Armor UI | XP Bar | Settings Panel | Creative Inventory  |  |
+|  |  Durability Display | Footstep Sounds | Minimap            |  |
 |  +-----------------------------------------------------------+  |
 +------------------------------------------------------------------+
                                | WebSocket (SignalR)
@@ -25,7 +27,9 @@
 |  |  - Connection Management, Player Actions, Chunk Stream |      |
 |  |  - DigBlockStart (validation), DigBlock (wear/drops)  |      |
 |  |  - PunchPlayer (PvP + knockback)                      |      |
-|  |  - InteractWithBlock (chest/furnace/crafting_table)   |      |
+|  |  - InteractWithBlock (chest/furnace/crafting_table/   |      |
+|  |    door_wood, bucket fluid pickup)                    |      |
+|  |  - EquipArmor, UnequipArmor                           |      |
 |  |  - GetCraftingRecipes, CraftRecipe                    |      |
 |  |  - GetSmeltingRecipes, StartSmelting                  |      |
 |  |  - GetChestInventory, MoveItemToChest, TakeItemFromChest |   |
@@ -38,10 +42,13 @@
 |  |            (Singleton Service)                         |      |
 |  |  - World, Player, Game Loop (20 TPS), Day/Night       |      |
 |  |  - Physics validation (server-authoritative)          |      |
-|  |  - Chest inventories (per-block, 27 slots)            |      |
+|  |  - Chest inventories (per-block, 27 slots, persisted)|      |
 |  |  - Furnace operations (smelting progress tracking)    |      |
 |  |  - World persistence (auto-save every 300s)           |      |
 |  |  - Item pickup system (2 block range)                 |      |
+|  |  - Player death drops (inventory + armor)             |      |
+|  |  - Mob death drops                                   |      |
+|  |  - Agriculture system (crop growth)                   |      |
 |  +-----------+-----------+-----------+-----------+--------+      |
 |             |           |           |           |               |
 |  +----------v---+ +-----v----+ +---v-------+ +v------------+    |
@@ -50,16 +57,18 @@
 |  |  PrivilegeSys | | Smelting | | (WorldRef)| | Validation  |    |
 |  |  (JSON load)  | | System   | | Mob AI    | | Knockback   |    |
 |  +--------------+ +----------+ +-----------+ +-------------+    |
-|  +--------------+                                                     |
-|  |  ABM System  |  ActiveBlockModifier (falling nodes, etc.)       |
-|  +--------------+                                                     |
+|  +--------------+ +--------------+ +--------------+             |
+|  |  ABM System  | | PlayerDB    | | BlockMetaDB  |             |
+|  |  (falling)   | | (SQLite)    | | (SQLite)     |             |
+|  +--------------+ +--------------+ +--------------+             |
 +------------------------------------------------------------------+
                                |
                                v
 +------------------------------------------------------------------+
-|                      Data Files (JSON)                           |
-|  - server_config.json  - blocks.json (64 types)  - items.json   |
+|                      Data Files (JSON) + SQLite                  |
+|  - server_config.json  - blocks.json (68 types)  - items.json   |
 |  - privileges.json (15 privileges) - smelting.json              |
+|  - players.db (SQLite)       - blockmeta.db (SQLite)            |
 +------------------------------------------------------------------+
 ```
 
@@ -93,8 +102,8 @@ This project is a web-based port of the Luanti voxel engine. The original C++ ar
 | `src/content_sao.cpp` (knockback) | `Core/Physics/KnockbackSystem.cs` |
 | `src/environment.h` (falling nodes) | `Core/World/ActiveBlockModifier.cs` (sand/gravel ABM) |
 | `src/inventorymanager.*` (furnace) | `Core/GameServer.cs` (`FurnaceOperation`) |
-| `src/inventorymanager.*` (metadata) | `Core/GameServer.cs` (`_chestInventories`) |
-| `src/server/save.*` | `Core/World/WorldPersistence.cs` |
+| `src/inventorymanager.*` (metadata) | `Core/World/BlockMetadataDatabase.cs` (SQLite) |
+| `src/server/save.*` | `Core/World/WorldPersistence.cs` + `Core/Player/PlayerDatabase.cs` |
 
 ### Protocol Mapping
 
@@ -106,9 +115,9 @@ This project is a web-based port of the Luanti voxel engine. The original C++ ar
 | `TOSERVER_INTERACT (dig complete)` | `DigBlock(x,y,z)` — applies tool wear, spawns item drops |
 | `TOSERVER_INTERACT (place)` | `PlaceBlock(x,y,z,blockType)` |
 | `TOSERVER_INTERACT (punch player)` | `PunchPlayer(targetName)` — PvP damage + knockback |
-| `TOSERVER_INTERACT (right-click block)` | `InteractWithBlock(x,y,z)` — chest/furnace/crafting_table |
+| `TOSERVER_INTERACT (right-click block)` | `InteractWithBlock(x,y,z)` — chest/furnace/crafting_table/door_wood |
 | `TOSERVER_CHAT_MESSAGE` | `SendChat(message)` |
-| `TOSERVER_ITEM_USE` | `UseItem(slotIndex)` — food consumption |
+| `TOSERVER_ITEM_USE` | `UseItem(slotIndex)` — food/bucket consumption |
 | `TOSERVER_BREATH` | Server-side drowning via `Drowning` block property |
 | `TOCLIENT_BLOCKDATA` | `OnChunkReceived(x,y,z,data)` |
 | `TOCLIENT_CHAT_MESSAGE` | `OnChatMessage(sender,message)` |
@@ -125,6 +134,8 @@ This project is a web-based port of the Luanti voxel engine. The original C++ ar
 | (custom) | `OnSmeltingRecipes(recipes[])` |
 | (custom) | `OnChestInventory(items[])` |
 | (custom) | `OnFurnaceUpdate(input,fuel,output,progress)` |
+| (custom) | `OnArmorUpdate(armorSlots[])` |
+| (custom) | `OnExperienceUpdate(level,totalExp)` |
 
 ### Chat Command Mapping
 
@@ -146,20 +157,69 @@ Integrates all subsystems via constructor injection:
 | `PrivilegeSystem` | Singleton | 15 Minetest-compatible privileges (loaded from JSON) |
 | `ActiveBlockModifierSystem` | Singleton | Periodic block modifications (falling sand/gravel ABMs) |
 | `KnockbackSystem` | Singleton | PvP knockback physics |
-| `BlockDefinitionManager` | Singleton | 64 block type definitions |
+| `BlockDefinitionManager` | Singleton | 68 block type definitions |
 | `CraftingSystem` | Singleton | Recipe matching and crafting |
 | `EntityManager` | Singleton | Item drops and mob entities |
 | `SmeltingSystem` | Singleton | Furnace smelting recipes |
+| `PlayerDatabase` | Singleton | SQLite-based player persistence (position, inventory, armor, XP) |
+| `BlockMetadataDatabase` | Singleton | SQLite-based chest/furnace/node timer persistence |
+| `AgricultureSystem` | Singleton | Crop planting, growth, and harvesting |
 
 **Server-authoritative features:**
-- `ValidatePlayerPosition()` — caps movement speed per tick to prevent teleport exploits
+- `ValidatePlayerPosition()` — caps movement speed per tick to prevent teleport exploits; tracks previous position for proper speed validation
 - `PickupItem()` — validates range (2 blocks) and inventory capacity before transferring
 - `StartSmelting()` — validates recipe, input item, and fuel before consuming
 - `MoveItemToChest()` / `TakeItemFromChest()` — validates slot bounds and stack limits (max 64)
+- `DamagePlayer()` — applies armor defense reduction, triggers death drops on kill
+
+**Death drops:**
+- `DropPlayerInventory()` — drops all inventory items and armor slots as `ItemEntity` instances at player position on death
 
 **Storage systems:**
-- `_chestInventories: ConcurrentDictionary<string, ItemStack?[]>` — 27-slot per-block chest storage, keyed by `"x,y,z"`
-- `_activeFurnaces: ConcurrentDictionary<string, FurnaceOperation>` — per-furnace smelting progress tracking
+- `_chestInventories: ConcurrentDictionary<string, ItemStack?[]>` — 27-slot per-block chest storage, keyed by `"x,y,z"`, persisted to SQLite via `BlockMetadataDatabase`
+- `_activeFurnaces: ConcurrentDictionary<string, FurnaceOperation>` — per-furnace smelting progress tracking, persisted to SQLite
+
+### Player Persistence (Core/Player/PlayerDatabase.cs)
+SQLite database storing full player state across sessions.
+
+**Schema (`players` table):**
+| Column | Type | Description |
+|--------|------|-------------|
+| `name` | TEXT (PK) | Player name |
+| `position_x/y/z` | REAL | World position |
+| `yaw`, `pitch` | REAL | Camera orientation |
+| `health`, `max_health` | REAL | Health state |
+| `breath` | REAL | Breath/drowning state |
+| `food_level`, `food_saturation` | REAL | Hunger state |
+| `total_experience`, `experience_level` | INTEGER | Experience/level |
+| `game_mode` | INTEGER | Game mode enum |
+| `inventory_json` | TEXT | Serialized inventory (JSON) |
+| `armor_json` | TEXT | Serialized armor slots (JSON) |
+| `selected_hotbar_slot` | INTEGER | Active hotbar slot |
+| `last_ground_y` | REAL | Fall damage tracking |
+| `last_login`, `last_save` | TEXT | Timestamps (ISO 8601) |
+
+**Behavior:**
+- `SavePlayer()` called on disconnect (`PlayerLeave`)
+- `LoadPlayer()` called on `PlayerJoin` if player exists in database
+- `INSERT OR REPLACE` semantics (upsert)
+- Inventory/armor serialized as JSON arrays of `{ itemId, count, metadata }`
+
+### Block Metadata Persistence (Core/World/BlockMetadataDatabase.cs)
+SQLite database for block-associated metadata that persists across server restarts.
+
+**Schema:**
+
+| Table | Key | Data |
+|-------|-----|------|
+| `chest_inventories` | `pos_key TEXT (PK)` | `items_json TEXT` — 27-slot inventory |
+| `furnace_operations` | `pos_key TEXT (PK)` | `input_item_id`, `result_item_id`, `cook_time`, `progress`, `connection_id` |
+| `node_timers` | `(x,y,z) INTEGER (PK)` | `block_name TEXT`, `expiration REAL` |
+
+**Behavior:**
+- `SaveAllMetadata()` called on server shutdown and auto-save
+- Chest inventories loaded on first access via `GetOrCreateChestInventory()`
+- Furnace operations and node timers bulk-loaded at save time
 
 ### World System (Core/World/)
 - **World.cs** — Lazy chunk generation, concurrent storage, block get/set, liquid simulation, auto-save
@@ -170,6 +230,25 @@ Integrates all subsystems via constructor injection:
   - `ActiveBlockModifier` record: `Name`, `Interval`, `Chance`, `RequiredNeighbor`, `MinY`, `MaxY`, `Action`
   - `ActiveBlockModifierSystem`: iterates loaded chunks each tick, checks interval/chance/neighbors, invokes action
   - Maps to Luanti's `minetest.register_abm()`
+- **AgricultureSystem.cs** — Crop growth simulation
+- **BlockMetadataDatabase.cs** — SQLite persistence for chest/furnace/node timer data
+
+### Agriculture System (Core/World/AgricultureSystem.cs)
+Manages crop planting, growth, and harvesting.
+
+**Crop types:**
+
+| Crop | Block ID | Grow Time | Notes |
+|------|----------|-----------|-------|
+| WheatCrop | 64 | 60s | 8 growth stages (Param2 0-7) |
+| CarrotCrop | 65 | 45s | 8 growth stages |
+| PotatoCrop | 66 | 45s | 8 growth stages |
+
+**Growth mechanics:**
+- `PlantCrop()` — requires farmland below and air at placement position
+- `TryGrowCrop()` — stochastic growth per tick; probability = `dt / growTime` (x4 if water within 4-block radius)
+- `GrowAllCrops()` — iterates all loaded chunks every game tick, checks for crop blocks and attempts growth
+- Growth stages tracked via `Block.Param2` (0 = seedling, 7 = fully grown)
 
 ### Tree Generation (NoiseWorldGenerator)
 The noise world generator includes procedural tree generation during chunk creation:
@@ -211,9 +290,39 @@ Sand and gravel blocks use the Active Block Modifier system to simulate gravity:
 
 Mob physics include gravity (`MobGravity = 20.0`), ground collision detection, and void protection (Y < 1 teleport).
 
+**Mob death drops:** When a mob's health reaches 0, `MobDeathDrops` delegate is invoked to spawn item entities at the mob's position.
+
 ### Player System (Core/Player/)
-- **Player.cs** — Position, health, inventory, game mode, state flags
+- **Player.cs** — Position, health, inventory, game mode, state flags, armor slots, experience
 - **Inventory.cs** — 32-slot inventory with `ItemStack` records; durability tracked via `Metadata` field
+- **PlayerDatabase.cs** — SQLite persistence for full player state
+
+**Player properties:**
+| Property | Type | Description |
+|----------|------|-------------|
+| `ArmorSlots` | `ItemStack?[4]` | Helmet, chestplate, leggings, boots |
+| `TotalExperience` | `int` | Accumulated XP |
+| `ExperienceLevel` | `int` | Current level |
+| `FoodLevel` | `float` | Hunger (0-20) |
+| `FoodSaturation` | `float` | Saturation |
+| `FallDistance` | `float` | Distance since last ground contact |
+| `LastGroundY` | `float` | Y position on last ground contact |
+
+**Armor defense values:**
+
+| Armor | Defense |
+|-------|---------|
+| Leather (any) | 1.0 |
+| Iron Helmet | 2.0 |
+| Iron Chestplate | 6.0 |
+| Iron Leggings | 5.0 |
+| Iron Boots | 2.0 |
+| Diamond Helmet | 3.0 |
+| Diamond Chestplate | 8.0 |
+| Diamond Leggings | 6.0 |
+| Diamond Boots | 3.0 |
+
+Damage reduction: `finalDamage = max(0, damage - totalDefense * 0.04)`
 
 ### Crafting (Core/Crafting/)
 JSON-based recipe system with ingredient matching. Expanded: 56 recipes, 16 food values, 5 tool capability tiers.
@@ -243,8 +352,24 @@ Per-block chest storage using `ConcurrentDictionary<string, ItemStack?[]>`:
 | Key format | `"x,y,z"` (via `GameServer.PositionKey()`) |
 | Slot count | 27 (3 rows of 9) |
 | Max stack | 64 |
-| Persistence | In-memory only (lost on server restart) |
-| Auto-creation | `GetOrCreateChestInventory()` creates empty 27-slot array on first access |
+| Persistence | SQLite via `BlockMetadataDatabase` |
+| Auto-creation | `GetOrCreateChestInventory()` creates empty 27-slot array on first access (loads from DB if exists) |
+
+### Door Mechanics
+`InteractWithBlock()` handles `door_wood` blocks:
+- Reads current `Param2` bit 0 for open/close state
+- Toggles: `(isOpen ? 0 : 1)`
+- Broadcasts `OnBlockUpdate` to all clients
+
+### Fluid Bucket Interaction
+`InteractWithBlock()` and `UseItem()` handle bucket items:
+
+| Item | Right-click on Liquid | Use Item |
+|------|----------------------|----------|
+| `bucket` | Picks up water → `water_bucket` or lava → `lava_bucket` | — |
+| `water_bucket` | — | Consumes, gives `bucket` |
+| `lava_bucket` | — | Consumes, gives `bucket` |
+| `milk_bucket` | — | Consumes, gives `bucket`, heals 4 HP |
 
 ### Physics (Core/Physics/)
 Gravity, collision detection, movement simulation, server-authoritative validation.
@@ -256,6 +381,15 @@ Gravity, collision detection, movement simulation, server-authoritative validati
 - **PhysicsState** record struct for state snapshot
 - **PlayerInput** record struct for input state
 
+### Physics Validation (Server-Authoritative)
+`GameServer.ValidatePlayerPosition()` runs every tick:
+
+- Calculates max allowed distance: `maxSpeed * dt * 1.5`
+- `maxSpeed` is walk/sprint/fly speed depending on player state
+- Compares distance between current position and previous position (`player.Velocity`)
+- If exceeded, clamps to max distance along the direction vector
+- Updates ground/liquid state flags based on block checks at player feet
+
 ### World Persistence (Auto-save)
 `GameLoopService.CheckAutoSave()` triggers world save:
 
@@ -266,7 +400,7 @@ Gravity, collision detection, movement simulation, server-authoritative validati
 | Trigger | `world.NeedsSave && timeSinceLastSave > 300s` |
 | Save location | `data/worlds/default/` |
 | File format | `{x}_{y}_{z}.chunk` (binary) |
-| Persistence | Chunks are saved but chest inventories and furnace operations are in-memory only |
+| Persistence | Chunks + chest inventories + furnace operations + node timers (all saved via `SaveAllMetadata()`) |
 
 ### Auth & Privileges (Core/Auth/)
 - **AuthSystem** — Name validation, banning
@@ -305,15 +439,15 @@ SignalR hub bridging client actions to server systems. All injected via construc
 
 | Method | Description | Rate Limit |
 |--------|-------------|------------|
-| `Join(playerName)` | Validates, creates Player, sends initial sync | — |
+| `Join(playerName)` | Validates, creates Player, loads from DB if exists, sends initial sync | — |
 | `UpdatePosition(x,y,z,vx,vy,vz,yaw,pitch)` | Syncs position, broadcasts to nearby | — |
 | `SendChat(message)` | Broadcasts chat or executes slash command | 500ms |
 | `DigBlockStart(x,y,z)` | Validates block is breakable | — |
 | `DigBlock(x,y,z)` | Breaks block, spawns item entity, applies tool wear | 250ms |
 | `PlaceBlock(x,y,z,blockType)` | Places block in world | 250ms |
-| `InteractWithBlock(x,y,z)` | Opens UI for chest/furnace/crafting_table | — |
+| `InteractWithBlock(x,y,z)` | Opens UI for chest/furnace/crafting_table, toggles doors, handles bucket fluid pickup | — |
 | `PunchPlayer(targetName)` | PvP: weapon damage + knockback | — |
-| `UseItem(slotIndex)` | Consumes food items (heals + feeds) | — |
+| `UseItem(slotIndex)` | Consumes food items, bucket items (water/lava/milk) | — |
 | `GetPrivileges()` | Returns caller's privilege list | — |
 | `Craft(recipeId)` | Auto-matches recipe from inventory | — |
 | `GetCraftingRecipes()` | Returns all crafting recipes | — |
@@ -326,6 +460,8 @@ SignalR hub bridging client actions to server systems. All injected via construc
 | `SelectSlot(slot)` | Updates selected hotbar slot | — |
 | `Respawn()` | Respawns dead player | — |
 | `DropItem(slotIndex,count)` | Drops item as entity | — |
+| `EquipArmor(slotIndex,armorSlot)` | Moves item from inventory to armor slot | — |
+| `UnequipArmor(armorSlot)` | Moves item from armor slot to inventory | — |
 
 ### Rate Limiting
 Implemented as a static cooldown dictionary in `GameHub`:
@@ -365,7 +501,7 @@ Connected server events:
 
 | Event | Handler |
 |-------|---------|
-| `OnKnockback(vx,vy,vz)` | Applies velocity impulse to player |
+| `OnKnockback(vx,vy,vz)` | Applies velocity impulse to player + damage flash |
 | `OnPrivilegeList(privs[])` | Stores player privileges |
 | `OnGameModeChanged(mode)` | Switches game mode |
 | `OnTeleported(x,y,z)` | Updates player position |
@@ -382,17 +518,20 @@ Connected server events:
 | `OnChestInventory` | Updates chest UI grid |
 | `OnFurnaceUpdate` | Updates furnace progress bar and slots |
 | `OnDeath` | Shows death screen |
+| `OnFallingBlock` | Triggers falling block animation |
+| `OnArmorUpdate` | Updates armor UI panel |
+| `OnExperienceUpdate` | Updates XP bar and level display |
 
-AudioManager is connected and active.
+AudioManager is connected and active. Settings panel wired to apply FOV on change.
 
 ### Renderer (rendering/Renderer.ts)
-Three.js scene, camera, lighting, sky dome, fog.
+Three.js scene, camera, lighting, sky dome, fog, damage flash, cave darkness, lava overlay, cloud system.
 
 ### WorldManager (world/WorldManager.ts)
-Chunk loading/meshing, player entities, block updates, texture atlas system.
+Chunk loading/meshing, player entities, block updates, texture atlas system, falling block animations.
 
 ### BlockRegistry (world/BlockRegistry.ts)
-64 block type definitions with extended properties, `textureName` field, and helper methods.
+68 block type definitions with extended properties, `textureName` field, and helper methods.
 
 ### ChunkMesh (world/ChunkMesh.ts)
 16x16x16 mesh builder with per-face culling and UV mapping support for texture atlas.
@@ -406,15 +545,16 @@ Extended features:
 - **Crafting toggle** — E key opens/closes crafting UI
 - **Drowning detection** — checks `BlockRegistry.isLiquid()` for liquid blocks with `drowning: true`
 - **Interactive block detection** — right-click checks `BlockRegistry.isInteractive()`, dispatches `interactBlock` CustomEvent
+- **Footstep sounds** — triggers `audioManager.play('footstep')` during movement
 
 ### InputManager (input/InputManager.ts)
 Keyboard state tracking, pointer lock.
 
 ### UIManager (ui/UIManager.ts)
-Chat, health hearts, hotbar, debug overlay, and new interactive UI panels:
+Chat, health hearts, hotbar, debug overlay, and interactive UI panels:
 Extended features:
 
-- **Durability display** — shows tool durability bar on hotbar items
+- **Tool durability display** — color-coded durability bars on hotbar items
 - **Slot selection** — highlights active hotbar slot, supports number key selection
 - **Crafting UI** — recipe listing with ingredients, craft buttons per recipe
 - **Furnace UI** — smelting recipe list, input/fuel/output slots, real-time progress bar
@@ -422,14 +562,47 @@ Extended features:
 - **Death screen** — overlay with respawn button
 - **Player list panel** — shows online players
 - **Breath bar** — underwater oxygen indicator
+- **Armor equipment UI** — P key opens armor panel with 4 slots (helmet, chestplate, leggings, boots), equip/unequip
+- **Experience bar** — XP bar below hotbar with level display
+- **Creative inventory UI** — paginated grid with search/filter (I key)
+- **Settings panel** — FOV, sensitivity, render distance, volumes, clouds, AO (O key), all persisted to localStorage
 
-## Block System (64 Types)
+### SettingsPanel (ui/SettingsPanel.ts)
+Dedicated settings management with localStorage persistence.
+
+| Setting | Range | Default |
+|---------|-------|---------|
+| Mouse Sensitivity | 0.001 - 0.01 | 0.002 |
+| Render Distance | 2 - 8 | 4 |
+| FOV | 50 - 110 | 70 |
+| Music Volume | 0 - 1 | 0.5 |
+| Sound Volume | 0 - 1 | 0.5 |
+| Clouds | toggle | enabled |
+| Ambient Occlusion | toggle | enabled |
+
+Settings applied on panel close via callback to `GameClient.applySettings()`.
+
+### AudioManager (audio/AudioManager.ts)
+Procedural sound effects using Web Audio API. No audio files.
+
+| Sound | Method | Generation |
+|-------|--------|------------|
+| `block_break` | `playBlockBreak` | White noise burst (0.1s), decay |
+| `block_place` | `playBlockPlace` | Sine sweep 150->60 Hz (0.08s) |
+| `footstep` | `playFootstep` | Quiet white noise (0.05s) |
+| `hurt` | `playHurt` | Sawtooth 200Hz + square 153Hz (0.2s) |
+| `pickup` | `playPickup` | Sine 400->600 Hz step (0.15s) |
+| `death` | `playDeath` | Sawtooth sweep 440->55 Hz (0.5s) |
+
+Auto-resumes suspended `AudioContext` (browser autoplay policy).
+
+## Block System (68 Types)
 
 ### BlockDefinition Properties
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `id` | `ushort` | Unique block identifier (0-63) |
+| `id` | `ushort` | Unique block identifier (0-67) |
 | `name` | `string` | Block name (e.g. "stone", "water_flowing") |
 | `solid` | `bool` | Blocks movement and ray casting |
 | `transparent` | `bool` | Allows rendering of adjacent faces |
@@ -469,7 +642,7 @@ Extended features:
 | `dig_immediate` | Hand-diggable | — |
 | `oddly_breakable_by_hand` | Any tool works | — |
 
-### Complete Block List (64 types)
+### Complete Block List (68 types)
 
 | ID | Name | Category | Notable Properties |
 |----|------|----------|-------------------|
@@ -492,7 +665,7 @@ Extended features:
 | 16 | torch | Decoration | light=14, non-solid |
 | 17 | ladder | Decoration | climbable |
 | 18 | fence | Building | hardness=2.0, transparent |
-| 19 | door_wood | Decoration | interactive, hardness=3.0 |
+| 19 | door_wood | Decoration | interactive, hardness=3.0, open/close via Param2 |
 | 20 | chest | Decoration | interactive, hardness=2.5 |
 | 21 | crafting_table | Decoration | interactive, hardness=2.5 |
 | 22 | furnace | Decoration | interactive, hardness=3.5 |
@@ -537,17 +710,23 @@ Extended features:
 | 61 | wool_light_gray | Wool | hardness=0.8, snappy=2 |
 | 62 | glowing_obsidian | Building | hardness=50.0, light=14, cracky=5 |
 | 63 | apple_block | Plant | hardness=0.8, drops apple, snappy=3 |
+| 64 | wheat_crop | Agriculture | 8 growth stages (Param2 0-7), plantable on farmland |
+| 65 | carrot_crop | Agriculture | 8 growth stages, 45s grow time |
+| 66 | potato_crop | Agriculture | 8 growth stages, 45s grow time |
+| 67 | hay_bale | Agriculture | Building block from harvested crops |
 
 ## Data Files
 
 ### blocks.json
-64 block type definitions with all `BlockDefinition` properties including groups, sound groups, liquid properties.
+68 block type definitions with all `BlockDefinition` properties including groups, sound groups, liquid properties.
 
 ### items.json
 68 items with:
 - 56 crafting recipes (shaped and shapeless)
 - 16 food values (bread, apple, cooked_beef, cooked_pork, raw_beef, raw_pork, carrot, potato, baked_potato, mushroom_stew, melon_slice, cookie, cake, and more)
 - 5 tool capability tiers (wooden, stone, iron, diamond, default) with material-specific group ratings and dig speeds
+- Bucket items (bucket, water_bucket, lava_bucket, milk_bucket)
+- Armor items (leather/iron/diamond helmet, chestplate, leggings, boots)
 
 ### smelting.json
 Smelting recipes with input, result, cook time, and experience yield.
@@ -566,9 +745,9 @@ The client uses a texture atlas for block rendering instead of per-block solid c
 - **Atlas layout:** 8 columns x N rows (dynamic based on loaded textures)
 - **Tile size:** 16x16 pixels
 - **Filtering:** `NearestFilter` (pixelated, no smoothing)
-- **Loaded textures:** 32 texture names from `public/textures/blocks/`
+- **Loaded textures:** 125 PNG textures from `public/textures/blocks/`
 
-Texture names include: `default_stone`, `default_dirt`, `default_grass`, `default_water`, `default_sand`, `default_tree`, `default_leaves`, `default_snow`, `default_ice`, `default_lava`, `default_cobble`, `default_gravel`, `default_water_flowing`, `default_lava_flowing`, `default_mossycobble`, `default_desert_sand`, `default_desert_stone`, `default_tree_top`, `default_pine_tree`, `default_pine_tree_top`, `default_pine_needles`, `default_jungletree`, `default_jungletree_top`, `default_jungleleaves`, `default_junglegrass`, `default_river_water`, `default_river_water_flowing`, `default_apple`, `basenodes_snow_sheet`, `basenodes_dirt_with_snow`, `basenodes_dirt_with_snow_bottom`, `basenodes_dirt_with_grass_bottom`.
+Texture categories include: natural blocks (stone, dirt, grass, sand, etc.), ores (coal, iron, gold, diamond), building blocks (brick, glass, planks, cobblestone, etc.), wool variants (16 colors), tool textures (wood/stone/steel/mese/diamond swords, picks, shovels, axes, shears, daggers), decorative blocks (chest, furnace, crafting table, bookshelf, fence, ladder), tree variants (oak, pine, jungle), and special blocks (hay, melon, pumpkin, cactus, ice, snow).
 
 Blocks without a matching atlas texture fall back to vertex colors.
 
@@ -627,6 +806,7 @@ Blocks without a matching atlas texture fall back to vertex colors.
 - Level averaging when flowing blocks merge
 - Water + lava interaction: source+source → obsidian, flowing → cobblestone
 - Level 0 flowing blocks despawn automatically
+- Bucket interaction: right-click water/lava with empty bucket to pick up; use water_bucket/lava_bucket to place
 
 ## Mob Spawning System
 
@@ -636,12 +816,14 @@ Blocks without a matching atlas texture fall back to vertex colors.
 - Despawn when >128 blocks from nearest player
 - Max 50 mobs server-wide
 - Mob AI: chase within 16 blocks, attack within 2 blocks, wander when idle
+- **Mob death drops:** Items spawned at mob position when killed
 
 ## Cloud System
 
 - `CloudSystem.ts` — procedural canvas texture with white radial gradient blobs
 - Large plane at Y=120, slowly drifting in X direction with wrapping
 - Color/opacity responds to day/night cycle (white → orange/pink → dark gray)
+- Toggleable via settings panel
 
 ## Post-Processing Effects
 
@@ -667,12 +849,14 @@ Blocks without a matching atlas texture fall back to vertex colors.
 - Wired into `GameServer.Update()` main loop
 - Timers: farmland→dirt (30s, no water), dirt→grass (10-30s, near grass), ice→water (5-10s, near light >12)
 - `InitializeNodeTimers()` scans chunks on server start
+- Timers persisted to SQLite via `BlockMetadataDatabase`
 
 ## Creative Mode & Settings
 
 - Paginated creative inventory UI with search/filter (I key)
 - Settings panel (O key): mouse sensitivity, render distance, FOV, volumes, cloud/AO toggles
 - All settings persisted to localStorage
+- Settings applied in real-time (FOV applied on panel close)
 
 ## Player Animation
 

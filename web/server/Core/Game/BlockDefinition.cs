@@ -138,6 +138,10 @@ public class BlockDefinitionManager
             [(ushort)BlockType.WoolLightGray] = new() { Id = 61, Name = "wool_light_gray", Solid = true, Color = "#A0A0A0", Hardness = 0.8f, Groups = new() { ["snappy"] = 2 }, SoundGroup = "cloth" },
             [(ushort)BlockType.GlowingObsidian] = new() { Id = 62, Name = "glowing_obsidian", Solid = true, Color = "#3A1A5E", Hardness = 50.0f, Light = 14, Groups = new() { ["cracky"] = 5 }, SoundGroup = "stone" },
             [(ushort)BlockType.Apple] = new() { Id = 63, Name = "apple_block", Solid = true, Color = "#CC2222", Hardness = 0.8f, Drops = "apple", Groups = new() { ["snappy"] = 3, ["oddly_breakable_by_hand"] = 3 }, SoundGroup = "grass" },
+            [(ushort)BlockType.WheatCrop] = new() { Id = 64, Name = "wheat_crop", Solid = false, Transparent = true, Color = "#9ACD32", Hardness = 0.0f, Drops = "wheat", Groups = new() { ["snappy"] = 3, ["dig_immediate"] = 3 }, SoundGroup = "grass" },
+            [(ushort)BlockType.CarrotCrop] = new() { Id = 65, Name = "carrot_crop", Solid = false, Transparent = true, Color = "#FF8C00", Hardness = 0.0f, Drops = "carrot", Groups = new() { ["snappy"] = 3, ["dig_immediate"] = 3 }, SoundGroup = "grass" },
+            [(ushort)BlockType.PotatoCrop] = new() { Id = 66, Name = "potato_crop", Solid = false, Transparent = true, Color = "#DAA520", Hardness = 0.0f, Drops = "potato", Groups = new() { ["snappy"] = 3, ["dig_immediate"] = 3 }, SoundGroup = "grass" },
+            [(ushort)BlockType.HayBale] = new() { Id = 67, Name = "hay_bale", Solid = true, Color = "#DAA520", Hardness = 0.5f, Groups = new() { ["snappy"] = 3 }, SoundGroup = "grass" },
         };
     }
 

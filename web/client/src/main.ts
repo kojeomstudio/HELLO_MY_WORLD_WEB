@@ -72,6 +72,9 @@ class App {
             if (e.key === 'i' || e.key === 'I') {
                 this.gameClient.showCreativeInventory();
             }
+            if (e.key === 'p' || e.key === 'P') {
+                this.uiManager.toggleArmorPanel();
+            }
         });
 
         document.addEventListener('respawnRequest', () => {

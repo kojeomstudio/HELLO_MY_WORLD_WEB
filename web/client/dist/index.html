@@ -226,7 +226,7 @@
             transition: opacity 0.3s ease;
         }
     </style>
-  <script type="module" crossorigin src="/assets/index-CL_6IT2x.js"></script>
+  <script type="module" crossorigin src="/assets/index-BhXRwtbn.js"></script>
 </head>
 <body>
     <div id="game-container"></div>
@@ -235,6 +235,10 @@
         <div id="health-bar"></div>
         <div id="breath-bar"></div>
         <div id="hotbar"></div>
+        <div id="xp-bar" style="position:fixed;bottom:52px;left:50%;transform:translateX(-50%);width:182px;height:5px;background:rgba(0,0,0,0.5);border:1px solid #333;z-index:100;">
+            <div class="xp-fill" style="height:100%;background:#7dff00;width:0%;transition:width 0.3s;"></div>
+            <div class="xp-text" style="position:absolute;bottom:-2px;left:50%;transform:translateX(-50%);font-size:10px;color:#fff;text-shadow:1px 1px 1px #000;"></div>
+        </div>
         <div id="debug-info"></div>
         <div id="chat">
             <div id="chat-messages"></div>
@@ -254,6 +258,17 @@
         <div id="death-screen" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(255,0,0,0.3); flex-direction:column; align-items:center; justify-content:center; pointer-events:auto;">
             <h2 style="color:white; font-size:36px; margin-bottom:20px; text-shadow:0 0 10px rgba(0,0,0,0.8);" id="death-message">You died!</h2>
             <button id="respawn-button" style="padding:15px 50px; font-size:18px; border:none; border-radius:8px; background:#4CAF50; color:white; cursor:pointer;">Respawn</button>
+        </div>
+        <div id="armor-panel" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.85);border:2px solid #555;border-radius:8px;padding:16px;z-index:200;">
+            <div style="color:#fff;font-size:14px;margin-bottom:8px;text-align:center;">Armor</div>
+            <div style="display:grid;grid-template-columns:repeat(2,50px);gap:4px;">
+                <div class="armor-slot" data-slot="0" style="width:50px;height:50px;background:rgba(0,0,0,0.5);border:1px solid #555;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#888;font-size:10px;" title="Helmet"></div>
+                <div class="armor-slot" data-slot="1" style="width:50px;height:50px;background:rgba(0,0,0,0.5);border:1px solid #555;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#888;font-size:10px;" title="Chestplate"></div>
+                <div class="armor-slot" data-slot="2" style="width:50px;height:50px;background:rgba(0,0,0,0.5);border:1px solid #555;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#888;font-size:10px;" title="Leggings"></div>
+                <div class="armor-slot" data-slot="3" style="width:50px;height:50px;background:rgba(0,0,0,0.5);border:1px solid #555;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#888;font-size:10px;" title="Boots"></div>
+            </div>
+            <div id="armor-defense" style="color:#fff;font-size:11px;margin-top:8px;text-align:center;">Defense: 0</div>
+            <div style="color:#888;font-size:10px;margin-top:4px;text-align:center;">Click to unequip. Press P to close.</div>
         </div>
         <div id="damage-flash"></div>
         <div id="cave-vignette"></div>

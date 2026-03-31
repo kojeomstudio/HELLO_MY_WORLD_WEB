@@ -204,6 +204,14 @@ export class GameClient {
         this.connection.on('OnFallingBlock', (fromX: number, fromY: number, fromZ: number, toX: number, toY: number, toZ: number, blockType: number) => {
             this.worldManager.onFallingBlock(fromX, fromY, fromZ, toX, toY, toZ, blockType);
         });
+
+        this.connection.on('OnArmorUpdate', (items: any[]) => {
+            this.uiManager.updateArmor(items);
+        });
+
+        this.connection.on('OnExperienceUpdate', (_level: number, _totalExp: number) => {
+            this.uiManager.updateExperience(_level, _totalExp);
+        });
     }
 
     sendChat(message: string): void {
@@ -254,6 +262,14 @@ export class GameClient {
 
     getPrivileges(): void {
         this.connection?.invoke('GetPrivileges');
+    }
+
+    equipArmor(slotIndex: number, armorSlot: number): void {
+        this.connection?.invoke('EquipArmor', slotIndex, armorSlot);
+    }
+
+    unequipArmor(armorSlot: number): void {
+        this.connection?.invoke('UnequipArmor', armorSlot);
     }
 
     showCreativeInventory(): void {

@@ -9,6 +9,7 @@ using WebGameServer.Core.Game;
 using WebGameServer.Core.Physics;
 using WebGameServer.Core.Smelting;
 using WebGameServer.Core.World;
+using WebGameServer.Core.Player;
 using WebGameServer.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -100,6 +101,17 @@ builder.Services.AddSingleton<ActiveBlockModifierSystem>(sp =>
     return system;
 });
 builder.Services.AddSingleton<KnockbackSystem>();
+
+var dataDir = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "data", "worlds", "default");
+if (!Directory.Exists(dataDir))
+    dataDir = Path.Combine(Directory.GetCurrentDirectory(), "data", "worlds", "default");
+Directory.CreateDirectory(dataDir);
+
+var playerDbPath = Path.Combine(dataDir, "players.db");
+var blockMetaDbPath = Path.Combine(dataDir, "blockmeta.db");
+
+builder.Services.AddSingleton(new PlayerDatabase(playerDbPath));
+builder.Services.AddSingleton(new BlockMetadataDatabase(blockMetaDbPath));
 builder.Services.AddSingleton<GameServer>();
 builder.Services.AddSingleton<AuthenticationService>();
 builder.Services.AddSingleton<ChatCommandManager>(sp =>
@@ -163,6 +175,9 @@ var hubContext = app.Services.GetRequiredService<IHubContext<GameHub, IGameClien
 gameServer.SetHubContext(hubContext);
 gameServer.Start();
 
+var agricultureSystem = new AgricultureSystem(gameServer.DefaultWorld, app.Services.GetRequiredService<BlockDefinitionManager>());
+gameServer.Agriculture = agricultureSystem;
+
 var worldDataPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "data", "worlds", "default");
 if (!Directory.Exists(worldDataPath))
     worldDataPath = Path.Combine(Directory.GetCurrentDirectory(), "data", "worlds", "default");
@@ -171,6 +186,7 @@ gameServer.DefaultWorld.Load(worldDataPath);
 
 app.Lifetime.ApplicationStopping.Register(() =>
 {
+    gameServer.SaveAllMetadata();
     gameServer.DefaultWorld.Save(worldDataPath);
     gameServer.Stop();
 });

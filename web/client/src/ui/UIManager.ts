@@ -850,4 +850,94 @@ export class UIManager {
     private formatItemName(itemId: string): string {
         return itemId.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
     }
+
+    private static armorSlotNames = ['Helmet', 'Chestplate', 'Leggings', 'Boots'];
+
+    private static getDefenseValue(itemId: string): number {
+        const id = itemId.toLowerCase();
+        switch (id) {
+            case 'leather_helmet': case 'leather_chestplate': case 'leather_leggings': case 'leather_boots': return 1;
+            case 'iron_helmet': return 2;
+            case 'iron_chestplate': return 6;
+            case 'iron_leggings': return 5;
+            case 'iron_boots': return 2;
+            case 'diamond_helmet': return 3;
+            case 'diamond_chestplate': return 8;
+            case 'diamond_leggings': return 6;
+            case 'diamond_boots': return 3;
+            default: return 0;
+        }
+    }
+
+    updateArmor(items: any[]): void {
+        const slots = document.querySelectorAll('.armor-slot');
+        let totalDefense = 0;
+
+        for (let i = 0; i < 4; i++) {
+            const slot = slots[i] as HTMLElement | undefined;
+            if (!slot) continue;
+
+            if (items[i] && items[i].itemId) {
+                const item = items[i];
+                const def = UIManager.getDefenseValue(item.itemId);
+                totalDefense += def;
+                slot.innerHTML = `<span style="font-size:9px;color:#fff;text-align:center;">${this.formatItemName(item.itemId)}</span>`;
+                slot.style.background = 'rgba(100,150,255,0.3)';
+                slot.style.borderColor = '#6699ff';
+            } else {
+                slot.innerHTML = UIManager.armorSlotNames[i];
+                slot.style.background = 'rgba(0,0,0,0.5)';
+                slot.style.borderColor = '#555';
+            }
+        }
+
+        const defenseEl = document.getElementById('armor-defense');
+        if (defenseEl) {
+            defenseEl.textContent = `Defense: ${totalDefense}`;
+        }
+    }
+
+    updateExperience(level: number, totalExp: number): void {
+        const xpFill = document.querySelector('.xp-fill') as HTMLElement | null;
+        const xpText = document.querySelector('.xp-text') as HTMLElement | null;
+        if (xpFill) {
+            const progress = (totalExp % 100) / 100 * 100;
+            xpFill.style.width = `${progress}%`;
+        }
+        if (xpText) {
+            xpText.textContent = String(level);
+        }
+    }
+
+    showArmorPanel(): void {
+        const panel = document.getElementById('armor-panel');
+        if (!panel) return;
+        panel.style.display = 'block';
+        document.exitPointerLock();
+
+        const slots = panel.querySelectorAll('.armor-slot');
+        slots.forEach(slot => {
+            const newSlot = slot as HTMLElement;
+            newSlot.onclick = () => {
+                const armorSlot = parseInt(newSlot.dataset.slot || '0');
+                this._connection?.invoke('UnequipArmor', armorSlot);
+            };
+        });
+    }
+
+    hideArmorPanel(): void {
+        const panel = document.getElementById('armor-panel');
+        if (panel) {
+            panel.style.display = 'none';
+        }
+    }
+
+    toggleArmorPanel(): void {
+        const panel = document.getElementById('armor-panel');
+        if (!panel || panel.style.display === 'none') {
+            this.showArmorPanel();
+        } else {
+            this.hideArmorPanel();
+        }
+    }
 }

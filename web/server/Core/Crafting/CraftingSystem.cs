@@ -60,6 +60,9 @@ public class CraftingSystem
 
     public CraftingRecipe? FindRecipe(List<(string ItemId, int Count)> availableItems)
     {
+        // Simplified from Minetest's shaped crafting: pattern data is loaded but matching
+        // falls back to ingredient count comparison (shapeless). Full grid-based pattern
+        // validation would require the client to send a crafting grid layout.
         foreach (var recipe in _recipes)
         {
             if (recipe.Shaped && recipe.Pattern != null && recipe.Keys != null)

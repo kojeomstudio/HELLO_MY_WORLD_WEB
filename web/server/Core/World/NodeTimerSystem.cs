@@ -76,4 +76,12 @@ public class NodeTimerSystem
             return _timers.Count;
         }
     }
+
+    public List<(int X, int Y, int Z, string BlockName, double Expiration)> GetAllTimers()
+    {
+        lock (_lock)
+        {
+            return _timers.Select(t => (t.Key.X, t.Key.Y, t.Key.Z, t.Value.Timeout.ToString(), t.Value.Timeout - t.Value.Elapsed)).ToList();
+        }
+    }
 }

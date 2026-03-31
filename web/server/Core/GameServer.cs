@@ -33,8 +33,11 @@ public class GameServer
     private readonly KnockbackSystem _knockbackSystem;
     private readonly PhysicsEngine _physicsEngine;
     private readonly EntityManager _entityManager;
+    private readonly PlayerDatabase _playerDatabase;
+    private readonly BlockMetadataDatabase _blockMetadataDatabase;
     private readonly MobSpawner _mobSpawner;
     private NodeTimerSystem _nodeTimerSystem;
+    public AgricultureSystem? Agriculture { get; set; }
 
     private IHubContext<GameHub, IGameClient>? _hubContext;
     private int _tickCount;
@@ -64,7 +67,9 @@ public class GameServer
         ActiveBlockModifierSystem abmSystem,
         KnockbackSystem knockbackSystem,
         PhysicsEngine physicsEngine,
-        EntityManager entityManager)
+        EntityManager entityManager,
+        PlayerDatabase playerDatabase,
+        BlockMetadataDatabase blockMetadataDatabase)
     {
         _config = config;
         _blockDefinitionManager = blockDefinitionManager;
@@ -75,6 +80,8 @@ public class GameServer
         _knockbackSystem = knockbackSystem;
         _physicsEngine = physicsEngine;
         _entityManager = entityManager;
+        _playerDatabase = playerDatabase;
+        _blockMetadataDatabase = blockMetadataDatabase;
         _mobSpawner = new MobSpawner(entityManager);
 
         MaxPlayers = config.Server.MaxPlayers;
@@ -166,9 +173,19 @@ public class GameServer
             State = PlayerState.Connected
         };
 
-        var spawnY = DefaultWorld.GetGroundHeight(0, 0) + 2;
-        player.Position = new Vector3(0, spawnY, 0);
-        player.LastGroundY = spawnY;
+        if (_playerDatabase.PlayerExists(playerName))
+        {
+            _playerDatabase.LoadPlayer(player);
+            player.ConnectionId = connectionId;
+            player.State = PlayerState.Connected;
+            player.IsDead = false;
+        }
+        else
+        {
+            var spawnY = DefaultWorld.GetGroundHeight(0, 0) + 2;
+            player.Position = new Vector3(0, spawnY, 0);
+            player.LastGroundY = spawnY;
+        }
 
         _players.TryAdd(playerName, player);
         _connectionToPlayer.TryAdd(connectionId, playerName);
@@ -183,6 +200,10 @@ public class GameServer
     {
         if (_connectionToPlayer.TryRemove(connectionId, out var playerName))
         {
+            if (_players.TryGetValue(playerName, out var player))
+            {
+                _playerDatabase.SavePlayer(player);
+            }
             _players.TryRemove(playerName, out _);
             _connectionToPlayerId.TryRemove(playerName, out _);
             _privilegeSystem.RemovePlayer(playerName);
@@ -267,6 +288,8 @@ public class GameServer
         DefaultWorld.UpdateLiquids(_tickCount);
 
         _abmSystem.Process(DefaultWorld, _tickCount, _blockDefinitionManager);
+
+        Agriculture?.GrowAllCrops(1f / TickRate);
 
         UpdateFurnaces(1f / TickRate);
 
@@ -373,6 +396,7 @@ public class GameServer
             {
                 _ = _hubContext.Clients.All.OnDeath(deathMessage);
             }
+            DropPlayerInventory(player);
         }
     }
 
@@ -429,12 +453,12 @@ public class GameServer
                 : _physicsEngine.WalkSpeed;
 
         var maxDistance = maxSpeed * dt * 1.5f;
-        var distance = Vector3.Distance(player.Position, player.Velocity);
+        var distance = Vector3.Distance(player.Position, player.PreviousPosition);
 
-        if (distance > maxDistance && distance > 0)
+        if (distance > maxDistance && distance > 0 && player.PreviousPosition.Length > 0)
         {
-            var direction = (player.Position - player.Velocity).Normalized;
-            var correctedPos = player.Velocity + direction * maxDistance;
+            var direction = (player.Position - player.PreviousPosition).Normalized;
+            var correctedPos = player.PreviousPosition + direction * maxDistance;
             player.Position = correctedPos;
         }
 
@@ -464,7 +488,12 @@ public class GameServer
 
     public ItemStack?[] GetOrCreateChestInventory(string posKey)
     {
-        return _chestInventories.GetOrAdd(posKey, _ => new ItemStack?[27]);
+        if (_chestInventories.TryGetValue(posKey, out var existing))
+            return existing;
+
+        var loaded = _blockMetadataDatabase.LoadChestInventory(posKey);
+        _chestInventories[posKey] = loaded;
+        return loaded;
     }
 
     public ItemStack?[]? GetChestInventory(string posKey)
@@ -690,6 +719,40 @@ public class GameServer
     }
 
     public static string PositionKey(int x, int y, int z) => $"{x},{y},{z}";
+
+    public void SaveAllMetadata()
+    {
+        foreach (var kvp in _chestInventories)
+        {
+            _blockMetadataDatabase.SaveChestInventory(kvp.Key, kvp.Value);
+        }
+        foreach (var kvp in _activeFurnaces)
+        {
+            _blockMetadataDatabase.SaveFurnaceOperation(kvp.Key, kvp.Value);
+        }
+        var timers = _nodeTimerSystem.GetAllTimers();
+        _blockMetadataDatabase.SaveAllNodeTimers(timers);
+    }
+
+    public void DropPlayerInventory(PlayerEnt player)
+    {
+        for (int i = 0; i < player.Inventory.Size; i++)
+        {
+            var item = player.Inventory[i];
+            if (item == null) continue;
+            var entity = new ItemEntity(item.ItemId, item.Count, player.Position);
+            _entityManager.Add(entity);
+            player.Inventory[i] = null;
+        }
+        for (int i = 0; i < player.ArmorSlots.Length; i++)
+        {
+            var item = player.ArmorSlots[i];
+            if (item == null) continue;
+            var entity = new ItemEntity(item.ItemId, item.Count, player.Position);
+            _entityManager.Add(entity);
+            player.ArmorSlots[i] = null;
+        }
+    }
 
     private void OnNodeTimerExpired(int x, int y, int z, string blockName)
     {

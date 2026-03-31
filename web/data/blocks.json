@@ -63,6 +63,10 @@
         "60": { "name": "wool_gray", "solid": true, "transparent": false, "color": "#6B6B6B", "hardness": 0.8, "groups": { "snappy": 2 }, "soundGroup": "cloth" },
         "61": { "name": "wool_light_gray", "solid": true, "transparent": false, "color": "#A0A0A0", "hardness": 0.8, "groups": { "snappy": 2 }, "soundGroup": "cloth" },
         "62": { "name": "glowing_obsidian", "solid": true, "transparent": false, "color": "#3A1A5E", "hardness": 50.0, "light": 14, "groups": { "cracky": 5 }, "soundGroup": "stone" },
-        "63": { "name": "apple_block", "solid": true, "transparent": false, "color": "#CC2222", "hardness": 0.8, "drops": "apple", "groups": { "snappy": 3, "oddly_breakable_by_hand": 3 }, "soundGroup": "grass" }
+        "63": { "name": "apple_block", "solid": true, "transparent": false, "color": "#CC2222", "hardness": 0.8, "drops": "apple", "groups": { "snappy": 3, "oddly_breakable_by_hand": 3 }, "soundGroup": "grass" },
+        "64": { "name": "wheat_crop", "solid": false, "transparent": true, "color": "#9ACD32", "hardness": 0.0, "drops": "wheat", "groups": { "snappy": 3, "dig_immediate": 3 }, "soundGroup": "grass" },
+        "65": { "name": "carrot_crop", "solid": false, "transparent": true, "color": "#FF8C00", "hardness": 0.0, "drops": "carrot", "groups": { "snappy": 3, "dig_immediate": 3 }, "soundGroup": "grass" },
+        "66": { "name": "potato_crop", "solid": false, "transparent": true, "color": "#DAA520", "hardness": 0.0, "drops": "potato", "groups": { "snappy": 3, "dig_immediate": 3 }, "soundGroup": "grass" },
+        "67": { "name": "hay_bale", "solid": true, "transparent": false, "color": "#DAA520", "hardness": 0.5, "groups": { "snappy": 3 }, "soundGroup": "grass" }
     }
 }
