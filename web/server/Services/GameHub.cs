@@ -42,6 +42,7 @@ public interface IGameClient
     Task OnSmeltingRecipes(object[] recipes);
     Task OnChestInventory(object[] items);
     Task OnFurnaceUpdate(string input, string fuel, string output, float progress);
+    Task OnFallingBlock(int fromX, int fromY, int fromZ, int toX, int toY, int toZ, ushort blockType);
 }
 
 public class GameHub : Hub<IGameClient>
@@ -268,17 +269,69 @@ public class GameHub : Hub<IGameClient>
         }
     }
 
-    public async Task<bool> DigBlockStart(int x, int y, int z)
+    public async Task<float> DigBlockStart(int x, int y, int z)
     {
         var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
-        if (player == null) return false;
+        if (player == null) return -1f;
         var blockPos = new Vector3s((short)x, (short)y, (short)z);
         var block = _gameServer.DefaultWorld.GetBlock(blockPos);
         var blockData = block.ToUInt16();
-        if (blockData == 0) return false;
+        if (blockData == 0) return -1f;
         var blockDef = _blockDefinitionManager.Get(blockData);
-        if (blockDef != null && !blockDef.Breakable) return false;
-        return true;
+        if (blockDef == null || !blockDef.Breakable) return -1f;
+
+        if (blockDef.Groups.TryGetValue("dig_immediate", out _))
+        {
+            return 0.15f;
+        }
+
+        var hardness = blockDef.Hardness;
+        if (hardness <= 0) hardness = 0.1f;
+
+        var toolMultiplier = 1.0f;
+        var toolItem = player.GetSelectedHotbarItem();
+        if (toolItem != null)
+        {
+            var toolName = toolItem.ItemId.ToLowerInvariant();
+            toolMultiplier = GetToolMultiplier(toolName, blockDef);
+        }
+
+        var digTime = hardness / toolMultiplier;
+        return Math.Max(digTime, 0.1f);
+    }
+
+    private static float GetToolMultiplier(string toolName, BlockDefinition blockDef)
+    {
+        var materialMultiplier = toolName switch
+        {
+            var n when n.StartsWith("diamond_") => 8,
+            var n when n.StartsWith("iron_") => 6,
+            var n when n.StartsWith("stone_") => 4,
+            var n when n.StartsWith("wooden_") => 2,
+            _ => 1
+        };
+
+        string? toolGroup = null;
+        if (toolName.Contains("pickaxe")) toolGroup = "cracky";
+        else if (toolName.Contains("axe")) toolGroup = "choppy";
+        else if (toolName.Contains("shovel")) toolGroup = "crumbly";
+        else if (toolName.Contains("sword")) toolGroup = "snappy";
+        else if (toolName.Contains("hoe")) toolGroup = "crumbly";
+
+        if (toolGroup != null && blockDef.Groups.TryGetValue(toolGroup, out var groupLevel))
+        {
+            if (groupLevel > 0)
+            {
+                return materialMultiplier;
+            }
+        }
+
+        if (blockDef.Groups.TryGetValue("oddly_breakable_by_hand", out var handLevel) && handLevel > 0)
+        {
+            return Math.Max(materialMultiplier, 1.0f);
+        }
+
+        return 1.0f;
     }
 
     public async Task UseItem(int slotIndex)

@@ -23,7 +23,7 @@ public class Chunk
             {
                 for (int z = 0; z < Size; z++)
                 {
-                    _blocks[x, y, z] = Block.Air;
+                    _blocks[x, y, z] = new Block(BlockType.Air, 0, 0, 0);
                 }
             }
         }

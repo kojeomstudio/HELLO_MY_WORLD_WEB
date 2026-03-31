@@ -11,6 +11,13 @@ public class ServerConfig
     public PhysicsSettings Physics { get; set; } = new();
     public DayNightSettings DayNight { get; set; } = new();
     public NetworkSettings Network { get; set; } = new();
+    public LiquidSettings Liquid { get; set; } = new();
+}
+
+public class LiquidSettings
+{
+    public int WaterFlowInterval { get; set; } = 3;
+    public int LavaFlowInterval { get; set; } = 5;
 }
 
 public class ServerSettings

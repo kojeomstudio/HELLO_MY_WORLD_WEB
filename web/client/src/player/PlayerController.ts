@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import * as HubConnection from '@microsoft/signalr';
 import { InputManager } from '../input/InputManager';
 import { WorldManager } from '../world/WorldManager';
 import { SelectionBox } from '../rendering/SelectionBox';
@@ -28,6 +29,12 @@ export class PlayerController {
     private _knockbackVelocity: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
     private _selectionBox: SelectionBox | null = null;
     private _particleEmitter: ((x: number, y: number, z: number, type: string) => void) | null = null;
+    private _connection: HubConnection.HubConnection | null = null;
+    private digStartTime: number = 0;
+    private digTarget: { x: number; y: number; z: number } | null = null;
+    private digDuration: number = 0;
+    private isDigging: boolean = false;
+    private isLeftMouseDown: boolean = false;
     health: number = 20;
     maxHealth: number = 20;
     inventory: any[] = [];
@@ -53,6 +60,10 @@ export class PlayerController {
 
     setParticleEmitter(emitter: (x: number, y: number, z: number, type: string) => void): void {
         this._particleEmitter = emitter;
+    }
+
+    setConnection(connection: HubConnection.HubConnection): void {
+        this._connection = connection;
     }
 
     private requestPointerLock(): void {
@@ -97,20 +108,103 @@ export class PlayerController {
             if (!this._input.isPointerLocked()) return;
             if (this.isDead) return;
             if (e.button === 0) {
-                this.onDig();
+                this.isLeftMouseDown = true;
+                this.startDig();
             } else if (e.button === 2) {
                 this.onPlace();
+            }
+        });
+
+        document.addEventListener('mouseup', (e: MouseEvent) => {
+            if (e.button === 0) {
+                this.isLeftMouseDown = false;
+                this.resetDig();
             }
         });
 
         document.addEventListener('contextmenu', (e) => e.preventDefault());
     }
 
-    private onDig(): void {
+    private startDig(): void {
         const ray = this.castRay();
-        if (ray) {
-            this._particleEmitter?.(ray.blockX, ray.blockY, ray.blockZ, 'dig');
-            this.emitBlockEvent('dig', ray.blockX, ray.blockY, ray.blockZ);
+        if (!ray) return;
+
+        const target = { x: ray.blockX, y: ray.blockY, z: ray.blockZ };
+
+        if (this.digTarget &&
+            this.digTarget.x === target.x &&
+            this.digTarget.y === target.y &&
+            this.digTarget.z === target.z &&
+            this.isDigging)
+        {
+            return;
+        }
+
+        this.resetDig();
+        this.digTarget = target;
+
+        if (!this._connection) {
+            this.instantDig(ray);
+            return;
+        }
+
+        this._connection.invoke('DigBlockStart', ray.blockX, ray.blockY, ray.blockZ)
+            .then((digTime: number) => {
+                if (digTime < 0) return;
+                this.digStartTime = performance.now() / 1000;
+                this.digDuration = digTime;
+                this.isDigging = true;
+            })
+            .catch(() => {
+                this.instantDig(ray);
+            });
+    }
+
+    private instantDig(ray: { blockX: number; blockY: number; blockZ: number }): void {
+        this._particleEmitter?.(ray.blockX, ray.blockY, ray.blockZ, 'dig');
+        this.emitBlockEvent('dig', ray.blockX, ray.blockY, ray.blockZ);
+    }
+
+    private completeDig(): void {
+        if (!this.digTarget) return;
+        this._particleEmitter?.(this.digTarget.x, this.digTarget.y, this.digTarget.z, 'dig');
+        this.emitBlockEvent('dig', this.digTarget.x, this.digTarget.y, this.digTarget.z);
+        this.resetDig();
+    }
+
+    private resetDig(): void {
+        this.digStartTime = 0;
+        this.digTarget = null;
+        this.digDuration = 0;
+        this.isDigging = false;
+        this._selectionBox?.setDigProgress(0);
+    }
+
+    private updateDig(): void {
+        if (!this.isLeftMouseDown || !this.isDigging || !this.digTarget) {
+            if (this.isDigging) {
+                this.resetDig();
+            }
+            return;
+        }
+
+        const ray = this.castRay();
+        if (!ray ||
+            ray.blockX !== this.digTarget.x ||
+            ray.blockY !== this.digTarget.y ||
+            ray.blockZ !== this.digTarget.z)
+        {
+            this.resetDig();
+            return;
+        }
+
+        const elapsed = performance.now() / 1000 - this.digStartTime;
+        const progress = Math.min(elapsed / this.digDuration, 1.0);
+        this._selectionBox?.setDigProgress(progress);
+
+        if (progress >= 1.0)
+        {
+            this.completeDig();
         }
     }
 
@@ -195,6 +289,7 @@ export class PlayerController {
         this.updateMovement(dt);
         this.updateCamera();
         this.updateSelectionBox();
+        this.updateDig();
     }
 
     private updateMovement(dt: number): void {
@@ -418,4 +513,5 @@ export class PlayerController {
 
     getSelectedSlot(): number { return this._selectedSlot; }
     getSelectedBlockType(): number { return this._selectedBlockType; }
+    setSelectedBlockType(blockType: number): void { this._selectedBlockType = blockType; }
 }

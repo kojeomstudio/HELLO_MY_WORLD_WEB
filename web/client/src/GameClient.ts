@@ -10,6 +10,7 @@ import { Minimap } from './ui/Minimap';
 import { ParticleSystem } from './world/ParticleSystem';
 import { WieldItem } from './rendering/WieldItem';
 import { SelectionBox } from './rendering/SelectionBox';
+import { WeatherSystem } from './world/WeatherSystem';
 
 export class GameClient {
     private connection: HubConnection.HubConnection | null = null;
@@ -23,12 +24,15 @@ export class GameClient {
     private particleSystem: ParticleSystem;
     private wieldItem: WieldItem;
     private selectionBox: SelectionBox;
+    private weatherSystem: WeatherSystem;
     private isRunning: boolean = false;
     private lastTime: number = 0;
     private frameCount: number = 0;
     private fps: number = 0;
     private fpsTimer: number = 0;
     private chunkRequestTimer: number = 0;
+    private weatherTimer: number = 0;
+    private skyBrightness: number = 1;
 
     constructor(uiManager: UIManager) {
         this.uiManager = uiManager;
@@ -40,12 +44,22 @@ export class GameClient {
         this.particleSystem = new ParticleSystem(this.renderer.getScene());
         this.wieldItem = new WieldItem(this.renderer.getScene(), this.renderer.getCamera());
         this.selectionBox = new SelectionBox(this.renderer.getScene());
+        this.weatherSystem = new WeatherSystem(this.renderer.getScene());
         this.playerController = new PlayerController(this.renderer.getCamera(), this.inputManager);
         this.playerController.setWorldManager(this.worldManager);
         this.playerController.setSelectionBox(this.selectionBox);
         this.playerController.setParticleEmitter((x, y, z, type) => {
             this.onParticleEvent(x, y, z, type);
         });
+
+        this.applySettings(this.uiManager.getSettingsPanel().getSettings());
+        this.uiManager.getSettingsPanel().setOnSettingsChanged((settings) => {
+            this.applySettings(settings);
+        });
+    }
+
+    private applySettings(settings: any): void {
+        this.renderer.setFov(settings.fov);
     }
 
     async connect(playerName: string): Promise<void> {
@@ -56,6 +70,7 @@ export class GameClient {
             .build();
 
         this.worldManager.setConnection(this.connection);
+        this.playerController.setConnection(this.connection);
         this.setupServerHandlers();
         this.uiManager.setConnection(this.connection);
 
@@ -114,6 +129,7 @@ export class GameClient {
         });
 
         this.connection.on('OnTimeUpdate', (_time: number, _speed: number, skyBrightness: number) => {
+            this.skyBrightness = skyBrightness;
             this.renderer.updateSkyBrightness(skyBrightness);
         });
 
@@ -149,6 +165,7 @@ export class GameClient {
         this.connection.on('OnKnockback', (vx: number, vy: number, vz: number) => {
             this.playerController.applyKnockback(vx, vy, vz);
             this.audioManager.play('hurt');
+            this.renderer.flashDamage(0.6);
         });
 
         this.connection.on('OnPrivilegeList', (_privileges: string[]) => {
@@ -182,6 +199,10 @@ export class GameClient {
 
         this.connection.on('OnFurnaceUpdate', (input: string, fuel: string, output: string, progress: number) => {
             this.uiManager.updateFurnaceState(input, fuel, output, progress);
+        });
+
+        this.connection.on('OnFallingBlock', (fromX: number, fromY: number, fromZ: number, toX: number, toY: number, toZ: number, blockType: number) => {
+            this.worldManager.onFallingBlock(fromX, fromY, fromZ, toX, toY, toZ, blockType);
         });
     }
 
@@ -235,6 +256,21 @@ export class GameClient {
         this.connection?.invoke('GetPrivileges');
     }
 
+    showCreativeInventory(): void {
+        const registry = this.worldManager.getBlockRegistry();
+        const allBlocks: { id: number; name: string; color: string; solid: boolean }[] = [];
+        registry.getAll().forEach((def, id) => {
+            if (id > 0) {
+                allBlocks.push({ id, name: def.name, color: def.color, solid: def.solid });
+            }
+        });
+        allBlocks.sort((a, b) => a.id - b.id);
+        this.uiManager.setCreativeSelectHandler((blockId: number) => {
+            this.playerController.setSelectedBlockType(blockId);
+        });
+        this.uiManager.showCreativeInventory(allBlocks);
+    }
+
     private gameLoop(): void {
         if (!this.isRunning) return;
         requestAnimationFrame(() => this.gameLoop());
@@ -284,6 +320,40 @@ export class GameClient {
         }
 
         this.worldManager.update(dt);
+        this.renderer.updateClouds(dt);
+        this.renderer.updateEffects(dt);
+
+        this.weatherTimer += dt;
+        if (this.weatherTimer >= 5.0) {
+            this.weatherTimer = 0;
+            if (this.skyBrightness < 0.3) {
+                this.weatherSystem.setRaining(true);
+            } else {
+                this.weatherSystem.setRaining(Math.random() < 0.2);
+            }
+            this.renderer.setRaining(this.weatherSystem.getIsRaining());
+        }
+
+        const playerPos = this.playerController.getPosition();
+        this.weatherSystem.update(dt, playerPos.x, playerPos.y, playerPos.z);
+
+        const vel = this.playerController.getVelocity();
+        const isMoving = (vel.x * vel.x + vel.z * vel.z) > 0.5;
+        this.worldManager.animatePlayer('__local__', isMoving, dt);
+
+        if (playerPos.y < 30) {
+            const hasSkyAccess = this.checkSkyAccess(
+                Math.floor(playerPos.x),
+                Math.floor(playerPos.y) + 2,
+                Math.floor(playerPos.z)
+            );
+            this.renderer.updateCaveDarkness(playerPos.y, !hasSkyAccess);
+        } else {
+            this.renderer.updateCaveDarkness(playerPos.y, false);
+        }
+
+        this.renderer.updateLavaEffect(this.checkNearLava(playerPos));
+
         this.renderer.render();
         this.uiManager.updateDebugInfo(
             this.fps,
@@ -332,5 +402,34 @@ export class GameClient {
                 this.particleSystem.emitSmokeParticles(x, y, z, 4);
                 break;
         }
+    }
+
+    private checkSkyAccess(x: number, startY: number, z: number): boolean {
+        for (let y = startY; y < 80; y += 3) {
+            if (this.worldManager.isSolid(x, y, z)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private checkNearLava(pos: THREE.Vector3): boolean {
+        const range = 4;
+        const px = Math.floor(pos.x);
+        const py = Math.floor(pos.y);
+        const pz = Math.floor(pos.z);
+        for (let dx = -range; dx <= range; dx++) {
+            for (let dy = -range; dy <= range; dy++) {
+                for (let dz = -range; dz <= range; dz++) {
+                    if (dx * dx + dy * dy + dz * dz > range * range) continue;
+                    const blockId = this.worldManager.getBlock(px + dx, py + dy, pz + dz);
+                    const blockDef = this.worldManager.getBlockRegistry().get(blockId);
+                    if (blockDef && (blockDef.name === 'default:lava' || blockDef.name === 'default:lava_source')) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 }

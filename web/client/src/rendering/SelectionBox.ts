@@ -2,6 +2,8 @@ import * as THREE from 'three';
 
 export class SelectionBox {
     private wireframe: THREE.LineSegments;
+    private digOverlay: THREE.Mesh;
+    private digMaterial: THREE.MeshBasicMaterial;
     private edges: THREE.EdgesGeometry;
     private material: THREE.LineBasicMaterial;
     private visible: boolean = false;
@@ -18,6 +20,18 @@ export class SelectionBox {
         this.wireframe = new THREE.LineSegments(this.edges, this.material);
         this.wireframe.visible = false;
         scene.add(this.wireframe);
+
+        const overlayGeometry = new THREE.BoxGeometry(1.008, 1.008, 1.008);
+        this.digMaterial = new THREE.MeshBasicMaterial({
+            color: 0x000000,
+            transparent: true,
+            opacity: 0,
+            depthTest: true,
+            side: THREE.FrontSide
+        });
+        this.digOverlay = new THREE.Mesh(overlayGeometry, this.digMaterial);
+        this.digOverlay.visible = false;
+        this.wireframe.add(this.digOverlay);
     }
 
     update(hitPoint: THREE.Vector3 | null, normal: THREE.Vector3 | null): void {
@@ -36,6 +50,16 @@ export class SelectionBox {
         this.visible = true;
     }
 
+    setDigProgress(progress: number): void {
+        if (progress <= 0) {
+            this.digOverlay.visible = false;
+            this.digMaterial.opacity = 0;
+        } else {
+            this.digOverlay.visible = true;
+            this.digMaterial.opacity = Math.min(progress * 0.6, 0.6);
+        }
+    }
+
     setVisible(visible: boolean): void {
         this.wireframe.visible = visible && this.visible;
     }
@@ -47,6 +71,8 @@ export class SelectionBox {
     destroy(): void {
         this.edges.dispose();
         this.material.dispose();
+        this.digMaterial.dispose();
+        this.digOverlay.geometry.dispose();
         this.wireframe.removeFromParent();
     }
 }

@@ -1,4 +1,12 @@
 import * as HubConnection from '@microsoft/signalr';
+import { SettingsPanel } from './SettingsPanel';
+
+interface CreativeInventoryEntry {
+    id: number;
+    name: string;
+    color: string;
+    solid: boolean;
+}
 
 export class UIManager {
     private _connection: HubConnection.HubConnection | null = null;
@@ -11,14 +19,21 @@ export class UIManager {
     private breathBar: HTMLElement | null = null;
     private furnaceUI: HTMLElement | null = null;
     private chestUI: HTMLElement | null = null;
+    private creativeInventoryUI: HTMLElement | null = null;
     private chestPosition: { x: number; y: number; z: number } | null = null;
     private furnacePosition: { x: number; y: number; z: number } | null = null;
+    private creativePage: number = 0;
+    private creativeFilter: string = '';
+    private creativeEntries: CreativeInventoryEntry[] = [];
+    private onCreativeSelect: ((blockId: number) => void) | null = null;
+    private settingsPanel: SettingsPanel;
 
     constructor() {
         this.chatMessages = document.getElementById('chat-messages')!;
         this.healthBar = document.getElementById('health-bar')!;
         this.hotbar = document.getElementById('hotbar')!;
         this.debugInfo = document.getElementById('debug-info')!;
+        this.settingsPanel = new SettingsPanel();
         this.setupHotbar();
     }
 
@@ -616,6 +631,182 @@ export class UIManager {
         this.hideCraftingUI();
         this.hideFurnaceUI();
         this.hideChestUI();
+        this.hideCreativeInventory();
+    }
+
+    setCreativeSelectHandler(handler: (blockId: number) => void): void {
+        this.onCreativeSelect = handler;
+    }
+
+    showCreativeInventory(allBlocks: CreativeInventoryEntry[]): void {
+        this.hideCraftingUI();
+        this.hideFurnaceUI();
+        this.hideChestUI();
+        this.hideCreativeInventory();
+        document.exitPointerLock();
+
+        this.creativeEntries = allBlocks.filter(b => b.id > 0);
+        this.creativePage = 0;
+        this.creativeFilter = '';
+
+        this.creativeInventoryUI = document.createElement('div');
+        this.creativeInventoryUI.id = 'creative-inventory-ui';
+        this.creativeInventoryUI.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(40,40,60,0.95);color:white;padding:20px;border-radius:8px;z-index:500;width:520px;max-height:80vh;display:flex;flex-direction:column;';
+
+        const header = document.createElement('div');
+        header.style.cssText = 'font-size:20px;font-weight:bold;margin-bottom:12px;text-align:center;display:flex;justify-content:space-between;align-items:center;';
+        const title = document.createElement('span');
+        title.textContent = 'Creative Inventory';
+        const closeBtn = document.createElement('button');
+        closeBtn.style.cssText = 'cursor:pointer;background:none;border:none;color:white;font-size:20px;';
+        closeBtn.textContent = 'X';
+        closeBtn.addEventListener('click', () => {
+            this.hideCreativeInventory();
+        });
+        header.appendChild(title);
+        header.appendChild(closeBtn);
+
+        const searchInput = document.createElement('input');
+        searchInput.type = 'text';
+        searchInput.placeholder = 'Search blocks...';
+        searchInput.style.cssText = 'width:100%;padding:8px;margin-bottom:12px;background:rgba(0,0,0,0.4);border:1px solid #555;border-radius:4px;color:white;font-size:14px;outline:none;box-sizing:border-box;';
+        searchInput.addEventListener('input', () => {
+            this.creativeFilter = searchInput.value.toLowerCase();
+            this.creativePage = 0;
+            this.renderCreativeGrid();
+        });
+
+        const gridContainer = document.createElement('div');
+        gridContainer.id = 'creative-grid-container';
+        gridContainer.style.cssText = 'flex:1;overflow-y:auto;';
+
+        const pageControls = document.createElement('div');
+        pageControls.style.cssText = 'display:flex;justify-content:center;gap:12px;margin-top:12px;align-items:center;';
+
+        const prevBtn = document.createElement('button');
+        prevBtn.style.cssText = 'padding:6px 16px;cursor:pointer;background:#555;color:white;border:1px solid #777;border-radius:4px;font-size:13px;';
+        prevBtn.textContent = '\u2190 Prev';
+        prevBtn.addEventListener('click', () => {
+            if (this.creativePage > 0) {
+                this.creativePage--;
+                this.renderCreativeGrid();
+            }
+        });
+
+        const pageInfo = document.createElement('span');
+        pageInfo.id = 'creative-page-info';
+        pageInfo.style.cssText = 'font-size:13px;color:#aaa;';
+
+        const nextBtn = document.createElement('button');
+        nextBtn.style.cssText = 'padding:6px 16px;cursor:pointer;background:#555;color:white;border:1px solid #777;border-radius:4px;font-size:13px;';
+        nextBtn.textContent = 'Next \u2192';
+        nextBtn.addEventListener('click', () => {
+            this.creativePage++;
+            this.renderCreativeGrid();
+        });
+
+        pageControls.appendChild(prevBtn);
+        pageControls.appendChild(pageInfo);
+        pageControls.appendChild(nextBtn);
+
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:499;';
+        overlay.addEventListener('click', () => {
+            this.hideCreativeInventory();
+        });
+
+        this.creativeInventoryUI.appendChild(header);
+        this.creativeInventoryUI.appendChild(searchInput);
+        this.creativeInventoryUI.appendChild(gridContainer);
+        this.creativeInventoryUI.appendChild(pageControls);
+        document.body.appendChild(overlay);
+        document.body.appendChild(this.creativeInventoryUI);
+
+        this.renderCreativeGrid();
+    }
+
+    private renderCreativeGrid(): void {
+        const container = document.getElementById('creative-grid-container');
+        if (!container) return;
+        container.innerHTML = '';
+
+        let filtered = this.creativeEntries;
+        if (this.creativeFilter) {
+            filtered = this.creativeEntries.filter(b => b.name.toLowerCase().includes(this.creativeFilter));
+        }
+
+        const itemsPerPage = 32;
+        const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
+        if (this.creativePage >= totalPages) this.creativePage = totalPages - 1;
+
+        const start = this.creativePage * itemsPerPage;
+        const pageItems = filtered.slice(start, start + itemsPerPage);
+
+        const grid = document.createElement('div');
+        grid.style.cssText = 'display:grid;grid-template-columns:repeat(8,1fr);gap:4px;';
+
+        for (const entry of pageItems) {
+            const slot = document.createElement('div');
+            slot.style.cssText = 'width:52px;height:52px;background:rgba(0,0,0,0.4);border:2px solid #555;border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;position:relative;transition:border-color 0.1s;';
+
+            const colorSwatch = document.createElement('div');
+            colorSwatch.style.cssText = `width:28px;height:28px;background:${entry.color};border-radius:3px;border:1px solid rgba(255,255,255,0.2);`;
+            slot.appendChild(colorSwatch);
+
+            const label = document.createElement('span');
+            label.style.cssText = 'font-size:8px;color:#ccc;margin-top:2px;text-align:center;line-height:1.1;max-width:48px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+            label.textContent = entry.name.replace(/_/g, ' ');
+            slot.appendChild(label);
+
+            slot.addEventListener('mouseenter', () => {
+                slot.style.borderColor = '#aaddff';
+                slot.style.background = 'rgba(100,150,200,0.3)';
+            });
+            slot.addEventListener('mouseleave', () => {
+                slot.style.borderColor = '#555';
+                slot.style.background = 'rgba(0,0,0,0.4)';
+            });
+            slot.addEventListener('click', () => {
+                this.onCreativeSelect?.(entry.id);
+                this.hideCreativeInventory();
+            });
+
+            grid.appendChild(slot);
+        }
+
+        container.appendChild(grid);
+
+        const pageInfo = document.getElementById('creative-page-info');
+        if (pageInfo) {
+            pageInfo.textContent = `${this.creativePage + 1} / ${totalPages} (${filtered.length} items)`;
+        }
+    }
+
+    hideCreativeInventory(): void {
+        if (this.creativeInventoryUI && this.creativeInventoryUI.parentNode) {
+            const overlay = this.creativeInventoryUI.previousElementSibling as HTMLElement | null;
+            if (overlay && overlay.style?.zIndex === '499') {
+                overlay.parentNode?.removeChild(overlay);
+            }
+            this.creativeInventoryUI.parentNode.removeChild(this.creativeInventoryUI);
+            this.creativeInventoryUI = null;
+        }
+    }
+
+    showSettingsPanel(): void {
+        this.settingsPanel.show();
+    }
+
+    hideSettingsPanel(): void {
+        this.settingsPanel.hide();
+    }
+
+    isSettingsPanelOpen(): boolean {
+        return this.settingsPanel.isOpen();
+    }
+
+    getSettingsPanel(): SettingsPanel {
+        return this.settingsPanel;
     }
 
     updateBreath(breath: number, maxBreath: number): void {

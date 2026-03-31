@@ -192,8 +192,41 @@
         #join-button:hover {
             background: #45a049;
         }
+        #damage-flash {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 0, 0, 0.5);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.05s linear;
+        }
+        #cave-vignette {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(ellipse at center, transparent 30%, rgba(0, 0, 0, 0.85) 100%);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+        }
+        #lava-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 100, 0, 0.25);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
     </style>
-  <script type="module" crossorigin src="/assets/index-n6k3S6oA.js"></script>
+  <script type="module" crossorigin src="/assets/index-CL_6IT2x.js"></script>
 </head>
 <body>
     <div id="game-container"></div>
@@ -222,6 +255,9 @@
             <h2 style="color:white; font-size:36px; margin-bottom:20px; text-shadow:0 0 10px rgba(0,0,0,0.8);" id="death-message">You died!</h2>
             <button id="respawn-button" style="padding:15px 50px; font-size:18px; border:none; border-radius:8px; background:#4CAF50; color:white; cursor:pointer;">Respawn</button>
         </div>
+        <div id="damage-flash"></div>
+        <div id="cave-vignette"></div>
+        <div id="lava-overlay"></div>
     </div>
 </body>
 </html>

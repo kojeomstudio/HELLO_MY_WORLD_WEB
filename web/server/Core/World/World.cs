@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using WebGameServer.Core.Game;
 
 namespace WebGameServer.Core.World;
 
@@ -14,7 +15,18 @@ public class World
     public int AutoSaveInterval { get; set; } = 300;
     public DateTime LastSaveTime { get; set; } = DateTime.UtcNow;
     public bool NeedsSave { get; set; }
-    private int _lastLiquidUpdateTick;
+    private int _lastWaterUpdateTick;
+    private int _lastLavaUpdateTick;
+
+    public int WaterFlowInterval { get; set; } = 3;
+    public int LavaFlowInterval { get; set; } = 5;
+
+    private const byte MaxLiquidLevel = 8;
+
+    private static readonly (short Dx, short Dz)[] HorizontalDirections =
+    {
+        (0, 1), (0, -1), (1, 0), (-1, 0)
+    };
 
     public World(string name, int seed, IWorldGenerator generator)
     {
@@ -30,6 +42,16 @@ public class World
         {
             var chunk = new Chunk(c);
             GenerateChunk(chunk);
+            LightingEngine.PropagateSunLight(this, chunk);
+            LightingEngine.InitializeArtificialLightInChunk(this, chunk);
+
+            var belowCoord = new ChunkCoord(c.X, c.Y - 1, c.Z);
+            var belowChunk = GetChunkIfExists(belowCoord);
+            if (belowChunk != null)
+            {
+                LightingEngine.PropagateSunLight(this, belowChunk);
+            }
+
             return chunk;
         });
     }
@@ -56,8 +78,12 @@ public class World
         var localX = blockCoord.X & (Chunk.Size - 1);
         var localY = blockCoord.Y & (Chunk.Size - 1);
         var localZ = blockCoord.Z & (Chunk.Size - 1);
+
+        var oldBlock = chunk.GetBlock(localX, localY, localZ);
         chunk.SetBlock(localX, localY, localZ, block);
         NeedsSave = true;
+
+        LightingEngine.OnBlockChanged(this, blockCoord, oldBlock.Type, block.Type);
     }
 
     private void GenerateChunk(Chunk chunk)
@@ -69,7 +95,7 @@ public class World
             {
                 for (int z = 0; z < Chunk.Size; z++)
                 {
-                    chunk.SetBlock(x, y, z, new Block((BlockType)blocks[x, y, z]));
+                    chunk.SetBlock(x, y, z, new Block((BlockType)blocks[x, y, z], 0, 0, 0));
                 }
             }
         }
@@ -92,9 +118,119 @@ public class World
 
     public void UpdateLiquids(int tickCount)
     {
-        if (tickCount - _lastLiquidUpdateTick < 5) return;
-        _lastLiquidUpdateTick = tickCount;
+        if (tickCount - _lastWaterUpdateTick >= WaterFlowInterval)
+        {
+            _lastWaterUpdateTick = tickCount;
+            ProcessLiquidFamily(BlockType.Water, BlockType.WaterFlowing);
+        }
 
+        if (tickCount - _lastLavaUpdateTick >= LavaFlowInterval)
+        {
+            _lastLavaUpdateTick = tickCount;
+            ProcessLiquidFamily(BlockType.Lava, BlockType.LavaFlowing);
+        }
+
+        ProcessWaterLavaInteraction();
+    }
+
+    private static byte GetLiquidLevel(Block block)
+    {
+        return block.Type is BlockType.Water or BlockType.Lava ? MaxLiquidLevel : block.Param2;
+    }
+
+    private static bool IsWater(BlockType type) => type is BlockType.Water or BlockType.WaterFlowing;
+    private static bool IsLava(BlockType type) => type is BlockType.Lava or BlockType.LavaFlowing;
+
+    private void ProcessLiquidFamily(BlockType sourceType, BlockType flowingType)
+    {
+        var processed = new HashSet<(short X, short Y, short Z)>();
+        var toRemove = new List<Vector3s>();
+
+        foreach (var chunkCoord in _chunks.Keys)
+        {
+            var chunk = GetChunkIfExists(chunkCoord);
+            if (chunk == null) continue;
+
+            for (int x = 0; x < Chunk.Size; x++)
+            {
+                for (int y = 0; y < Chunk.Size; y++)
+                {
+                    for (int z = 0; z < Chunk.Size; z++)
+                    {
+                        var block = chunk.GetBlock(x, y, z);
+                        if (block.Type != sourceType && block.Type != flowingType) continue;
+
+                        var worldX = (short)(chunkCoord.X * Chunk.Size + x);
+                        var worldY = (short)(chunkCoord.Y * Chunk.Size + y);
+                        var worldZ = (short)(chunkCoord.Z * Chunk.Size + z);
+
+                        if (processed.Contains((worldX, worldY, worldZ))) continue;
+                        processed.Add((worldX, worldY, worldZ));
+
+                        var level = GetLiquidLevel(block);
+
+                        if (level == 0)
+                        {
+                            toRemove.Add(new Vector3s(worldX, worldY, worldZ));
+                            continue;
+                        }
+
+                        var belowPos = new Vector3s(worldX, (short)(worldY - 1), worldZ);
+                        var belowBlock = GetBlock(belowPos);
+
+                        if (belowBlock.Type == BlockType.Air)
+                        {
+                            var newLevel = level == MaxLiquidLevel
+                                ? (byte)(MaxLiquidLevel - 1)
+                                : (byte)Math.Max(1, level - 1);
+                            SetBlock(belowPos, new Block(flowingType, 0, newLevel));
+                            processed.Add((worldX, (short)(worldY - 1), worldZ));
+                            continue;
+                        }
+
+                        if (belowBlock.Type == sourceType || belowBlock.Type == flowingType)
+                        {
+                            continue;
+                        }
+
+                        var shuffled = HorizontalDirections
+                            .OrderBy(_ => Random.Shared.Next()).ToArray();
+
+                        foreach (var (dx, dz) in shuffled)
+                        {
+                            var nx = (short)(worldX + dx);
+                            var nz = (short)(worldZ + dz);
+
+                            if (processed.Contains((nx, worldY, nz))) continue;
+
+                            var neighborPos = new Vector3s(nx, worldY, nz);
+                            var neighbor = GetBlock(neighborPos);
+
+                            if (neighbor.Type == BlockType.Air && level > 1)
+                            {
+                                SetBlock(neighborPos, new Block(flowingType, 0, (byte)(level - 1)));
+                                processed.Add((nx, worldY, nz));
+                            }
+                            else if (neighbor.Type == flowingType && neighbor.Param2 < level)
+                            {
+                                var avg = (byte)((level + neighbor.Param2) / 2);
+                                SetBlock(neighborPos, new Block(flowingType, 0, avg));
+                                processed.Add((nx, worldY, nz));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        foreach (var pos in toRemove)
+        {
+            SetBlock(pos, Block.Air);
+        }
+    }
+
+    private void ProcessWaterLavaInteraction()
+    {
         var processed = new HashSet<(short X, short Y, short Z)>();
 
         foreach (var chunkCoord in _chunks.Keys)
@@ -109,7 +245,7 @@ public class World
                     for (int z = 0; z < Chunk.Size; z++)
                     {
                         var block = chunk.GetBlock(x, y, z);
-                        if (block.Type != BlockType.Water && block.Type != BlockType.Lava) continue;
+                        if (!IsWater(block.Type)) continue;
 
                         var worldX = (short)(chunkCoord.X * Chunk.Size + x);
                         var worldY = (short)(chunkCoord.Y * Chunk.Size + y);
@@ -117,45 +253,33 @@ public class World
 
                         if (processed.Contains((worldX, worldY, worldZ))) continue;
 
-                        var flowTarget = FindFlowTarget(worldX, worldY, worldZ);
-                        if (flowTarget == null) continue;
+                        foreach (var (dx, dz) in HorizontalDirections)
+                        {
+                            var nx = (short)(worldX + dx);
+                            var nz = (short)(worldZ + dz);
 
-                        processed.Add((flowTarget.Value.X, flowTarget.Value.Y, flowTarget.Value.Z));
-                        SetBlock(flowTarget.Value, new Block(block.Type));
+                            if (processed.Contains((nx, worldY, nz))) continue;
+
+                            var neighborPos = new Vector3s(nx, worldY, nz);
+                            var neighbor = GetBlock(neighborPos);
+
+                            if (neighbor.Type is BlockType.Lava or BlockType.LavaFlowing)
+                            {
+                                var resultType = (block.Type == BlockType.Water && neighbor.Type == BlockType.Lava)
+                                    ? BlockType.Obsidian
+                                    : BlockType.Cobblestone;
+
+                                SetBlock(neighborPos, new Block(resultType));
+                                SetBlock(new Vector3s(worldX, worldY, worldZ), Block.Air);
+                                processed.Add((worldX, worldY, worldZ));
+                                processed.Add((nx, worldY, nz));
+                                break;
+                            }
+                        }
                     }
                 }
             }
         }
-    }
-
-    private Vector3s? FindFlowTarget(short x, short y, short z)
-    {
-        var below = new Vector3s(x, (short)(y - 1), z);
-        var belowBlock = GetBlock(below);
-        if (belowBlock.Type == BlockType.Air)
-        {
-            return below;
-        }
-
-        var directions = new (short dx, short dz)[]
-        {
-            (0, 1), (0, -1), (1, 0), (-1, 0)
-        };
-
-        var random = Random.Shared;
-        var shuffled = directions.OrderBy(_ => random.Next()).ToArray();
-
-        foreach (var (dx, dz) in shuffled)
-        {
-            var neighbor = new Vector3s((short)(x + dx), y, (short)(z + dz));
-            var neighborBlock = GetBlock(neighbor);
-            if (neighborBlock.Type == BlockType.Air)
-            {
-                return neighbor;
-            }
-        }
-
-        return null;
     }
 
     public void Save(string directory)
@@ -170,5 +294,62 @@ public class World
         WorldPersistence.LoadWorld(this, directory);
         NeedsSave = false;
         LastSaveTime = DateTime.UtcNow;
+    }
+
+    public List<(Vector3s From, Vector3s To, BlockType Type)> GetPendingFallingBlocks(BlockDefinitionManager blockDefs)
+    {
+        var results = new List<(Vector3s From, Vector3s To, BlockType Type)>();
+        var processed = new HashSet<(short X, short Y, short Z)>();
+
+        foreach (var chunkCoord in _chunks.Keys)
+        {
+            var chunk = GetChunkIfExists(chunkCoord);
+            if (chunk == null) continue;
+
+            for (int x = 0; x < Chunk.Size; x++)
+            {
+                for (int y = 0; y < Chunk.Size; y++)
+                {
+                    for (int z = 0; z < Chunk.Size; z++)
+                    {
+                        var block = chunk.GetBlock(x, y, z);
+                        var blockData = block.ToUInt16();
+                        if (blockData == 0) continue;
+
+                        var def = blockDefs.Get(blockData);
+                        if (def == null || !def.Falling) continue;
+
+                        var worldX = (short)(chunkCoord.X * Chunk.Size + x);
+                        var worldY = (short)(chunkCoord.Y * Chunk.Size + y);
+                        var worldZ = (short)(chunkCoord.Z * Chunk.Size + z);
+
+                        if (processed.Contains((worldX, worldY, worldZ))) continue;
+
+                        var belowPos = new Vector3s(worldX, (short)(worldY - 1), worldZ);
+                        var belowBlock = GetBlock(belowPos);
+                        var belowData = belowBlock.ToUInt16();
+
+                        if (belowData == 0)
+                        {
+                            results.Add((new Vector3s(worldX, worldY, worldZ), belowPos, block.Type));
+                            processed.Add((worldX, worldY, worldZ));
+                            processed.Add((worldX, (short)(worldY - 1), worldZ));
+                        }
+                        else
+                        {
+                            var belowDef = blockDefs.Get(belowData);
+                            if (belowDef != null && belowDef.Liquid)
+                            {
+                                results.Add((new Vector3s(worldX, worldY, worldZ), belowPos, block.Type));
+                                processed.Add((worldX, worldY, worldZ));
+                                processed.Add((worldX, (short)(worldY - 1), worldZ));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return results;
     }
 }

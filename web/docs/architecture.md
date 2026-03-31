@@ -571,3 +571,111 @@ The client uses a texture atlas for block rendering instead of per-block solid c
 Texture names include: `default_stone`, `default_dirt`, `default_grass`, `default_water`, `default_sand`, `default_tree`, `default_leaves`, `default_snow`, `default_ice`, `default_lava`, `default_cobble`, `default_gravel`, `default_water_flowing`, `default_lava_flowing`, `default_mossycobble`, `default_desert_sand`, `default_desert_stone`, `default_tree_top`, `default_pine_tree`, `default_pine_tree_top`, `default_pine_needles`, `default_jungletree`, `default_jungletree_top`, `default_jungleleaves`, `default_junglegrass`, `default_river_water`, `default_river_water_flowing`, `default_apple`, `basenodes_snow_sheet`, `basenodes_dirt_with_snow`, `basenodes_dirt_with_snow_bottom`, `basenodes_dirt_with_grass_bottom`.
 
 Blocks without a matching atlas texture fall back to vertex colors.
+
+## Lighting System
+
+### Server-Side (C#)
+- `LightingEngine.cs` — Static BFS-based lighting propagation
+  - Light packing: high nibble = sun light (4 bits), low nibble = artificial light (4 bits) in `Block.Light`
+  - `PropagateSunLight()` — column top-down + horizontal BFS spread
+  - `PropagateArtificialLight()` — BFS from light-emitting blocks
+  - `RemoveLight()` — flood-remove + re-propagate remaining sources
+  - `OnBlockChanged()` — orchestrates full re-computation on block edits
+- `LightingSystem.cs` — Higher-level wrapper using `BlockDefinitionManager`
+
+### Client-Side (TypeScript)
+- `ChunkMesh.getLight()` reads light byte from chunk data
+- Per-vertex light sampling from 4 surrounding blocks, averaged
+- Light multiplier mixed with AO: `finalColor = baseColor * (avgLight / 15) * ao`
+- Light-emitting blocks use full brightness (multiplier = 1.0)
+- Minimum light floor of 0.1 to prevent pitch-black surfaces
+
+## Tool Mining System
+
+### Server-Side
+- `DigBlockStart(x, y, z)` returns dig time based on:
+  - Block hardness from `BlockDefinition`
+  - Tool group matching against block groups (cracky, crumbly, choppy, snappy, dig_immediate)
+  - Tool material multiplier: wooden=2x, stone=4x, iron=6x, diamond=8x, hand=1x
+  - `dig_immediate` blocks get 0.15s dig time
+  - Dig time = hardness / toolMultiplier (minimum 0.1s)
+
+### Client-Side
+- Progressive dig with `digStartTime`, `digTarget`, `digDuration` tracking
+- Selection box darkens as dig progresses (opacity 0 to 0.6)
+- Auto-completes dig when elapsed >= duration
+- Resets on crosshair change or mouse release
+- Falls back to instant dig on server communication failure
+
+## Falling Node System
+
+### Server-Side
+- `World.GetPendingFallingBlocks()` scans for blocks with `Falling=true` where below is air/liquid
+- `GameLoopService.ProcessFallingBlocks()` runs every 10 ticks
+- Broadcasts `OnFallingBlock` events to all clients
+
+### Client-Side
+- `WorldManager.FallingBlockAnimation` — gravity-based physics animation
+- Creates temporary mesh at source position, animates to target over 0.5s
+- Applies block data changes on completion
+
+## Liquid Simulation
+
+- Level-based flow using `Block.Param2` for liquid level (0-7 for flowing, 8 for source)
+- Water flows every 3 ticks, lava every 5 ticks (viscosity)
+- Horizontal spread with randomized direction order
+- Level averaging when flowing blocks merge
+- Water + lava interaction: source+source → obsidian, flowing → cobblestone
+- Level 0 flowing blocks despawn automatically
+
+## Mob Spawning System
+
+- `MobSpawner.cs` spawns mobs every 10 seconds near players (24-48 blocks away)
+- Weighted random selection: Zombie(3), Skeleton(2), Spider(2), Cow(3), Pig(3), Chicken(2)
+- Y-range validation per mob type
+- Despawn when >128 blocks from nearest player
+- Max 50 mobs server-wide
+- Mob AI: chase within 16 blocks, attack within 2 blocks, wander when idle
+
+## Cloud System
+
+- `CloudSystem.ts` — procedural canvas texture with white radial gradient blobs
+- Large plane at Y=120, slowly drifting in X direction with wrapping
+- Color/opacity responds to day/night cycle (white → orange/pink → dark gray)
+
+## Post-Processing Effects
+
+- **Damage flash**: Full-screen red overlay, fades from 0.6 to 0 over 0.3s
+- **Cave darkness**: Radial-gradient vignette + ambient dimming when player Y < 30
+- **Lava overlay**: Orange tint when player is within 4 blocks of lava
+
+## Weather System
+
+- `WeatherSystem.ts` — 800 rain particles with wind effect
+- Player-following cylinder (radius 60, height 40)
+- Toggles based on time of day (always rain at night, 20% during day)
+- Fog density increases during rain
+
+## Waving Vegetation
+
+- Leaves, pine needles, sugar cane blocks get vertex animation
+- Sin-wave Y offset on top face vertices (amplitude 0.05, frequency 1-2 Hz)
+- Tracked per chunk, updated in WorldManager game loop
+
+## Node Timer System
+
+- Wired into `GameServer.Update()` main loop
+- Timers: farmland→dirt (30s, no water), dirt→grass (10-30s, near grass), ice→water (5-10s, near light >12)
+- `InitializeNodeTimers()` scans chunks on server start
+
+## Creative Mode & Settings
+
+- Paginated creative inventory UI with search/filter (I key)
+- Settings panel (O key): mouse sensitivity, render distance, FOV, volumes, cloud/AO toggles
+- All settings persisted to localStorage
+
+## Player Animation
+
+- Multi-part body: head, torso, legs (x2), arms (x2)
+- Walk animation: limb swinging via sin(time * walkSpeed) at ±30 degrees
+- Idle pose: all limbs at rest rotation

@@ -153,6 +153,13 @@ export class BlockRegistry {
     isClimbable(id: number): boolean { return this.blocks.get(id)?.climbable ?? false; }
     isFalling(id: number): boolean { return this.blocks.get(id)?.falling ?? false; }
     isInteractive(id: number): boolean { return this.blocks.get(id)?.interactive ?? false; }
+    isLightSource(id: number): boolean { return (this.blocks.get(id)?.light ?? 0) > 0; }
+    getLightLevel(id: number): number { return this.blocks.get(id)?.light ?? 0; }
+    lightPropagates(id: number): boolean {
+        const block = this.blocks.get(id);
+        if (!block) return true;
+        return block.transparent === true || block.liquid === true;
+    }
     getGroups(id: number): Record<string, number> { return this.blocks.get(id)?.groups ?? {}; }
     getAll(): Map<number, BlockDefinition> { return this.blocks; }
 }

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { CloudSystem } from './CloudSystem';
 
 export class Renderer {
     private scene: THREE.Scene;
@@ -9,6 +10,17 @@ export class Renderer {
     private ambientLight: THREE.AmbientLight;
     private fog: THREE.Fog;
     private skyColor: THREE.Color;
+    private cloudSystem: CloudSystem;
+    private damageFlashEl: HTMLElement;
+    private vignetteEl: HTMLElement;
+    private lavaOverlayEl: HTMLElement;
+    private damageFlashIntensity: number = 0;
+    private currentBrightness: number = 1;
+    private isRaining: boolean = false;
+    private normalFogNear: number = 80;
+    private normalFogFar: number = 160;
+    private rainFogNear: number = 30;
+    private rainFogFar: number = 80;
 
     constructor(container: HTMLElement) {
         this.canvas = document.createElement('canvas');
@@ -37,6 +49,11 @@ export class Renderer {
 
         this.addSkyDome();
         this.setupResizeHandler();
+        this.cloudSystem = new CloudSystem(this.scene);
+
+        this.damageFlashEl = document.getElementById('damage-flash')!;
+        this.vignetteEl = document.getElementById('cave-vignette')!;
+        this.lavaOverlayEl = document.getElementById('lava-overlay')!;
     }
 
     private addSkyDome(): void {
@@ -68,6 +85,16 @@ export class Renderer {
     getScene(): THREE.Scene { return this.scene; }
     getCamera(): THREE.PerspectiveCamera { return this.camera; }
     getCanvas(): HTMLCanvasElement { return this.canvas; }
+    getBrightness(): number { return this.currentBrightness; }
+
+    setFov(fov: number): void {
+        this.camera.fov = fov;
+        this.camera.updateProjectionMatrix();
+    }
+
+    setRaining(raining: boolean): void {
+        this.isRaining = raining;
+    }
 
     addToScene(object: THREE.Object3D): void {
         this.scene.add(object);
@@ -78,15 +105,28 @@ export class Renderer {
     }
 
     updateSkyBrightness(brightness: number): void {
-        const r = 0.53 * brightness;
-        const g = 0.81 * brightness;
-        const b = 0.92 * brightness;
+        this.currentBrightness = brightness;
+
+        let r = 0.53 * brightness;
+        let g = 0.81 * brightness;
+        let b = 0.92 * brightness;
+
+        if (this.isRaining) {
+            const rainMix = 0.3;
+            r = r * (1 - rainMix) + 0.4 * rainMix;
+            g = g * (1 - rainMix) + 0.42 * rainMix;
+            b = b * (1 - rainMix) + 0.48 * rainMix;
+        }
+
         this.skyColor.setRGB(r, g, b);
         this.scene.background = this.skyColor;
         (this.scene.fog as THREE.Fog).color = this.skyColor;
 
-        this.skyLight.intensity = brightness;
-        this.ambientLight.intensity = 0.2 + 0.6 * brightness;
+        this.fog.near = this.isRaining ? this.rainFogNear : this.normalFogNear;
+        this.fog.far = this.isRaining ? this.rainFogFar : this.normalFogFar;
+
+        this.skyLight.intensity = this.isRaining ? brightness * 0.6 : brightness;
+        this.ambientLight.intensity = this.isRaining ? 0.3 + 0.3 * brightness : 0.2 + 0.6 * brightness;
 
         const sky = this.scene.getObjectByName('sky');
         if (sky) {
@@ -95,6 +135,44 @@ export class Renderer {
                 side: THREE.BackSide,
             });
         }
+    }
+
+    updateClouds(dt: number): void {
+        this.cloudSystem.update(this.currentBrightness, dt);
+    }
+
+    flashDamage(intensity: number): void {
+        this.damageFlashIntensity = intensity;
+        this.damageFlashEl.style.opacity = String(intensity);
+    }
+
+    private updateDamageFlash(dt: number): void {
+        if (this.damageFlashIntensity > 0) {
+            this.damageFlashIntensity -= dt / 0.3;
+            if (this.damageFlashIntensity < 0) this.damageFlashIntensity = 0;
+            this.damageFlashEl.style.opacity = String(this.damageFlashIntensity);
+        }
+    }
+
+    updateCaveDarkness(playerY: number, isUnderground: boolean): void {
+        if (isUnderground && playerY < 30) {
+            const depth = Math.min(1, (30 - playerY) / 25);
+            const vignetteOpacity = 0.4 + 0.5 * depth;
+            const ambientDim = 1 - depth * 0.7;
+            this.vignetteEl.style.opacity = String(vignetteOpacity);
+            this.ambientLight.intensity = (0.2 + 0.6 * this.currentBrightness) * ambientDim;
+        } else {
+            this.vignetteEl.style.opacity = '0';
+            this.ambientLight.intensity = 0.2 + 0.6 * this.currentBrightness;
+        }
+    }
+
+    updateLavaEffect(nearLava: boolean): void {
+        this.lavaOverlayEl.style.opacity = nearLava ? '0.3' : '0';
+    }
+
+    updateEffects(dt: number): void {
+        this.updateDamageFlash(dt);
     }
 
     render(): void {

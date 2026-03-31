@@ -20,9 +20,68 @@ const TEXTURE_NAMES: string[] = [
     'basenodes_dirt_with_snow_bottom', 'basenodes_dirt_with_grass_bottom'
 ];
 
-export interface PlayerInfo {
+const FALL_GRAVITY = 20.0;
+
+class FallingBlockAnimation {
     mesh: THREE.Mesh;
+    fromX: number;
+    fromY: number;
+    fromZ: number;
+    toX: number;
+    toY: number;
+    toZ: number;
+    blockType: number;
+    elapsedTime: number = 0;
+    startY: number;
+    velocityY: number = 0;
+    completed: boolean = false;
+
+    constructor(
+        fromX: number, fromY: number, fromZ: number,
+        toX: number, toY: number, toZ: number,
+        blockType: number, color: number
+    ) {
+        this.fromX = fromX;
+        this.fromY = fromY;
+        this.fromZ = fromZ;
+        this.toX = toX;
+        this.toY = toY;
+        this.toZ = toZ;
+        this.blockType = blockType;
+        this.startY = fromY;
+
+        const geometry = new THREE.BoxGeometry(1, 1, 1);
+        const material = new THREE.MeshLambertMaterial({ color });
+        this.mesh = new THREE.Mesh(geometry, material);
+        this.mesh.position.set(fromX + 0.5, fromY + 0.5, fromZ + 0.5);
+    }
+
+    update(dt: number): void {
+        if (this.completed) return;
+
+        this.elapsedTime += dt;
+        this.velocityY -= FALL_GRAVITY * dt;
+        const newY = this.startY + 0.5 + (this.velocityY * this.elapsedTime) + (0.5 * FALL_GRAVITY * this.elapsedTime * this.elapsedTime);
+
+        if (newY <= this.toY + 0.5)
+        {
+            this.mesh.position.y = this.toY + 0.5;
+            this.completed = true;
+        }
+        else
+        {
+            this.mesh.position.y = newY;
+        }
+    }
+}
+
+export interface PlayerInfo {
+    mesh: THREE.Group;
     label: THREE.Sprite;
+    leftLeg: THREE.Mesh;
+    rightLeg: THREE.Mesh;
+    leftArm: THREE.Mesh;
+    rightArm: THREE.Mesh;
 }
 
 export class WorldManager {
@@ -34,6 +93,7 @@ export class WorldManager {
     private pendingChunks: Set<string> = new Set();
     private connection: HubConnection.HubConnection | null = null;
     private textureAtlas: TextureAtlas | null = null;
+    private fallingBlocks: FallingBlockAnimation[] = [];
 
     constructor(renderer: Renderer) {
         this.renderer = renderer;
@@ -137,7 +197,7 @@ export class WorldManager {
         }
 
         const chunk = ChunkMesh.fromServerData(chunkX, chunkY, chunkZ, data);
-        chunk.buildMesh(this.blockRegistry, (wx, wy, wz) => this.getBlock(wx, wy, wz), this.textureAtlas);
+        chunk.buildMesh(this.blockRegistry, (wx, wy, wz) => this.getBlock(wx, wy, wz), this.textureAtlas, (wx, wy, wz) => this.getBlockLight(wx, wy, wz));
 
         if (chunk.mesh) {
             this.renderer.addToScene(chunk.mesh);
@@ -181,7 +241,7 @@ export class WorldManager {
             this.renderer.removeFromScene(chunk.transparentMesh);
         }
 
-        chunk.buildMesh(this.blockRegistry, (wx, wy, wz) => this.getBlock(wx, wy, wz), this.textureAtlas);
+        chunk.buildMesh(this.blockRegistry, (wx, wy, wz) => this.getBlock(wx, wy, wz), this.textureAtlas, (wx, wy, wz) => this.getBlockLight(wx, wy, wz));
 
         if (chunk.mesh) {
             this.renderer.addToScene(chunk.mesh);
@@ -253,9 +313,41 @@ export class WorldManager {
     addPlayer(name: string): void {
         if (this.playerMeshes.has(name)) return;
 
-        const geometry = new THREE.BoxGeometry(0.6, 1.8, 0.6);
-        const material = new THREE.MeshLambertMaterial({ color: 0x4488ff });
-        const mesh = new THREE.Mesh(geometry, material);
+        const group = new THREE.Group();
+
+        const bodyGeo = new THREE.BoxGeometry(0.6, 0.75, 0.3);
+        const bodyMat = new THREE.MeshLambertMaterial({ color: 0x2244aa });
+        const body = new THREE.Mesh(bodyGeo, bodyMat);
+        body.position.y = 0.375;
+        group.add(body);
+
+        const headGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+        const headMat = new THREE.MeshLambertMaterial({ color: 0xffcc99 });
+        const head = new THREE.Mesh(headGeo, headMat);
+        head.position.y = 0.875;
+        group.add(head);
+
+        const legGeo = new THREE.BoxGeometry(0.25, 0.75, 0.25);
+        const legMat = new THREE.MeshLambertMaterial({ color: 0x112266 });
+
+        const leftLeg = new THREE.Mesh(legGeo, legMat);
+        leftLeg.position.set(-0.15, -0.375, 0);
+        group.add(leftLeg);
+
+        const rightLeg = new THREE.Mesh(legGeo, legMat);
+        rightLeg.position.set(0.15, -0.375, 0);
+        group.add(rightLeg);
+
+        const armGeo = new THREE.BoxGeometry(0.25, 0.75, 0.25);
+        const armMat = new THREE.MeshLambertMaterial({ color: 0xffcc99 });
+
+        const leftArm = new THREE.Mesh(armGeo, armMat);
+        leftArm.position.set(-0.425, 0.375, 0);
+        group.add(leftArm);
+
+        const rightArm = new THREE.Mesh(armGeo, armMat);
+        rightArm.position.set(0.425, 0.375, 0);
+        group.add(rightArm);
 
         const canvas = document.createElement('canvas');
         canvas.width = 256;
@@ -272,13 +364,11 @@ export class WorldManager {
         label.position.y = 2.2;
         label.scale.set(3, 0.75, 1);
 
-        const group = new THREE.Group();
-        group.add(mesh);
         group.add(label);
         group.position.y = 0.9;
         this.renderer.addToScene(group);
 
-        this.playerMeshes.set(name, { mesh: group as any, label });
+        this.playerMeshes.set(name, { mesh: group, label, leftLeg, rightLeg, leftArm, rightArm });
     }
 
     removePlayer(name: string): void {
@@ -297,6 +387,39 @@ export class WorldManager {
         const playerInfo = this.playerMeshes.get(name)!;
         playerInfo.mesh.position.set(x, y, z);
         playerInfo.mesh.rotation.y = _yaw * Math.PI / 180;
+    }
+
+    private playerAnimTime: number = 0;
+
+    animatePlayer(name: string, isMoving: boolean, dt: number): void {
+        const info = this.playerMeshes.get(name);
+        if (!info) return;
+
+        if (isMoving) {
+            this.playerAnimTime += dt;
+            const walkSpeed = 8;
+            const swing = Math.sin(this.playerAnimTime * walkSpeed) * 0.5236;
+            const legPivotY = -0.375 + 0.375;
+            const armPivotY = 0.375 + 0.375;
+
+            info.leftLeg.position.set(-0.15, legPivotY, 0);
+            info.leftLeg.rotation.x = swing;
+            info.rightLeg.position.set(0.15, legPivotY, 0);
+            info.rightLeg.rotation.x = -swing;
+            info.leftArm.position.set(-0.425, armPivotY, 0);
+            info.leftArm.rotation.x = -swing;
+            info.rightArm.position.set(0.425, armPivotY, 0);
+            info.rightArm.rotation.x = swing;
+        } else {
+            info.leftLeg.rotation.x = 0;
+            info.rightLeg.rotation.x = 0;
+            info.leftArm.rotation.x = 0;
+            info.rightArm.rotation.x = 0;
+            info.leftLeg.position.set(-0.15, -0.375, 0);
+            info.rightLeg.position.set(0.15, -0.375, 0);
+            info.leftArm.position.set(-0.425, 0.375, 0);
+            info.rightArm.position.set(0.425, 0.375, 0);
+        }
     }
 
     spawnEntity(entityId: string, entityType: string, x: number, y: number, z: number): void {
@@ -344,15 +467,61 @@ export class WorldManager {
         return chunk.getBlock(localX, localY, localZ);
     }
 
+    getBlockLight(worldX: number, worldY: number, worldZ: number): number {
+        const chunkX = Math.floor(worldX / 16);
+        const chunkY = Math.floor(worldY / 16);
+        const chunkZ = Math.floor(worldZ / 16);
+        const key = `${chunkX},${chunkY},${chunkZ}`;
+
+        const chunk = this.chunks.get(key);
+        if (!chunk) return 15;
+
+        const localX = ((worldX % 16) + 16) % 16;
+        const localY = ((worldY % 16) + 16) % 16;
+        const localZ = ((worldZ % 16) + 16) % 16;
+
+        return chunk.getLight(localX, localY, localZ);
+    }
+
     isSolid(worldX: number, worldY: number, worldZ: number): boolean {
         const blockId = this.getBlock(worldX, worldY, worldZ);
         return this.blockRegistry.isSolid(blockId);
+    }
+
+    onFallingBlock(fromX: number, fromY: number, fromZ: number, toX: number, toY: number, toZ: number, blockType: number): void {
+        const blockDef = this.blockRegistry.get(blockType);
+        const colorHex = blockDef?.color || '#888888';
+        const color = new THREE.Color(colorHex).getHex();
+
+        const anim = new FallingBlockAnimation(fromX, fromY, fromZ, toX, toY, toZ, blockType, color);
+        this.renderer.addToScene(anim.mesh);
+        this.fallingBlocks.push(anim);
     }
 
     update(dt: number): void {
         for (const mesh of this.entityMeshes.values()) {
             mesh.position.y += Math.sin(Date.now() * 0.003) * 0.002;
             mesh.rotation.y += dt;
+        }
+
+        for (let i = this.fallingBlocks.length - 1; i >= 0; i--) {
+            const anim = this.fallingBlocks[i];
+            anim.update(dt);
+
+            if (anim.completed) {
+                this.renderer.removeFromScene(anim.mesh);
+                anim.mesh.geometry.dispose();
+                (anim.mesh.material as THREE.Material).dispose();
+                this.updateBlock(anim.toX, anim.toY, anim.toZ, anim.blockType);
+                this.fallingBlocks.splice(i, 1);
+            }
+        }
+
+        const time = performance.now() / 1000;
+        for (const chunk of this.chunks.values()) {
+            if (chunk.isVegetation) {
+                chunk.animateVegetation(time);
+            }
         }
     }
 

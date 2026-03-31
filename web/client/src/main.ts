@@ -56,7 +56,21 @@ class App {
                 debugInfo.style.display = debugInfo.style.display === 'none' ? 'block' : 'none';
             }
             if (e.key === 'Escape') {
-                this.uiManager.hideAllUIs();
+                if (this.uiManager.isSettingsPanelOpen()) {
+                    this.uiManager.hideSettingsPanel();
+                } else {
+                    this.uiManager.hideAllUIs();
+                }
+            }
+            if (e.key === 'o' || e.key === 'O') {
+                if (this.uiManager.isSettingsPanelOpen()) {
+                    this.uiManager.hideSettingsPanel();
+                } else {
+                    this.uiManager.showSettingsPanel();
+                }
+            }
+            if (e.key === 'i' || e.key === 'I') {
+                this.gameClient.showCreativeInventory();
             }
         });
 

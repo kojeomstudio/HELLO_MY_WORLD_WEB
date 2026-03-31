@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.SignalR;
 using WebGameServer.Core;
 using WebGameServer.Core.Entities;
+using WebGameServer.Core.Game;
 using WebGameServer.Core.Player;
 using WebGameServer.Core.World;
 using PlayerEnt = WebGameServer.Core.Player.Player;
@@ -13,6 +14,7 @@ public class GameLoopService : BackgroundService
     private readonly EntityManager _entityManager;
     private readonly IHubContext<GameHub, IGameClient> _hub;
     private readonly ILogger<GameLoopService> _logger;
+    private readonly BlockDefinitionManager _blockDefinitionManager;
 
     private int _tickCount;
     private int _previousEntityCount;
@@ -23,17 +25,20 @@ public class GameLoopService : BackgroundService
     private const int TimeBroadcastInterval = 100;
     private const float PickupRange = 2.0f;
     private const int AutoSaveIntervalSeconds = 300;
+    private const int FallingBlockInterval = 10;
 
     public GameLoopService(
         GameServer gameServer,
         EntityManager entityManager,
         IHubContext<GameHub, IGameClient> hub,
-        ILogger<GameLoopService> logger)
+        ILogger<GameLoopService> logger,
+        BlockDefinitionManager blockDefinitionManager)
     {
         _gameServer = gameServer;
         _entityManager = entityManager;
         _hub = hub;
         _logger = logger;
+        _blockDefinitionManager = blockDefinitionManager;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -70,6 +75,11 @@ public class GameLoopService : BackgroundService
             }
 
             await BroadcastEntityEvents();
+
+            if (_tickCount % FallingBlockInterval == 0)
+            {
+                await ProcessFallingBlocks();
+            }
 
             CheckAutoSave();
 
@@ -176,6 +186,30 @@ public class GameLoopService : BackgroundService
         }
 
         _previousEntityCount = currentCount;
+    }
+
+    private async Task ProcessFallingBlocks()
+    {
+        var world = _gameServer.DefaultWorld;
+        var fallingBlocks = world.GetPendingFallingBlocks(_blockDefinitionManager);
+
+        foreach (var (from, to, blockType) in fallingBlocks)
+        {
+            world.SetBlock(from, Block.Air);
+            world.SetBlock(to, new Block(blockType));
+
+            try
+            {
+                await _hub.Clients.All.OnFallingBlock(
+                    from.X, from.Y, from.Z,
+                    to.X, to.Y, to.Z,
+                    (ushort)blockType);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to broadcast falling block");
+            }
+        }
     }
 
     private void CheckAutoSave()

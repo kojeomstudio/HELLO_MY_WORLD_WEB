@@ -33,6 +33,8 @@ public class GameServer
     private readonly KnockbackSystem _knockbackSystem;
     private readonly PhysicsEngine _physicsEngine;
     private readonly EntityManager _entityManager;
+    private readonly MobSpawner _mobSpawner;
+    private NodeTimerSystem _nodeTimerSystem;
 
     private IHubContext<GameHub, IGameClient>? _hubContext;
     private int _tickCount;
@@ -73,6 +75,7 @@ public class GameServer
         _knockbackSystem = knockbackSystem;
         _physicsEngine = physicsEngine;
         _entityManager = entityManager;
+        _mobSpawner = new MobSpawner(entityManager);
 
         MaxPlayers = config.Server.MaxPlayers;
         TickRate = config.Server.TickRate;
@@ -84,6 +87,10 @@ public class GameServer
         var seed = config.World.WorldSeed == 0 ? Random.Shared.Next() : config.World.WorldSeed;
         DefaultWorld = new WorldMap("default", seed, generator);
         _worlds.TryAdd("default", DefaultWorld);
+
+        _nodeTimerSystem = new NodeTimerSystem(DefaultWorld, OnNodeTimerExpired);
+        DefaultWorld.WaterFlowInterval = config.Liquid.WaterFlowInterval;
+        DefaultWorld.LavaFlowInterval = config.Liquid.LavaFlowInterval;
     }
 
     public void SetHubContext(IHubContext<GameHub, IGameClient> hubContext)
@@ -107,6 +114,8 @@ public class GameServer
 
         IsRunning = true;
         StartTime = DateTime.UtcNow;
+
+        InitializeNodeTimers();
     }
 
     public void Stop()
@@ -234,6 +243,25 @@ public class GameServer
 
         _entityManager.UpdateAll(1f / TickRate);
 
+        _nodeTimerSystem.Update(1.0 / TickRate);
+
+        _mobSpawner.Update(
+            1f / TickRate,
+            DefaultWorld,
+            pos =>
+            {
+                var block = DefaultWorld.GetBlock(new Vector3s(
+                    (short)Math.Floor(pos.X),
+                    (short)Math.Floor(pos.Y),
+                    (short)Math.Floor(pos.Z)));
+                return block.Type != BlockType.Air
+                    && block.Type != BlockType.Water
+                    && block.Type != BlockType.WaterFlowing
+                    && block.Type != BlockType.Lava
+                    && block.Type != BlockType.LavaFlowing;
+            },
+            (x, z) => DefaultWorld.GetGroundHeight(x, z));
+
         _tickCount++;
 
         DefaultWorld.UpdateLiquids(_tickCount);
@@ -262,12 +290,12 @@ public class GameServer
         var standingBlock = DefaultWorld.GetBlock(playerBlockPos);
         var standingDef = _blockDefinitionManager.Get(standingBlock.ToUInt16());
 
-        if (standingBlock.Type == BlockType.Lava)
+        if (standingBlock.Type is BlockType.Lava or BlockType.LavaFlowing)
         {
             var lavaDamage = standingDef?.Damage ?? 4;
             DamagePlayer(player, lavaDamage, "lava");
         }
-        else if (standingBlock.Type == BlockType.Water)
+        else if (standingBlock.Type is BlockType.Water or BlockType.WaterFlowing)
         {
             player.Velocity = new Vector3(player.Velocity.X, player.Velocity.Y * 0.8f, player.Velocity.Z);
         }
@@ -415,13 +443,15 @@ public class GameServer
             new Vector3s((short)player.Position.X, feetBlockY, (short)player.Position.Z));
         player.IsOnGround = groundBlock.Type != BlockType.Air &&
                             groundBlock.Type != BlockType.Water &&
+                            groundBlock.Type != BlockType.WaterFlowing &&
                             groundBlock.Type != BlockType.Lava &&
+                            groundBlock.Type != BlockType.LavaFlowing &&
                             groundBlock.Type != BlockType.Ladder;
 
         var liquidCheckY = (short)Math.Floor(player.Position.Y - _physicsEngine.PlayerHeight * 0.5);
         var liquidBlock = DefaultWorld.GetBlock(
             new Vector3s((short)player.Position.X, liquidCheckY, (short)player.Position.Z));
-        player.IsInLiquid = liquidBlock.Type is BlockType.Water or BlockType.Lava;
+        player.IsInLiquid = liquidBlock.Type is BlockType.Water or BlockType.WaterFlowing or BlockType.Lava or BlockType.LavaFlowing;
     }
 
     public bool GiveItem(string playerName, string itemId, int count)
@@ -660,6 +690,135 @@ public class GameServer
     }
 
     public static string PositionKey(int x, int y, int z) => $"{x},{y},{z}";
+
+    private void OnNodeTimerExpired(int x, int y, int z, string blockName)
+    {
+        var pos = new Vector3s((short)x, (short)y, (short)z);
+        var block = DefaultWorld.GetBlock(pos);
+
+        switch (blockName)
+        {
+            case "Farmland":
+                if (block.Type == BlockType.Farmland && !HasWaterNearby(x, y, z))
+                {
+                    DefaultWorld.SetBlock(pos, new Block(BlockType.Dirt));
+                }
+                else if (block.Type == BlockType.Farmland)
+                {
+                    _nodeTimerSystem.SetTimer(x, y, z, 30.0);
+                }
+                break;
+
+            case "Dirt":
+                if (block.Type == BlockType.Dirt && HasAdjacentBlock(x, y, z, BlockType.Grass) && Random.Shared.NextDouble() < 0.1)
+                {
+                    DefaultWorld.SetBlock(pos, new Block(BlockType.Grass));
+                }
+                else if (block.Type == BlockType.Dirt && HasAdjacentBlock(x, y, z, BlockType.Grass))
+                {
+                    _nodeTimerSystem.SetTimer(x, y, z, 10.0 + Random.Shared.NextDouble() * 20.0);
+                }
+                break;
+
+            case "Ice":
+                if (block.Type == BlockType.Ice && HasLightSourceNearby(x, y, z))
+                {
+                    DefaultWorld.SetBlock(pos, new Block(BlockType.Water, 0, 8));
+                }
+                break;
+        }
+    }
+
+    private bool HasWaterNearby(int x, int y, int z)
+    {
+        for (int dx = -4; dx <= 4; dx++)
+        {
+            for (int dz = -4; dz <= 4; dz++)
+            {
+                for (int dy = -1; dy <= 1; dy++)
+                {
+                    var checkPos = new Vector3s((short)(x + dx), (short)(y + dy), (short)(z + dz));
+                    var checkBlock = DefaultWorld.GetBlock(checkPos);
+                    if (checkBlock.Type is BlockType.Water or BlockType.WaterFlowing)
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private bool HasAdjacentBlock(int x, int y, int z, BlockType type)
+    {
+        var directions = new (int dx, int dy, int dz)[]
+        {
+            (1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)
+        };
+
+        foreach (var (dx, dy, dz) in directions)
+        {
+            var neighbor = DefaultWorld.GetBlock(new Vector3s((short)(x + dx), (short)(y + dy), (short)(z + dz)));
+            if (neighbor.Type == type) return true;
+        }
+
+        return false;
+    }
+
+    private bool HasLightSourceNearby(int x, int y, int z)
+    {
+        var directions = new (int dx, int dy, int dz)[]
+        {
+            (1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)
+        };
+
+        foreach (var (dx, dy, dz) in directions)
+        {
+            var neighbor = DefaultWorld.GetBlock(new Vector3s((short)(x + dx), (short)(y + dy), (short)(z + dz)));
+            var emission = LightingEngine.GetEmissionLevel(neighbor.Type);
+            if (emission > 12) return true;
+        }
+
+        return false;
+    }
+
+    private void InitializeNodeTimers()
+    {
+        var loadedChunks = DefaultWorld.GetLoadedChunks();
+
+        foreach (var chunkCoord in loadedChunks)
+        {
+            var chunk = DefaultWorld.GetChunkIfExists(chunkCoord);
+            if (chunk == null) continue;
+
+            for (int x = 0; x < Chunk.Size; x++)
+            {
+                for (int y = 0; y < Chunk.Size; y++)
+                {
+                    for (int z = 0; z < Chunk.Size; z++)
+                    {
+                        var block = chunk.GetBlock(x, y, z);
+                        var worldX = chunkCoord.X * Chunk.Size + x;
+                        var worldY = chunkCoord.Y * Chunk.Size + y;
+                        var worldZ = chunkCoord.Z * Chunk.Size + z;
+
+                        if (block.Type == BlockType.Farmland && !HasWaterNearby(worldX, worldY, worldZ))
+                        {
+                            _nodeTimerSystem.SetTimer(worldX, worldY, worldZ, 30.0);
+                        }
+                        else if (block.Type == BlockType.Dirt && HasAdjacentBlock(worldX, worldY, worldZ, BlockType.Grass))
+                        {
+                            _nodeTimerSystem.SetTimer(worldX, worldY, worldZ, 10.0 + Random.Shared.NextDouble() * 20.0);
+                        }
+                        else if (block.Type == BlockType.Ice && HasLightSourceNearby(worldX, worldY, worldZ))
+                        {
+                            _nodeTimerSystem.SetTimer(worldX, worldY, worldZ, 5.0 + Random.Shared.NextDouble() * 5.0);
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 public record FurnaceOperation(
