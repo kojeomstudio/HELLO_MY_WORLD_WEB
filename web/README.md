@@ -57,40 +57,53 @@ Output is in `web/client/dist/`. Serve with any static file server.
 ## Features
 
 ### World
-- Procedural terrain generation with Perlin noise (biomes, caves, ores, sandy biomes)
-- Tree generation (trunk + canopy, biome-aware placement)
+- Procedural terrain generation with Perlin noise (biomes, caves, caverns, dungeons, ores)
+- Tree generation (oak, pine, birch variants with biome-aware placement)
+- Gravel veins and clay deposits
 - 64 block types with groups, sounds, and extended properties
 - Block placement/digging with tool wear and durability system
 - Texture atlas-based block rendering (32 textures, pixelated style)
+- Ambient occlusion in chunk meshing for realistic lighting
 - Falling node physics (sand, gravel) via ABM system
 - Liquid physics (water/lava flow and spreading)
 - Day/night cycle with sky rendering
 - World persistence (auto-save every 5 minutes to disk)
 
+### Rendering
+- Three.js WebGL renderer with perspective camera
+- Dynamic sky dome with sun and fog
+- Ambient occlusion per-vertex lighting
+- Transparent block rendering (water, glass, leaves)
+- Minimap with 3 modes: surface, radar, normal (click to toggle)
+- Block selection highlight wireframe
+- Wield item display with tool/block models
+- Particle effects (dig, place, damage, smoke)
+
 ### Player
 - First-person camera with WASD + mouse controls
-- Gravity, jumping, collision detection
+- Gravity, jumping, collision detection with step height
 - Ladder climbing
 - Sprint (Shift) and fly (F) modes
 - Fall damage and drowning
 - 32-slot inventory with 8-slot hotbar
 - Food system (16 food items with health/hunger)
-- Tool durability (wooden, stone, iron, diamond)
+- Tool durability (wooden, stone, iron, diamond, mese)
 - 4 game modes: Survival, Creative, Adventure, Spectator
 
 ### Multiplayer
 - Real-time multiplayer via SignalR/WebSocket
 - Player list and position sync
-- Chat system with slash commands (`/gamemode`, `/tp`, `/give`, etc.)
+- Chat system with slash commands (`/gamemode`, `/tp`, `/give`, `/help`, `/time`, `/tps`)
 - PvP combat with weapon damage and Minetest knockback formula
 - Rate limiting on chat, dig, and place actions
 - Server-authoritative physics validation
 
 ### Crafting & Smelting
-- Crafting UI with full recipe listing (56 recipes)
+- Crafting UI with full recipe listing (80+ recipes)
 - Furnace smelting with real-time progress bar (15 recipes)
 - Chest inventory UI with 27-slot per-block storage
 - Click-to-transfer items between player and chest
+- Dye recipes for all wool colors
 
 ### Entities
 - Item drop entities with gravity and 5-minute lifespan
@@ -101,9 +114,11 @@ Output is in `web/client/dist/`. Serve with any static file server.
 ### Systems
 - 15 Minetest-compatible privileges (loaded from JSON)
 - Active Block Modifier (ABM) system for periodic block changes
-- Procedural audio (Web Audio API, no audio files)
-- HUD (health hearts, breath bar, hotbar, debug overlay)
+- Node timer system for time-based block events
+- Procedural audio (Web Audio API, 6 sound types)
+- HUD (health hearts, breath bar, hotbar, debug overlay, minimap)
 - Death screen with respawn
+- Wield item display with tool/block visual models
 
 ## Controls
 
@@ -164,8 +179,11 @@ web/
         WorldPersistence.cs      # Save/load to filesystem
         WorldManager.cs          # Multi-world management
         ActiveBlockModifier.cs   # ABM system for periodic modifications
+        NodeTimer.cs             # Node timer for time-based block events
+        NodeTimerKey.cs          # Node position key for timers
+        NodeTimerSystem.cs       # Timer management system
         Generators/
-          NoiseWorldGenerator.cs # Perlin noise terrain with trees/caves/ores
+          NoiseWorldGenerator.cs # Perlin noise terrain with trees/caves/ores/dungeons
           FlatWorldGenerator.cs  # Simple flat terrain
     Services/
       GameHub.cs               # SignalR hub (20+ methods, rate limiting)
@@ -177,16 +195,20 @@ web/
       GameClient.ts            # Central orchestrator, 24 server handlers
       rendering/
         Renderer.ts            # Three.js scene, sky, lighting
+        SelectionBox.ts        # Block selection wireframe highlight
+        WieldItem.ts           # Wield item display with tool/block models
       world/
         WorldManager.ts        # Chunk management, texture atlas, entities
         BlockRegistry.ts       # 64 block definitions with textureName
-        ChunkMesh.ts           # Mesh builder with UV mapping support
+        ChunkMesh.ts           # Mesh builder with ambient occlusion & UV mapping
+        ParticleSystem.ts      # Particle effects (dig, place, damage, smoke)
       player/
-        PlayerController.ts    # FPS controller, raycasting, interactive blocks
+        PlayerController.ts    # FPS controller, raycasting, step height
       input/
         InputManager.ts        # Keyboard/mouse state tracking
       ui/
         UIManager.ts           # HUD, chat, crafting, furnace, chest UI
+        Minimap.ts             # Minimap overlay (surface/radar/normal modes)
       audio/
         AudioManager.ts        # Procedural Web Audio sound synthesis
     index.html                 # Entry HTML with inline CSS
@@ -194,7 +216,7 @@ web/
       textures/blocks/         # 63 PNG textures from Minetest devtest
   data/                      # Game Data (JSON)
     blocks.json                # 64 block definitions with groups & sounds
-    items.json                 # 68 items, 56 recipes, 16 food values
+    items.json                 # 100+ items, 80+ recipes, 16 food values
     server_config.json         # Server configuration
     smelting.json              # 15 smelting recipes
     privileges.json            # 15 privilege definitions
@@ -215,7 +237,7 @@ All configuration is done via JSON files in `web/data/`:
 |------|---------|
 | `server_config.json` | Max players, tick rate, world seed, spawn, physics |
 | `blocks.json` | 64 block type definitions (properties, groups, sounds) |
-| `items.json` | 68 items, 56 crafting recipes, tool tiers |
+| `items.json` | 100+ items, 80+ crafting recipes, tool tiers |
 | `smelting.json` | 15 smelting recipes (input, output, cook time, XP) |
 | `privileges.json` | 15 privilege definitions (name, description, default) |
 
@@ -229,12 +251,35 @@ All configuration is done via JSON files in `web/data/`:
 | [server-api.md](docs/server-api.md) | Complete Hub method and event reference |
 | [data-models.md](docs/data-models.md) | C# records, TypeScript interfaces, config schemas |
 
-## Screenshots
+## Luanti Compatibility Mapping
 
-<!-- TODO: Add screenshots -->
-<!-- ![Gameplay](screenshots/gameplay.png) -->
-<!-- ![Crafting UI](screenshots/crafting.png) -->
-<!-- ![Furnace UI](screenshots/furnace.png) -->
+This project faithfully ports core Luanti/Minetest engine features:
+
+| Luanti Feature | Web Implementation |
+|----------------|-------------------|
+| Map (16x16x16 chunks) | `World.cs` / `Chunk.cs` / `ChunkMesh.ts` |
+| MapNode (4 bytes per node) | `Block.cs` (Type + Param1 + Param2 + Light) |
+| ContentFeatures (859 fields) | `BlockDefinition.cs` / `BlockRegistry.ts` |
+| NodeDefManager / ItemDefManager | `BlockDefinitionManager` |
+| Server/Client architecture | SignalR Hub + TypeScript client |
+| Network protocol (MTP/UDP) | WebSocket (SignalR) |
+| Perlin noise terrain | `NoiseWorldGenerator.cs` (full 3D Perlin) |
+| Biome system | Noise-based biome selection (grassland/sand) |
+| Cave generation (noise intersection) | Cave + cavern noise |
+| Dungeon generation | Random room placement with corridors |
+| Ore distribution | Noise-based vein clustering |
+| Tree generation | Oak, pine, birch procedural trees |
+| Crafting system | `CraftingSystem.cs` (shaped/shapeless) |
+| ABM system | `ActiveBlockModifierSystem.cs` |
+| Node timers | `NodeTimerSystem.cs` |
+| Physics (AABB collision) | `PhysicsEngine.cs` |
+| Knockback formula | `KnockbackSystem.cs` (Minetest formula) |
+| Minimap | `Minimap.ts` (surface/radar/normal) |
+| Ambient occlusion | Per-vertex AO in `ChunkMesh.ts` |
+| Particle system | `ParticleSystem.ts` |
+| HUD elements | Health, breath, hotbar, debug, minimap |
+| Privilege system | `PrivilegeSystem.cs` (15 privileges) |
+| Inventory (32-slot) | `Inventory.cs` / `UIManager.ts` |
 
 ## License
 

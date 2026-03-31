@@ -9,6 +9,11 @@ export interface TextureAtlas {
     hasTexture(blockId: number): boolean;
 }
 
+function computeAO(side1: boolean, side2: boolean, corner: boolean): number {
+    if (side1 && side2) return 0;
+    return 3 - (side1 ? 1 : 0) - (side2 ? 1 : 0) - (corner ? 1 : 0);
+}
+
 export class ChunkMesh {
     public mesh: THREE.Mesh | null = null;
     public transparentMesh: THREE.Mesh | null = null;
@@ -119,12 +124,43 @@ export class ChunkMesh {
                         if (face.dir[1] === 1) faceColor = color.clone().multiplyScalar(1.1);
                         if (face.dir[1] === -1) faceColor = color.clone().multiplyScalar(0.7);
 
-                        const cr = useWhiteColor ? 1 : faceColor.r;
-                        const cg = useWhiteColor ? 1 : faceColor.g;
-                        const cb = useWhiteColor ? 1 : faceColor.b;
-
                         for (let ci = 0; ci < 4; ci++) {
                             const corner = face.corners[ci];
+
+                            let ao = 1.0;
+                            if (!isTransparent) {
+                                const cx = worldX + corner[0] - face.dir[0] * 0.5;
+                                const cy = worldY + corner[1] - face.dir[1] * 0.5;
+                                const cz = worldZ + corner[2] - face.dir[2] * 0.5;
+
+                                const side1Id = getNeighborBlock(
+                                    worldX + corner[0] * 0.5 + face.dir[0] * 0.5 - face.dir[0],
+                                    worldY + corner[1] * 0.5 + face.dir[1] * 0.5 - face.dir[1],
+                                    worldZ + corner[2] * 0.5 + face.dir[2] * 0.5 - face.dir[2]
+                                );
+                                const side2Id = getNeighborBlock(
+                                    worldX + face.dir[0],
+                                    worldY + face.dir[1],
+                                    worldZ + face.dir[2]
+                                );
+
+                                const s1def = blockRegistry.get(side1Id);
+                                const s2def = blockRegistry.get(side2Id);
+                                const cdef = blockRegistry.get(getNeighborBlock(
+                                    Math.round(cx), Math.round(cy), Math.round(cz)
+                                ));
+
+                                const side1 = s1def?.solid === true && s1def?.transparent !== true;
+                                const side2 = s2def?.solid === true && s2def?.transparent !== true;
+                                const cornerSolid = cdef?.solid === true && cdef?.transparent !== true;
+
+                                ao = computeAO(side1, side2, cornerSolid) / 3.0;
+                            }
+
+                            const cr = useWhiteColor ? 1 : faceColor.r * ao;
+                            const cg = useWhiteColor ? 1 : faceColor.g * ao;
+                            const cb = useWhiteColor ? 1 : faceColor.b * ao;
+
                             positions.push(
                                 worldX + corner[0],
                                 worldY + corner[1],

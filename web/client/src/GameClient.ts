@@ -1,10 +1,15 @@
 import * as HubConnection from '@microsoft/signalr';
+import * as THREE from 'three';
 import { UIManager } from './ui/UIManager';
 import { Renderer } from './rendering/Renderer';
 import { PlayerController } from './player/PlayerController';
 import { WorldManager } from './world/WorldManager';
 import { InputManager } from './input/InputManager';
 import { AudioManager } from './audio/AudioManager';
+import { Minimap } from './ui/Minimap';
+import { ParticleSystem } from './world/ParticleSystem';
+import { WieldItem } from './rendering/WieldItem';
+import { SelectionBox } from './rendering/SelectionBox';
 
 export class GameClient {
     private connection: HubConnection.HubConnection | null = null;
@@ -14,6 +19,10 @@ export class GameClient {
     private inputManager: InputManager;
     private uiManager: UIManager;
     private audioManager: AudioManager;
+    private minimap: Minimap;
+    private particleSystem: ParticleSystem;
+    private wieldItem: WieldItem;
+    private selectionBox: SelectionBox;
     private isRunning: boolean = false;
     private lastTime: number = 0;
     private frameCount: number = 0;
@@ -27,8 +36,16 @@ export class GameClient {
         this.worldManager = new WorldManager(this.renderer);
         this.inputManager = new InputManager();
         this.audioManager = new AudioManager();
+        this.minimap = new Minimap(document.getElementById('game-container')!, this.worldManager);
+        this.particleSystem = new ParticleSystem(this.renderer.getScene());
+        this.wieldItem = new WieldItem(this.renderer.getScene(), this.renderer.getCamera());
+        this.selectionBox = new SelectionBox(this.renderer.getScene());
         this.playerController = new PlayerController(this.renderer.getCamera(), this.inputManager);
         this.playerController.setWorldManager(this.worldManager);
+        this.playerController.setSelectionBox(this.selectionBox);
+        this.playerController.setParticleEmitter((x, y, z, type) => {
+            this.onParticleEvent(x, y, z, type);
+        });
     }
 
     async connect(playerName: string): Promise<void> {
@@ -238,6 +255,28 @@ export class GameClient {
             this.playerController.update(dt);
         }
 
+        this.minimap.setPosition(
+            this.playerController.getPosition().x,
+            this.playerController.getPosition().y,
+            this.playerController.getPosition().z,
+            this.playerController.getYaw() * Math.PI / 180
+        );
+        this.minimap.update(dt);
+        this.particleSystem.update(dt);
+
+        const selectedSlot = this.playerController.getSelectedSlot();
+        const inventory = this.playerController.inventory;
+        if (inventory[selectedSlot]) {
+            this.wieldItem.updateItem(
+                inventory[selectedSlot].itemId || '',
+                inventory[selectedSlot].blockId || null,
+                inventory[selectedSlot].itemName || ''
+            );
+        } else {
+            this.wieldItem.updateItem('', null, '');
+        }
+        this.wieldItem.update(dt, this.playerController.getOnGround());
+
         this.chunkRequestTimer += dt;
         if (this.chunkRequestTimer >= 2.0) {
             this.chunkRequestTimer = 0;
@@ -268,5 +307,30 @@ export class GameClient {
     private showLoginScreen(): void {
         const loginScreen = document.getElementById('login-screen')!;
         loginScreen.style.display = 'flex';
+    }
+
+    private onParticleEvent(x: number, y: number, z: number, type: string): void {
+        const color = new THREE.Color(this.worldManager.getBlockRegistry().get(
+            this.worldManager.getBlock(x, y, z)
+        )?.color || '#888888');
+
+        switch (type) {
+            case 'dig':
+                this.particleSystem.emitBlockParticles(x, y, z, color, 8);
+                break;
+            case 'place':
+                this.particleSystem.emitPlaceParticles(x, y, z, color, 6);
+                break;
+            case 'damage':
+                this.particleSystem.emitDamageParticles(
+                    this.playerController.getPosition().x,
+                    this.playerController.getPosition().y,
+                    this.playerController.getPosition().z
+                );
+                break;
+            case 'smoke':
+                this.particleSystem.emitSmokeParticles(x, y, z, 4);
+                break;
+        }
     }
 }

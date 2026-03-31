@@ -62,6 +62,11 @@ public class NoiseWorldGenerator : IWorldGenerator
             }
         }
 
+        if (baseY >= 0 && baseY < 50)
+        {
+            GenerateDungeons(blocks, baseX, baseY, baseZ);
+        }
+
         if (_generateTrees)
         {
             GenerateTrees(blocks, baseX, baseY, baseZ);
@@ -108,55 +113,189 @@ public class NoiseWorldGenerator : IWorldGenerator
                     continue;
                 }
 
-                var trunkHeight = ((surfaceHeight * 7 + worldX * 13 + worldZ * 19) & 0x7FFFFFFF) % 3 + 4;
+                GenerateTree(blocks, x, localSurfaceY, z, baseX, baseY, baseZ, worldX, worldZ);
+            }
+        }
+    }
 
-                for (int ty = 1; ty <= trunkHeight; ty++)
+    private void GenerateTree(ushort[,,] blocks, int x, int surfaceY, int z, int baseX, int baseY, int baseZ, int worldX, int worldZ)
+    {
+        var rng = new Random(_seed + worldX * 73856093 ^ worldZ * 19349663);
+        var trunkHeight = rng.Next(4, 7);
+        var treeType = rng.Next(3);
+
+        if (treeType == 0)
+        {
+            GenerateOakTree(blocks, x, surfaceY, z, trunkHeight);
+        }
+        else if (treeType == 1)
+        {
+            GeneratePineTree(blocks, x, surfaceY, z, trunkHeight);
+        }
+        else
+        {
+            GenerateBirchTree(blocks, x, surfaceY, z, trunkHeight);
+        }
+    }
+
+    private void GenerateOakTree(ushort[,,] blocks, int x, int surfaceY, int z, int trunkHeight)
+    {
+        for (int ty = 1; ty <= trunkHeight; ty++)
+        {
+            var ly = surfaceY + ty;
+            if (ly >= 0 && ly < Chunk.Size)
+            {
+                blocks[x, ly, z] = (ushort)BlockType.Wood;
+            }
+        }
+
+        var canopyBase = surfaceY + trunkHeight - 1;
+        for (int dy = 0; dy <= 3; dy++)
+        {
+            var ly = canopyBase + dy;
+            if (ly < 0 || ly >= Chunk.Size) continue;
+
+            var radius = dy <= 1 ? 2 : 1;
+            for (int dx = -radius; dx <= radius; dx++)
+            {
+                for (int dz = -radius; dz <= radius; dz++)
                 {
-                    var ly = localSurfaceY + ty;
-                    if (ly < Chunk.Size)
+                    if (dx * dx + dz * dz > radius * radius + 1) continue;
+                    var lx = x + dx;
+                    var lz = z + dz;
+                    if (lx < 0 || lx >= Chunk.Size || lz < 0 || lz >= Chunk.Size) continue;
+                    if (blocks[lx, ly, lz] == (ushort)BlockType.Air)
                     {
-                        blocks[x, ly, z] = (ushort)BlockType.Wood;
+                        blocks[lx, ly, lz] = (ushort)BlockType.Leaves;
                     }
                 }
+            }
+        }
+    }
 
-                var canopyBase = localSurfaceY + trunkHeight - 1;
-                for (int dy = 0; dy <= 2; dy++)
+    private void GeneratePineTree(ushort[,,] blocks, int x, int surfaceY, int z, int trunkHeight)
+    {
+        var height = trunkHeight + 2;
+        for (int ty = 1; ty <= height; ty++)
+        {
+            var ly = surfaceY + ty;
+            if (ly >= 0 && ly < Chunk.Size)
+            {
+                blocks[x, ly, z] = (ushort)BlockType.Wood;
+            }
+        }
+
+        for (int ty = trunkHeight - 2; ty <= height; ty++)
+        {
+            var ly = surfaceY + ty;
+            if (ly < 0 || ly >= Chunk.Size) continue;
+
+            var distFromTop = height - ty;
+            var radius = distFromTop <= 1 ? 1 : 2;
+            for (int dx = -radius; dx <= radius; dx++)
+            {
+                for (int dz = -radius; dz <= radius; dz++)
                 {
-                    var ly = canopyBase + dy;
-                    if (ly < 0 || ly >= Chunk.Size)
+                    if (dx * dx + dz * dz > radius * radius) continue;
+                    var lx = x + dx;
+                    var lz = z + dz;
+                    if (lx < 0 || lx >= Chunk.Size || lz < 0 || lz >= Chunk.Size) continue;
+                    if (blocks[lx, ly, lz] == (ushort)BlockType.Air)
                     {
-                        continue;
+                        blocks[lx, ly, lz] = (ushort)BlockType.Leaves;
                     }
+                }
+            }
+        }
+    }
 
-                    var radius = dy == 2 ? 1 : 2;
-                    for (int dx = -radius; dx <= radius; dx++)
+    private void GenerateBirchTree(ushort[,,] blocks, int x, int surfaceY, int z, int trunkHeight)
+    {
+        for (int ty = 1; ty <= trunkHeight; ty++)
+        {
+            var ly = surfaceY + ty;
+            if (ly >= 0 && ly < Chunk.Size)
+            {
+                blocks[x, ly, z] = (ushort)BlockType.Wood;
+            }
+        }
+
+        var canopyBase = surfaceY + trunkHeight;
+        for (int dy = -1; dy <= 1; dy++)
+        {
+            var ly = canopyBase + dy;
+            if (ly < 0 || ly >= Chunk.Size) continue;
+
+            var radius = dy == 0 ? 2 : 1;
+            for (int dx = -radius; dx <= radius; dx++)
+            {
+                for (int dz = -radius; dz <= radius; dz++)
+                {
+                    if (Math.Abs(dx) + Math.Abs(dz) > radius + 1) continue;
+                    var lx = x + dx;
+                    var lz = z + dz;
+                    if (lx < 0 || lx >= Chunk.Size || lz < 0 || lz >= Chunk.Size) continue;
+                    if (blocks[lx, ly, lz] == (ushort)BlockType.Air)
                     {
-                        for (int dz = -radius; dz <= radius; dz++)
+                        blocks[lx, ly, lz] = (ushort)BlockType.Leaves;
+                    }
+                }
+            }
+        }
+    }
+
+    private void GenerateDungeons(ushort[,,] blocks, int baseX, int baseY, int baseZ)
+    {
+        var rng = new Random(_seed + baseX * 73856093 ^ baseZ * 19349663 ^ baseY * 83492791);
+
+        for (int attempt = 0; attempt < 2; attempt++)
+        {
+            var cx = rng.Next(2, Chunk.Size - 2);
+            var cy = rng.Next(1, Chunk.Size - 4);
+            var cz = rng.Next(2, Chunk.Size - 2);
+
+            if (blocks[cx, cy, cz] != (ushort)BlockType.Stone) continue;
+
+            var worldCX = baseX + cx;
+            var worldCY = baseY + cy;
+            if (worldCY > 30) continue;
+
+            var dungeonNoise = PerlinNoise2D(worldCX * 0.02f + 3000, baseZ * 0.02f + 3000);
+            if (dungeonNoise < 0.6f) continue;
+
+            var roomW = rng.Next(3, 6);
+            var roomH = rng.Next(3, 5);
+            var roomD = rng.Next(3, 6);
+
+            for (int dx = 0; dx < roomW; dx++)
+            {
+                for (int dy = 0; dy < roomH; dy++)
+                {
+                    for (int dz = 0; dz < roomD; dz++)
+                    {
+                        var lx = cx + dx;
+                        var ly = cy + dy;
+                        var lz = cz + dz;
+                        if (lx >= Chunk.Size || ly >= Chunk.Size || lz >= Chunk.Size) continue;
+
+                        if (dx == 0 || dx == roomW - 1 || dy == 0 || dy == roomH - 1 || dz == 0 || dz == roomD - 1)
                         {
-                            if (dx == 0 && dz == 0 && dy < 2)
-                            {
-                                continue;
-                            }
-
-                            if (dx * dx + dy * dy + dz * dz > 5)
-                            {
-                                continue;
-                            }
-
-                            var lx = x + dx;
-                            var lz = z + dz;
-                            if (lx < 0 || lx >= Chunk.Size || lz < 0 || lz >= Chunk.Size)
-                            {
-                                continue;
-                            }
-
-                            if (blocks[lx, ly, lz] == (ushort)BlockType.Air)
-                            {
-                                blocks[lx, ly, lz] = (ushort)BlockType.Leaves;
-                            }
+                            blocks[lx, ly, lz] = rng.NextDouble() > 0.5
+                                ? (ushort)BlockType.MossyCobblestone
+                                : (ushort)BlockType.Cobblestone;
+                        }
+                        else
+                        {
+                            blocks[lx, ly, lz] = (ushort)BlockType.Air;
                         }
                     }
                 }
+            }
+
+            if (roomW > 3 && roomD > 3 && cy + 1 < Chunk.Size)
+            {
+                blocks[cx, cy + 1, cz] = (ushort)BlockType.Cobblestone;
+                blocks[cx, cy + 2, cz] = (ushort)BlockType.Air;
             }
         }
     }
@@ -202,6 +341,12 @@ public class NoiseWorldGenerator : IWorldGenerator
             if (y < 48 && oreNoise > 0.75f) return (ushort)BlockType.OreIron;
             if (y < 64 && PerlinNoise3D(x * 0.15f, y * 0.15f, z * 0.15f) > 0.82f) return (ushort)BlockType.Coal;
 
+            var gravelNoise = PerlinNoise3D(x * 0.12f + 2000, y * 0.12f, z * 0.12f + 2000);
+            if (gravelNoise > 0.9f && y < 40) return (ushort)BlockType.Gravel;
+
+            var clayNoise = PerlinNoise3D(x * 0.09f + 4000, y * 0.09f, z * 0.09f + 4000);
+            if (clayNoise > 0.92f && y < WaterLevel + 5 && y > WaterLevel - 5) return (ushort)BlockType.Clay;
+
             return (ushort)BlockType.Stone;
         }
 
@@ -212,7 +357,15 @@ public class NoiseWorldGenerator : IWorldGenerator
     {
         var caveNoise = PerlinNoise3D(x * 0.05f, y * 0.07f, z * 0.05f);
         var caveNoise2 = PerlinNoise3D(x * 0.08f + 500, y * 0.08f, z * 0.08f + 500);
-        return (caveNoise * caveNoise + caveNoise2 * caveNoise2) < 0.015f;
+        if ((caveNoise * caveNoise + caveNoise2 * caveNoise2) < 0.015f) return true;
+
+        if (y < 20)
+        {
+            var cavernNoise = PerlinNoise3D(x * 0.02f + 9999, y * 0.02f + 9999, z * 0.02f + 9999);
+            if (cavernNoise > 0.65f) return true;
+        }
+
+        return false;
     }
 
     private float PerlinNoise2D(float x, float y)

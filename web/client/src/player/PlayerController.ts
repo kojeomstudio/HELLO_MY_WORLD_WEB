@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { InputManager } from '../input/InputManager';
 import { WorldManager } from '../world/WorldManager';
+import { SelectionBox } from '../rendering/SelectionBox';
 
 const GRAVITY = 20.0;
 const WALK_SPEED = 5.0;
@@ -10,6 +11,7 @@ const MOUSE_SENSITIVITY = 0.002;
 const PLAYER_HEIGHT = 1.7;
 const PLAYER_WIDTH = 0.6;
 const PLAYER_FULL_HEIGHT = 1.8;
+const STEP_HEIGHT = 0.6;
 
 export class PlayerController {
     private _camera: THREE.PerspectiveCamera;
@@ -24,6 +26,8 @@ export class PlayerController {
     private _worldManager: WorldManager | null = null;
     private _onGround: boolean = false;
     private _knockbackVelocity: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
+    private _selectionBox: SelectionBox | null = null;
+    private _particleEmitter: ((x: number, y: number, z: number, type: string) => void) | null = null;
     health: number = 20;
     maxHealth: number = 20;
     inventory: any[] = [];
@@ -41,6 +45,14 @@ export class PlayerController {
 
     setWorldManager(worldManager: WorldManager): void {
         this._worldManager = worldManager;
+    }
+
+    setSelectionBox(box: SelectionBox): void {
+        this._selectionBox = box;
+    }
+
+    setParticleEmitter(emitter: (x: number, y: number, z: number, type: string) => void): void {
+        this._particleEmitter = emitter;
     }
 
     private requestPointerLock(): void {
@@ -97,6 +109,7 @@ export class PlayerController {
     private onDig(): void {
         const ray = this.castRay();
         if (ray) {
+            this._particleEmitter?.(ray.blockX, ray.blockY, ray.blockZ, 'dig');
             this.emitBlockEvent('dig', ray.blockX, ray.blockY, ray.blockZ);
         }
     }
@@ -123,6 +136,7 @@ export class PlayerController {
             }
         }
 
+        this._particleEmitter?.(ray.placeX, ray.placeY, ray.placeZ, 'place');
         this.emitBlockEvent('place', ray.placeX, ray.placeY, ray.placeZ);
     }
 
@@ -169,11 +183,18 @@ export class PlayerController {
     }
 
     update(dt: number): void {
-        if (!this._input.isPointerLocked()) return;
-        if (this.isDead) return;
+        if (!this._input.isPointerLocked()) {
+            this._selectionBox?.setVisible(false);
+            return;
+        }
+        if (this.isDead) {
+            this._selectionBox?.setVisible(false);
+            return;
+        }
 
         this.updateMovement(dt);
         this.updateCamera();
+        this.updateSelectionBox();
     }
 
     private updateMovement(dt: number): void {
@@ -232,15 +253,36 @@ export class PlayerController {
                 this._onGround = false;
             } else {
                 if (this._velocity.y < 0) {
-                    this._onGround = true;
+                    if (this._onGround && Math.abs(this._velocity.y) < 8) {
+                        if (!this.checkCollision(this._position.x, newY + STEP_HEIGHT, this._position.z)) {
+                            this._position.y = newY + STEP_HEIGHT;
+                            this._velocity.y = 0;
+                        } else {
+                            this._onGround = true;
+                            this._velocity.y = 0;
+                        }
+                    } else {
+                        this._onGround = true;
+                        this._velocity.y = 0;
+                    }
+                } else {
+                    this._velocity.y = 0;
                 }
-                this._velocity.y = 0;
             }
 
             if (!this.checkCollision(this._position.x, this._position.y, newZ)) {
                 this._position.z = newZ;
             } else {
-                this._velocity.z = 0;
+                if (this._onGround && Math.abs(this._velocity.z) > 0.1) {
+                    if (!this.checkCollision(this._position.x, this._position.y + STEP_HEIGHT, newZ)) {
+                        this._position.z = newZ;
+                        this._position.y += STEP_HEIGHT;
+                    } else {
+                        this._velocity.z = 0;
+                    }
+                } else {
+                    this._velocity.z = 0;
+                }
             }
         } else {
             this._position.x = newX;
@@ -301,6 +343,31 @@ export class PlayerController {
 
         const euler = new THREE.Euler(this._pitch, this._yaw, 0, 'YXZ');
         this._camera.quaternion.setFromEuler(euler);
+    }
+
+    private updateSelectionBox(): void {
+        if (!this._selectionBox) return;
+
+        const ray = this.castRay();
+        if (ray) {
+            const normal = this.getBlockNormal(ray);
+            const hitPoint = new THREE.Vector3(
+                ray.blockX + 0.5 + normal.x * 0.5,
+                ray.blockY + 0.5 + normal.y * 0.5,
+                ray.blockZ + 0.5 + normal.z * 0.5
+            );
+            this._selectionBox.update(hitPoint, normal);
+        } else {
+            this._selectionBox.update(null, null);
+        }
+    }
+
+    private getBlockNormal(ray: { blockX: number; blockY: number; blockZ: number; placeX: number; placeY: number; placeZ: number }): THREE.Vector3 {
+        return new THREE.Vector3(
+            ray.placeX - ray.blockX,
+            ray.placeY - ray.blockY,
+            ray.placeZ - ray.blockZ
+        );
     }
 
     getPosition(): THREE.Vector3 { return this._position.clone(); }
