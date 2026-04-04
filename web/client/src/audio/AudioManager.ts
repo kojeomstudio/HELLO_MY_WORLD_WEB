@@ -1,5 +1,6 @@
 export class AudioManager {
     private audioContext: AudioContext | null = null;
+    private volume: number = 0.5;
 
     constructor() {
         try {
@@ -9,23 +10,27 @@ export class AudioManager {
         }
     }
 
-    play(soundName: string, volume: number = 0.5): void {
+    play(soundName: string, _volume: number = 0.5): void {
         if (!this.audioContext) return;
         if (this.audioContext.state === 'suspended') {
             this.audioContext.resume();
         }
 
         switch (soundName) {
-            case 'block_break': this.playBlockBreak(volume); break;
-            case 'block_place': this.playBlockPlace(volume); break;
-            case 'footstep': this.playFootstep(volume); break;
-            case 'hurt': this.playHurt(volume); break;
-            case 'pickup': this.playPickup(volume); break;
-            case 'death': this.playDeath(volume); break;
+            case 'block_break': this.playBlockBreak(); break;
+            case 'block_place': this.playBlockPlace(); break;
+            case 'footstep': this.playFootstep(); break;
+            case 'hurt': this.playHurt(); break;
+            case 'pickup': this.playPickup(); break;
+            case 'death': this.playDeath(); break;
         }
     }
 
-    private playBlockBreak(volume: number): void {
+    setVolume(volume: number): void {
+        this.volume = volume;
+    }
+
+    private playBlockBreak(): void {
         if (!this.audioContext) return;
         const ctx = this.audioContext;
         const duration = 0.1;
@@ -41,7 +46,7 @@ export class AudioManager {
         source.buffer = buffer;
 
         const gain = ctx.createGain();
-        gain.gain.setValueAtTime(volume * 0.3, ctx.currentTime);
+        gain.gain.setValueAtTime(this.volume * 0.3, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
 
         source.connect(gain);
@@ -49,7 +54,7 @@ export class AudioManager {
         source.start();
     }
 
-    private playBlockPlace(volume: number): void {
+    private playBlockPlace(): void {
         if (!this.audioContext) return;
         const ctx = this.audioContext;
         const duration = 0.08;
@@ -60,7 +65,7 @@ export class AudioManager {
         osc.frequency.exponentialRampToValueAtTime(60, ctx.currentTime + duration);
 
         const gain = ctx.createGain();
-        gain.gain.setValueAtTime(volume * 0.4, ctx.currentTime);
+        gain.gain.setValueAtTime(this.volume * 0.4, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
 
         osc.connect(gain);
@@ -69,7 +74,7 @@ export class AudioManager {
         osc.stop(ctx.currentTime + duration);
     }
 
-    private playFootstep(volume: number): void {
+    private playFootstep(): void {
         if (!this.audioContext) return;
         const ctx = this.audioContext;
         const duration = 0.05;
@@ -85,7 +90,7 @@ export class AudioManager {
         source.buffer = buffer;
 
         const gain = ctx.createGain();
-        gain.gain.setValueAtTime(volume * 0.1, ctx.currentTime);
+        gain.gain.setValueAtTime(this.volume * 0.1, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
 
         source.connect(gain);
@@ -93,7 +98,7 @@ export class AudioManager {
         source.start();
     }
 
-    private playHurt(volume: number): void {
+    private playHurt(): void {
         if (!this.audioContext) return;
         const ctx = this.audioContext;
         const duration = 0.2;
@@ -107,7 +112,7 @@ export class AudioManager {
         osc2.frequency.setValueAtTime(153, ctx.currentTime);
 
         const gain = ctx.createGain();
-        gain.gain.setValueAtTime(volume * 0.3, ctx.currentTime);
+        gain.gain.setValueAtTime(this.volume * 0.3, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
 
         osc1.connect(gain);
@@ -119,7 +124,7 @@ export class AudioManager {
         osc2.stop(ctx.currentTime + duration);
     }
 
-    private playPickup(volume: number): void {
+    private playPickup(): void {
         if (!this.audioContext) return;
         const ctx = this.audioContext;
         const duration = 0.15;
@@ -130,8 +135,8 @@ export class AudioManager {
         osc.frequency.setValueAtTime(600, ctx.currentTime + 0.075);
 
         const gain = ctx.createGain();
-        gain.gain.setValueAtTime(volume * 0.25, ctx.currentTime);
-        gain.gain.setValueAtTime(volume * 0.25, ctx.currentTime + 0.07);
+        gain.gain.setValueAtTime(this.volume * 0.25, ctx.currentTime);
+        gain.gain.setValueAtTime(this.volume * 0.25, ctx.currentTime + 0.07);
         gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
 
         osc.connect(gain);
@@ -140,7 +145,7 @@ export class AudioManager {
         osc.stop(ctx.currentTime + duration);
     }
 
-    private playDeath(volume: number): void {
+    private playDeath(): void {
         if (!this.audioContext) return;
         const ctx = this.audioContext;
         const duration = 0.5;
@@ -151,7 +156,7 @@ export class AudioManager {
         osc.frequency.exponentialRampToValueAtTime(55, ctx.currentTime + duration);
 
         const gain = ctx.createGain();
-        gain.gain.setValueAtTime(volume * 0.35, ctx.currentTime);
+        gain.gain.setValueAtTime(this.volume * 0.35, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
 
         osc.connect(gain);

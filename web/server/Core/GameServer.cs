@@ -293,6 +293,12 @@ public class GameServer
 
         UpdateFurnaces(1f / TickRate);
 
+        if (_tickCount % 600 == 0)
+        {
+            var playersDict = new Dictionary<string, PlayerEnt>(_players);
+            DefaultWorld.UnloadDistantChunks(playersDict, _config.World.RenderDistance);
+        }
+
         if (_tickCount % _config.Network.TimeBroadcastInterval == 0 && _hubContext != null)
         {
             _ = _hubContext.Clients.All.OnTimeUpdate(GameTime, TimeSpeed, DayNight.SkyBrightness);

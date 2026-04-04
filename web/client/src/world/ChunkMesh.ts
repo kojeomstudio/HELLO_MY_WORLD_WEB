@@ -49,7 +49,8 @@ export class ChunkMesh {
         blockRegistry: any,
         getNeighborBlock: (wx: number, wy: number, wz: number) => number,
         textureAtlas: TextureAtlas | null = null,
-        getNeighborLight: (wx: number, wy: number, wz: number) => number = () => 15
+        getNeighborLight: (wx: number, wy: number, wz: number) => number = () => 15,
+        aoEnabled: boolean = true
     ): void {
         const hasAtlas = textureAtlas !== null;
         this.isVegetation = false;
@@ -175,7 +176,7 @@ export class ChunkMesh {
                                 const side2 = s2def?.solid === true && s2def?.transparent !== true;
                                 const cornerSolid = cdef?.solid === true && cdef?.transparent !== true;
 
-                                ao = computeAO(side1, side2, cornerSolid) / 3.0;
+                                ao = aoEnabled ? computeAO(side1, side2, cornerSolid) / 3.0 : 1.0;
                             }
 
                             let lightMult: number;

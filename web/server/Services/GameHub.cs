@@ -571,10 +571,19 @@ public class GameHub : Hub<IGameClient>
         }
 
         var result = _craftingSystem.Craft(recipe, availableItems);
-        player.Inventory.Clear();
-        foreach (var (itemId, count) in result)
+        foreach (var ingredient in recipe.Ingredients)
         {
-            player.Inventory.AddItem(new ItemStack(itemId, count));
+            var remaining = ingredient.Count;
+            for (int i = 0; i < player.Inventory.Size && remaining > 0; i++)
+            {
+                var slot = player.Inventory[i];
+                if (slot != null && slot.ItemId.Equals(ingredient.ItemId, StringComparison.OrdinalIgnoreCase))
+                {
+                    var take = Math.Min(remaining, slot.Count);
+                    player.Inventory.RemoveItem(i, take);
+                    remaining -= take;
+                }
+            }
         }
         player.Inventory.AddItem(new ItemStack(recipe.ResultItemId, recipe.ResultCount));
 
@@ -619,10 +628,19 @@ public class GameHub : Hub<IGameClient>
         }
 
         var result = _craftingSystem.Craft(recipe, availableItems);
-        player.Inventory.Clear();
-        foreach (var (itemId, count) in result)
+        foreach (var ingredient in recipe.Ingredients)
         {
-            player.Inventory.AddItem(new ItemStack(itemId, count));
+            var remaining = ingredient.Count;
+            for (int i = 0; i < player.Inventory.Size && remaining > 0; i++)
+            {
+                var slot = player.Inventory[i];
+                if (slot != null && slot.ItemId.Equals(ingredient.ItemId, StringComparison.OrdinalIgnoreCase))
+                {
+                    var take = Math.Min(remaining, slot.Count);
+                    player.Inventory.RemoveItem(i, take);
+                    remaining -= take;
+                }
+            }
         }
         player.Inventory.AddItem(new ItemStack(recipe.ResultItemId, recipe.ResultCount));
 

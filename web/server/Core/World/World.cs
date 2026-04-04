@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using WebGameServer.Core.Game;
+using PlayerEnt = WebGameServer.Core.Player.Player;
 
 namespace WebGameServer.Core.World;
 
@@ -294,6 +295,41 @@ public class World
         WorldPersistence.LoadWorld(this, directory);
         NeedsSave = false;
         LastSaveTime = DateTime.UtcNow;
+    }
+
+    public void UnloadDistantChunks(Dictionary<string, PlayerEnt> players, int maxChunkDistance)
+    {
+        var playerChunkPositions = new List<(int X, int Z)>();
+        foreach (var player in players.Values)
+        {
+            var cx = (int)Math.Floor(player.Position.X / Chunk.Size);
+            var cz = (int)Math.Floor(player.Position.Z / Chunk.Size);
+            playerChunkPositions.Add((cx, cz));
+        }
+
+        var chunksToUnload = new List<ChunkCoord>();
+        foreach (var kvp in _chunks)
+        {
+            var coord = kvp.Key;
+            var isNearPlayer = false;
+            foreach (var (pcx, pcz) in playerChunkPositions)
+            {
+                if (Math.Abs(coord.X - pcx) <= maxChunkDistance + 2 && Math.Abs(coord.Z - pcz) <= maxChunkDistance + 2)
+                {
+                    isNearPlayer = true;
+                    break;
+                }
+            }
+            if (!isNearPlayer && coord.Y >= 0 && coord.Y <= 3)
+            {
+                chunksToUnload.Add(coord);
+            }
+        }
+
+        foreach (var coord in chunksToUnload)
+        {
+            _chunks.TryRemove(coord, out _);
+        }
     }
 
     public List<(Vector3s From, Vector3s To, BlockType Type)> GetPendingFallingBlocks(BlockDefinitionManager blockDefs)

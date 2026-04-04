@@ -8,7 +8,7 @@ const GRAVITY = 20.0;
 const WALK_SPEED = 5.0;
 const SPRINT_SPEED = 8.0;
 const FLY_SPEED = 12.0;
-const MOUSE_SENSITIVITY = 0.002;
+
 const PLAYER_HEIGHT = 1.7;
 const PLAYER_WIDTH = 0.6;
 const PLAYER_FULL_HEIGHT = 1.8;
@@ -34,6 +34,7 @@ export class PlayerController {
     private digTarget: { x: number; y: number; z: number } | null = null;
     private digDuration: number = 0;
     private isDigging: boolean = false;
+    private mouseSensitivity: number = 0.002;
     private isLeftMouseDown: boolean = false;
     health: number = 20;
     maxHealth: number = 20;
@@ -83,8 +84,8 @@ export class PlayerController {
         document.addEventListener('mousemove', (e: MouseEvent) => {
             if (!this._input.isPointerLocked()) return;
 
-            this._yaw -= e.movementX * MOUSE_SENSITIVITY;
-            this._pitch -= e.movementY * MOUSE_SENSITIVITY;
+            this._yaw -= e.movementX * this.mouseSensitivity;
+            this._pitch -= e.movementY * this.mouseSensitivity;
             this._pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, this._pitch));
         });
 
@@ -475,6 +476,11 @@ export class PlayerController {
         this._knockbackVelocity.set(vx, vy, vz);
     }
 
+    setPosition(x: number, y: number, z: number): void {
+        this._position.set(x, y, z);
+        this._velocity.set(0, 0, 0);
+    }
+
     setFlying(flying: boolean): void {
         this._isFlying = flying;
     }
@@ -514,4 +520,5 @@ export class PlayerController {
     getSelectedSlot(): number { return this._selectedSlot; }
     getSelectedBlockType(): number { return this._selectedBlockType; }
     setSelectedBlockType(blockType: number): void { this._selectedBlockType = blockType; }
+    setMouseSensitivity(value: number): void { this.mouseSensitivity = value; }
 }

@@ -15,14 +15,13 @@ public class GameLoopService : BackgroundService
     private readonly IHubContext<GameHub, IGameClient> _hub;
     private readonly ILogger<GameLoopService> _logger;
     private readonly BlockDefinitionManager _blockDefinitionManager;
+    private readonly ServerConfig _config;
 
     private int _tickCount;
     private int _previousEntityCount;
     private DateTime _lastTickTime;
     private int _tpsFrameCount;
     private float _currentTps;
-
-    private const int TimeBroadcastInterval = 100;
     private const float PickupRange = 2.0f;
     private const int AutoSaveIntervalSeconds = 300;
     private const int FallingBlockInterval = 10;
@@ -32,13 +31,15 @@ public class GameLoopService : BackgroundService
         EntityManager entityManager,
         IHubContext<GameHub, IGameClient> hub,
         ILogger<GameLoopService> logger,
-        BlockDefinitionManager blockDefinitionManager)
+        BlockDefinitionManager blockDefinitionManager,
+        ServerConfig config)
     {
         _gameServer = gameServer;
         _entityManager = entityManager;
         _hub = hub;
         _logger = logger;
         _blockDefinitionManager = blockDefinitionManager;
+        _config = config;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -53,13 +54,12 @@ public class GameLoopService : BackgroundService
             var now = DateTime.UtcNow;
 
             _gameServer.Update();
-            _entityManager.UpdateAll(1.0f / _gameServer.TickRate);
 
             await ProcessItemPickups();
 
             _tickCount++;
 
-            if (_tickCount % TimeBroadcastInterval == 0)
+            if (_tickCount % _config.Network.TimeBroadcastInterval == 0)
             {
                 try
                 {

@@ -16,11 +16,11 @@ Web-based voxel game ported from the minetest_sub_project (Luanti engine v5.16.0
 ### Rendering & Visuals
 - Three.js 3D scene with perspective camera (configurable FOV)
 - Chunk mesh building with per-face culling (solid vs transparent)
-- Ambient occlusion (3-bit per vertex, toggleable)
-- Texture atlas system (125 PNG textures composited into canvas)
+- Ambient occlusion (3-bit per vertex, toggleable via settings)
+- Texture atlas system (procedurally generated textures composited into canvas)
 - Sky dome with sun mesh and day/night sky brightness
 - Dynamic lighting system (sun light + artificial light propagation)
-- Cloud system (procedural texture, drift, day/night color response, toggleable)
+- Cloud system (procedural texture, drift, day/night color response, toggleable via settings)
 - Weather system (rain particles with wind effect, fog density changes)
 - Post-processing effects (damage flash, cave darkness vignette, lava overlay)
 - Waving vegetation animation (leaves, pine needles, sugar cane)
@@ -48,7 +48,7 @@ Web-based voxel game ported from the minetest_sub_project (Luanti engine v5.16.0
 - Experience and leveling system with XP bar display
 - Player and mob death drops (inventory scattered as entities)
 - Creative mode inventory UI (paginated grid with search/filter)
-- Settings panel (mouse sensitivity, render distance, FOV, volumes, clouds/AO toggles)
+- Settings panel (mouse sensitivity, render distance, FOV, volumes, clouds/AO toggles — all wired to game systems)
 - Player walk animation (multi-part body with limb swinging)
 
 ### Multiplayer
@@ -79,7 +79,7 @@ Web-based voxel game ported from the minetest_sub_project (Luanti engine v5.16.0
 
 ### Audio
 - Procedural Web Audio API sounds (no audio files)
-- Footstep sounds triggered during movement
+- Volume control via settings panel
 - Block break, block place, hurt, pickup, death sound effects
 
 ### Server
@@ -91,6 +91,7 @@ Web-based voxel game ported from the minetest_sub_project (Luanti engine v5.16.0
 - REST API status endpoint
 - Swagger UI for development
 - Configurable server settings via JSON
+- Chunk unloading for distant chunks (memory management)
 
 ## Prerequisites
 
@@ -101,7 +102,7 @@ Web-based voxel game ported from the minetest_sub_project (Luanti engine v5.16.0
 
 ```bash
 git clone <repository-url>
-cd hello_my_world_web
+cd hello-my-world-web
 ```
 
 ### Server Dependencies
@@ -118,7 +119,24 @@ npm install --prefix web/client
 
 ## Running
 
-### 1. Start the Server
+### Quick Start (Windows)
+
+```bash
+start.bat
+```
+
+This launches the server, client dev server, and opens the browser automatically.
+
+### Quick Start (Linux/macOS)
+
+```bash
+chmod +x start.sh
+./start.sh
+```
+
+### Manual Setup
+
+#### 1. Start the Server
 
 ```bash
 dotnet run --project web/server
@@ -126,7 +144,7 @@ dotnet run --project web/server
 
 Server starts at `http://localhost:5266`.
 
-### 2. Start the Client (in a new terminal)
+#### 2. Start the Client (in a new terminal)
 
 ```bash
 npm run dev --prefix web/client
@@ -134,112 +152,118 @@ npm run dev --prefix web/client
 
 Client starts at `http://localhost:5173`. The Vite dev server proxies `/game` to the server.
 
-### 3. Open in Browser
+#### 3. Open in Browser
 
 Navigate to `http://localhost:5173` and enter a player name to join.
 
 ## Project Structure
 
 ```
-hello_my_world_web/
+hello-my-world-web/
+  start.bat                          - Windows launcher (server + client + browser)
+  start.sh                           - Linux/macOS launcher
   web/
     client/
       src/
-        main.ts                    - Bootstrap, DOM event bridges
-        GameClient.ts              - Central orchestrator, game loop
+        main.ts                      - Bootstrap, DOM event bridges
+        GameClient.ts                - Central orchestrator, game loop
         rendering/
-          Renderer.ts              - Three.js scene, camera, lighting, sky
-          CloudSystem.ts           - Procedural cloud layer
-          SelectionBox.ts          - Block selection wireframe
-          WieldItem.ts             - Hand-held item display
+          Renderer.ts                - Three.js scene, camera, lighting, sky
+          CloudSystem.ts             - Procedural cloud layer
+          SelectionBox.ts            - Block selection wireframe
+          WieldItem.ts               - Hand-held item display
         world/
-          WorldManager.ts          - Chunk storage, texture atlas, entities
-          BlockRegistry.ts         - Block type definitions
-          ChunkMesh.ts             - Chunk mesh builder with UV mapping
-          WeatherSystem.ts         - Rain particle system
-          ParticleSystem.ts        - Dig/place/damage particles
+          WorldManager.ts            - Chunk storage, texture atlas, entities, chunk unloading
+          BlockRegistry.ts           - Block type definitions
+          ChunkMesh.ts               - Chunk mesh builder with UV mapping + AO toggle
+          WeatherSystem.ts           - Rain particle system
+          ParticleSystem.ts          - Dig/place/damage particles
         player/
-          PlayerController.ts      - FPS camera, physics, raycasting
+          PlayerController.ts        - FPS camera, physics, raycasting
         input/
-          InputManager.ts          - Keyboard state, pointer lock
+          InputManager.ts            - Keyboard state, pointer lock
         ui/
-          UIManager.ts             - HUD, chat, hotbar, panels
-          SettingsPanel.ts         - Settings with localStorage
-          Minimap.ts               - In-game minimap
+          UIManager.ts               - HUD, chat, hotbar, panels
+          SettingsPanel.ts           - Settings with localStorage persistence
+          Minimap.ts                 - In-game minimap
         audio/
-          AudioManager.ts          - Procedural Web Audio sounds
+          AudioManager.ts            - Procedural Web Audio sounds with volume control
       public/
-        textures/blocks/           - 125 16x16 PNG textures
+        textures/blocks/             - Block textures (PNG)
     server/
       Core/
-        GameServer.cs              - Central game controller
-        ServerConfig.cs            - JSON config model
-        DayNightCycle.cs           - Time/sky management
+        GameServer.cs                - Central game controller + chunk unloading
+        ServerConfig.cs              - JSON config model
+        DayNightCycle.cs             - Time/sky management
         Auth/
-          AuthenticationService.cs - Name validation, banning
-          PrivilegeSystem.cs       - 15 privileges
+          AuthenticationService.cs  - Name validation, banning
+          PrivilegeSystem.cs         - 15 privileges
         Chat/
-          ChatCommandManager.cs    - /gamemode, /tp, /give
+          ChatCommandManager.cs      - /gamemode, /tp, /give
         Crafting/
-          CraftingSystem.cs        - Recipe matching
+          CraftingSystem.cs          - Recipe matching
         Smelting/
-          SmeltingSystem.cs        - Furnace recipes
+          SmeltingSystem.cs          - Furnace recipes
         Entities/
-          Entity.cs                - Item + Mob entity types
-          EntityManager.cs         - Entity lifecycle
-          MobSpawner.cs            - Mob spawning logic
+          Entity.cs                  - Item + Mob entity types
+          EntityManager.cs           - Entity lifecycle
+          MobSpawner.cs              - Mob spawning logic
         Game/
-          BlockDefinition.cs       - Block property model
-          BlockDefinitionManager.cs- Block registry
+          BlockDefinition.cs         - Block property model
+          BlockDefinitionManager.cs  - Block registry
         Physics/
-          PhysicsEngine.cs         - Movement simulation
-          KnockbackSystem.cs       - PvP knockback
+          PhysicsEngine.cs           - Movement simulation
+          KnockbackSystem.cs         - PvP knockback
         Player/
-          Player.cs                - Player state + armor + XP
-          PlayerDatabase.cs        - SQLite player persistence
-          Inventory.cs             - 32-slot inventory
+          Player.cs                  - Player state + armor + XP
+          PlayerDatabase.cs          - SQLite player persistence
+          Inventory.cs               - 32-slot inventory
         World/
-          World.cs                 - Chunk storage, block ops
-          Chunk.cs                 - 16^3 block container
-          BlockType.cs             - Block enum (68 types)
-          Block.cs                 - Block data struct
-          WorldPersistence.cs      - Chunk save/load
-          BlockMetadataDatabase.cs - SQLite chest/furnace/timer persistence
-          AgricultureSystem.cs     - Crop growth
-          ActiveBlockModifier.cs   - Periodic block changes
-          NodeTimerSystem.cs       - Timed block events
-          LightingEngine.cs        - BFS light propagation
-          LightingSystem.cs        - Light wrapper
+          World.cs                   - Chunk storage, block ops, chunk unloading
+          Chunk.cs                   - 16^3 block container
+          BlockType.cs               - Block enum (68 types)
+          Block.cs                   - Block data struct
+          WorldPersistence.cs        - Chunk save/load
+          BlockMetadataDatabase.cs   - SQLite chest/furnace/timer persistence
+          AgricultureSystem.cs       - Crop growth
+          ActiveBlockModifier.cs     - Periodic block changes
+          NodeTimerSystem.cs         - Timed block events
+          LightingEngine.cs          - BFS light propagation
+          LightingSystem.cs          - Light wrapper
           Generators/
-            NoiseWorldGenerator.cs - Perlin terrain + trees
-            FlatWorldGenerator.cs  - Flat test world
+            NoiseWorldGenerator.cs   - Perlin terrain + trees
+            FlatWorldGenerator.cs    - Flat test world
       Services/
-        GameHub.cs                 - SignalR hub
-        GameLoopService.cs        - 20 TPS background service
-      Program.cs                   - DI setup, startup
+        GameHub.cs                   - SignalR hub
+        GameLoopService.cs           - 20 TPS background service
+      Program.cs                      - DI setup, startup
     data/
-      server_config.json           - Server settings
-      blocks.json                  - 68 block definitions
-      items.json                   - Items, tools, recipes
-      smelting.json                - Smelting recipes
-      privileges.json              - Privilege definitions
-      worlds/default/              - World save data + SQLite DBs
+      server_config.json             - Server settings (all categories)
+      blocks.json                    - 68 block definitions
+      items.json                     - Items, tools, recipes
+      smelting.json                  - Smelting recipes
+      privileges.json                - Privilege definitions
+      worlds/default/                - World save data + SQLite DBs
+    docs/
+      architecture.md
+      client-architecture.md
+      communication.md
+      data-models.md
+      server-api.md
   README.md
   AGENTS.md
-  web/docs/
-    architecture.md
-    client-architecture.md
-    server-api.md
 ```
 
 ## Architecture Highlights
 
 - **Client-server architecture**: TypeScript/Three.js browser client communicates with C# ASP.NET Core server via SignalR WebSocket
 - **Server-authoritative physics**: Server validates player positions with previous-position tracking to prevent speed exploits
-- **Texture atlas**: 125 procedurally generated 16x16 textures composited into a single canvas for GPU-efficient rendering
-- **Per-chunk meshing**: 16x16x16 meshes with per-face culling, ambient occlusion, and UV mapping
+- **Texture atlas**: Procedurally generated textures composited into a single canvas for GPU-efficient rendering
+- **Per-chunk meshing**: 16x16x16 meshes with per-face culling, configurable ambient occlusion, and UV mapping
+- **Chunk unloading**: Both server and client unload distant chunks to manage memory
 - **SQLite persistence**: Player data, chest inventories, furnace operations, and node timers survive server restarts
 - **Luanti port**: Faithful reimplementation of core Minetest/Luanti systems (ABMs, node timers, tool groups, privileges)
+- **Settings persistence**: Client settings saved to localStorage and wired to all game systems
 
 ## Controls
 

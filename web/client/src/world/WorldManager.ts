@@ -94,6 +94,8 @@ export class WorldManager {
     private connection: HubConnection.HubConnection | null = null;
     private textureAtlas: TextureAtlas | null = null;
     private fallingBlocks: FallingBlockAnimation[] = [];
+    private renderDistance: number = 4;
+    private aoEnabled: boolean = true;
 
     constructor(renderer: Renderer) {
         this.renderer = renderer;
@@ -106,6 +108,17 @@ export class WorldManager {
     }
 
     getBlockRegistry(): BlockRegistry { return this.blockRegistry; }
+
+    setRenderDistance(distance: number): void {
+        this.renderDistance = distance;
+    }
+
+    setAoEnabled(enabled: boolean): void {
+        this.aoEnabled = enabled;
+        for (const [key] of this.chunks) {
+            this.rebuildChunkMesh(key);
+        }
+    }
 
     private loadTextureAtlas(): void {
         const loadedImages: Map<string, HTMLImageElement> = new Map();
@@ -197,7 +210,7 @@ export class WorldManager {
         }
 
         const chunk = ChunkMesh.fromServerData(chunkX, chunkY, chunkZ, data);
-        chunk.buildMesh(this.blockRegistry, (wx, wy, wz) => this.getBlock(wx, wy, wz), this.textureAtlas, (wx, wy, wz) => this.getBlockLight(wx, wy, wz));
+        chunk.buildMesh(this.blockRegistry, (wx, wy, wz) => this.getBlock(wx, wy, wz), this.textureAtlas, (wx, wy, wz) => this.getBlockLight(wx, wy, wz), this.aoEnabled);
 
         if (chunk.mesh) {
             this.renderer.addToScene(chunk.mesh);
@@ -241,7 +254,7 @@ export class WorldManager {
             this.renderer.removeFromScene(chunk.transparentMesh);
         }
 
-        chunk.buildMesh(this.blockRegistry, (wx, wy, wz) => this.getBlock(wx, wy, wz), this.textureAtlas, (wx, wy, wz) => this.getBlockLight(wx, wy, wz));
+        chunk.buildMesh(this.blockRegistry, (wx, wy, wz) => this.getBlock(wx, wy, wz), this.textureAtlas, (wx, wy, wz) => this.getBlockLight(wx, wy, wz), this.aoEnabled);
 
         if (chunk.mesh) {
             this.renderer.addToScene(chunk.mesh);
@@ -250,7 +263,6 @@ export class WorldManager {
             this.renderer.addToScene(chunk.transparentMesh);
         }
     }
-
     updateBlock(x: number, y: number, z: number, blockData: number): void {
         const chunkX = Math.floor(x / 16);
         const chunkY = Math.floor(y / 16);
@@ -282,7 +294,7 @@ export class WorldManager {
         const playerChunkY = Math.floor(position.y / 16);
         const playerChunkZ = Math.floor(position.z / 16);
 
-        const renderDistance = 4;
+        const renderDistance = this.renderDistance;
         const requests: string[] = [];
 
         for (let dx = -renderDistance; dx <= renderDistance; dx++) {
@@ -521,6 +533,34 @@ export class WorldManager {
         for (const chunk of this.chunks.values()) {
             if (chunk.isVegetation) {
                 chunk.animateVegetation(time);
+            }
+        }
+    }
+
+    unloadDistantChunks(playerPos: THREE.Vector3): void {
+        const playerChunkX = Math.floor(playerPos.x / 16);
+        const playerChunkZ = Math.floor(playerPos.z / 16);
+        const maxDistance = this.renderDistance + 3;
+
+        const keysToRemove: string[] = [];
+        for (const [key, chunk] of this.chunks) {
+            const dx = chunk.chunkX - playerChunkX;
+            const dz = chunk.chunkZ - playerChunkZ;
+            if (Math.abs(dx) > maxDistance || Math.abs(dz) > maxDistance) {
+                keysToRemove.push(key);
+            }
+        }
+
+        for (const key of keysToRemove) {
+            const chunk = this.chunks.get(key);
+            if (chunk) {
+                if (chunk.mesh) {
+                    this.renderer.removeFromScene(chunk.mesh);
+                }
+                if (chunk.transparentMesh) {
+                    this.renderer.removeFromScene(chunk.transparentMesh);
+                }
+                this.chunks.delete(key);
             }
         }
     }

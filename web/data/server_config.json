@@ -12,7 +12,13 @@
         "chunkSize": 16,
         "renderDistance": 4,
         "worldSeed": 12345,
-        "generators": ["noise", "flat"]
+        "generators": ["noise", "flat"],
+        "generateTrees": true,
+        "generateCaves": true,
+        "generateOres": true,
+        "treeDensity": 0.02,
+        "caveDensity": 0.5,
+        "oreDensity": 0.3
     },
     "player": {
         "defaultHealth": 20,
@@ -20,6 +26,8 @@
         "respawnHealth": 20,
         "inventorySize": 32,
         "hotbarSize": 8,
+        "fallDamageThreshold": 3.0,
+        "fallDamageMultiplier": 1.0,
         "startItems": ["wooden_pickaxe", "wooden_sword", "torch", "bread"]
     },
     "physics": {
@@ -27,7 +35,11 @@
         "jumpForce": 8.0,
         "walkSpeed": 5.0,
         "sprintSpeed": 8.0,
-        "flySpeed": 12.0
+        "flySpeed": 12.0,
+        "terminalVelocity": 50.0,
+        "drag": 0.1,
+        "liquidDrag": 0.8,
+        "climbSpeed": 2.0
     },
     "dayNight": {
         "cycleLength": 24000,
@@ -39,6 +51,11 @@
     "network": {
         "protocolVersion": 1,
         "positionUpdateInterval": 50,
-        "chunkCompression": true
+        "chunkCompression": true,
+        "timeBroadcastInterval": 100
+    },
+    "liquid": {
+        "waterFlowInterval": 3,
+        "lavaFlowInterval": 5
     }
 }

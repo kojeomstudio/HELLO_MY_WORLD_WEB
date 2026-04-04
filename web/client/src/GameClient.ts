@@ -6,6 +6,7 @@ import { PlayerController } from './player/PlayerController';
 import { WorldManager } from './world/WorldManager';
 import { InputManager } from './input/InputManager';
 import { AudioManager } from './audio/AudioManager';
+import { GameSettings } from './ui/SettingsPanel';
 import { Minimap } from './ui/Minimap';
 import { ParticleSystem } from './world/ParticleSystem';
 import { WieldItem } from './rendering/WieldItem';
@@ -31,6 +32,7 @@ export class GameClient {
     private fps: number = 0;
     private fpsTimer: number = 0;
     private chunkRequestTimer: number = 0;
+    private chunkUnloadTimer: number = 0;
     private weatherTimer: number = 0;
     private skyBrightness: number = 1;
 
@@ -58,8 +60,13 @@ export class GameClient {
         });
     }
 
-    private applySettings(settings: any): void {
+    private applySettings(settings: GameSettings): void {
         this.renderer.setFov(settings.fov);
+        this.playerController.setMouseSensitivity(settings.mouseSensitivity);
+        this.worldManager.setRenderDistance(settings.renderDistance);
+        this.worldManager.setAoEnabled(settings.aoEnabled);
+        this.renderer.setCloudsEnabled(settings.cloudsEnabled);
+        this.audioManager.setVolume(settings.soundVolume);
     }
 
     async connect(playerName: string): Promise<void> {
@@ -181,7 +188,8 @@ export class GameClient {
             }
         });
 
-        this.connection.on('OnTeleported', (_x: number, _y: number, _z: number) => {
+        this.connection.on('OnTeleported', (x: number, y: number, z: number) => {
+            this.playerController.setPosition(x, y, z);
         });
 
         this.connection.on('OnCraftingRecipes', (recipes: any[]) => {
@@ -333,6 +341,12 @@ export class GameClient {
         if (this.chunkRequestTimer >= 2.0) {
             this.chunkRequestTimer = 0;
             this.worldManager.requestChunksAroundPlayer(this.playerController.getPosition());
+        }
+
+        this.chunkUnloadTimer += dt;
+        if (this.chunkUnloadTimer >= 10.0) {
+            this.chunkUnloadTimer = 0;
+            this.worldManager.unloadDistantChunks(this.playerController.getPosition());
         }
 
         this.worldManager.update(dt);

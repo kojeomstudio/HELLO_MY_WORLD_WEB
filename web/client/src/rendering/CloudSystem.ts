@@ -72,6 +72,10 @@ export class CloudSystem {
         return texture;
     }
 
+    setVisible(visible: boolean): void {
+        this.mesh.visible = visible;
+    }
+
     update(brightness: number, dt: number): void {
         this.mesh.position.x += CLOUD_SPEED * dt;
         if (this.mesh.position.x > CLOUD_WRAP) {

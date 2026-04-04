@@ -92,6 +92,10 @@ export class Renderer {
         this.camera.updateProjectionMatrix();
     }
 
+    setCloudsEnabled(enabled: boolean): void {
+        this.cloudSystem.setVisible(enabled);
+    }
+
     setRaining(raining: boolean): void {
         this.isRaining = raining;
     }
