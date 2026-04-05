@@ -71,6 +71,7 @@ Hub methods use a static cooldown dictionary (`Dictionary<string, DateTime>`) to
 | `chat` | 500ms | `SendChat` | Silently ignored if within cooldown |
 | `dig` | 250ms | `DigBlock` | Silently ignored if within cooldown |
 | `place` | 250ms | `PlaceBlock` | Silently ignored if within cooldown |
+| `bucket` | 500ms | `UseBucket` | Silently ignored if within cooldown |
 
 Key format: `"{connectionId}:{action}"`. Rate limits are per-connection and reset on each successful invocation.
 
@@ -98,7 +99,9 @@ All other Hub methods (position updates, crafting, smelting, chest, etc.) are no
 | `DigBlockStart` | Mouse left down | x, y, z (int) | Non-air, breakable | — |
 | `DigBlock` | Mouse left up | x, y, z (int) | Breakable, tool durability | 250ms |
 | `PlaceBlock` | Mouse right click | x, y, z (int), blockType (ushort) | Block exists | 250ms |
+| `InteractBlock` | — | x, y, z (int) | — | — |
 | `InteractWithBlock` | Mouse right on interactive | x, y, z (int) | Interactive block | — |
+| `UseBucket` | Bucket fluid interaction | x, y, z (int), place (bool) | Held bucket item | 500ms |
 | `RequestChunk` | Chunk needed | chunkX, Y, Z (int) | Chunk exists | — |
 
 ### Player Actions
@@ -303,7 +306,7 @@ Total 32 slots. Null = empty. `metadata` stores tool durability as string.
 
 - **No authentication:** Players are identified by name only
 - **Server-authoritative physics validation:** `ValidatePlayerPosition()` caps movement to `maxSpeed * dt * 1.5f` per tick
-- **Rate limiting** on `SendChat` (500ms), `DigBlock` (250ms), `PlaceBlock` (250ms)
+- **Rate limiting** on `SendChat` (500ms), `DigBlock` (250ms), `PlaceBlock` (250ms), `UseBucket` (500ms)
 - **No input validation** beyond basic null checks and property checks
 - **Bans are in-memory:** Lost on server restart
 - **Chest inventories are in-memory:** Lost on server restart
@@ -321,6 +324,7 @@ Total 32 slots. Null = empty. `metadata` stores tool durability as string.
 | Connection drop | `OnDisconnectedAsync` cleanup | Shows login screen |
 | Invalid block coordinates | Null player check -> silent | No response |
 | Rate limited action | `CheckRateLimit` returns false | No response |
+| UseBucket failure | Returns `false` | No response |
 | Invalid recipe index | Chat error "Invalid recipe index" | Chat notification |
 | Missing crafting ingredients | Chat error "Missing ingredients" | Chat notification |
 | Cannot start smelting | Chat error "Cannot start smelting" | Chat notification |

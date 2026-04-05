@@ -257,7 +257,7 @@ Each block face is a quad with 4 corners mapped to UV space:
 The `TextureAtlas.getUV(blockId)` function looks up the block's `textureName` field and maps it to its tile position in the atlas. Blocks without a matching texture return a default white tile UV.
 
 ### Supported Texture Names
-32 textures loaded from `public/textures/blocks/`:
+125 textures loaded from `public/textures/blocks/`:
 
 | Texture Name | Block(s) |
 |-------------|----------|

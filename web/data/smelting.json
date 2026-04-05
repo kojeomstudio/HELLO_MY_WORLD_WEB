@@ -14,6 +14,16 @@
         { "input": "gold_block", "result": "gold_ingot", "cookTime": 10.0, "experience": 0.1 },
         { "input": "sandstone", "result": "glass", "cookTime": 10.0, "experience": 0.1 },
         { "input": "cobblestone", "result": "stone", "cookTime": 10.0, "experience": 0.1 },
-        { "input": "clay_ball", "result": "brick", "cookTime": 10.0, "experience": 0.3 }
+        { "input": "clay_ball", "result": "brick", "cookTime": 10.0, "experience": 0.3 },
+        { "input": "mutton_raw", "result": "mutton_cooked", "cookTime": 10.0, "experience": 0.35 },
+        { "input": "fish_raw", "result": "fish_cooked", "cookTime": 10.0, "experience": 0.35 },
+        { "input": "clay_ball", "result": "brick_item", "cookTime": 10.0, "experience": 0.3 },
+        { "input": "potato", "result": "baked_potato", "cookTime": 10.0, "experience": 0.35 },
+        { "input": "sand_item", "result": "glass_block", "cookTime": 10.0, "experience": 0.1 },
+        { "input": "cobblestone_slab", "result": "stone_slab", "cookTime": 10.0, "experience": 0.1 },
+        { "input": "iron_block_item", "result": "iron_ingot", "cookTime": 10.0, "experience": 0.1 },
+        { "input": "gold_block_item", "result": "gold_ingot", "cookTime": 10.0, "experience": 0.1 },
+        { "input": "diamond_block_item", "result": "diamond", "cookTime": 10.0, "experience": 0.1 },
+        { "input": "cobblestone", "result": "stone_block", "cookTime": 10.0, "experience": 0.1 }
     ]
 }

@@ -14,6 +14,10 @@
         "give": { "description": "Can give items to self and others", "default": false },
         "password": { "description": "Can change own password", "default": false },
         "fly": { "description": "Can fly in survival mode", "default": false },
-        "fast": { "description": "Can move faster than normal speed", "default": false }
+        "fast": { "description": "Can move faster than normal speed", "default": false },
+        "noclip": { "description": "Can walk through walls (noclip mode)", "default": false },
+        "rollback": { "description": "Can use rollback functionality", "default": false },
+        "debug": { "description": "Can enable debug/wireframe mode", "default": false },
+        "password": { "description": "Can change player passwords", "default": false }
     }
 }

@@ -1,24 +1,26 @@
 @echo off
 echo ========================================
-echo   HelloMyWorld Web Game Launcher
+echo  HelloMyWorld Web Game - Starting Server
 echo ========================================
 echo.
 
-echo Starting server...
-start "HelloMyWorld Server" cmd /k "dotnet run --project web\server"
-echo Server starting on http://localhost:5266
-
+echo Starting C# server...
+start "WebGameServer" cmd /c "cd /d %~dp0web\server && dotnet run --project WebGameServer.csproj"
 timeout /t 5 /nobreak >nul
 
-echo Starting client...
-start "HelloMyWorld Client" cmd /k "npm run dev --prefix web\client"
-
-timeout /t 3 /nobreak >nul
-
-echo Opening browser...
-start http://localhost:5173
+echo Starting Vite client dev server...
+start "WebGameClient" cmd /c "cd /d %~dp0web\client && npm run dev"
 
 echo.
-echo Game is ready! Close server/client windows to stop.
-echo Press any key to close this launcher...
+echo ========================================
+echo  Game is starting!
+echo  Server: http://localhost:5266
+echo  Client: http://localhost:5173
+echo ========================================
+echo.
+echo Press any key to stop all servers...
 pause >nul
+
+taskkill /F /FI "WINDOWTITLE eq WebGameServer" >nul 2>&1
+taskkill /F /FI "WINDOWTITLE eq WebGameClient" >nul 2>&1
+echo Servers stopped.

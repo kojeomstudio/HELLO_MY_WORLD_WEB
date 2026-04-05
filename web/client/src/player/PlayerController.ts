@@ -126,9 +126,14 @@ export class PlayerController {
         document.addEventListener('contextmenu', (e) => e.preventDefault());
     }
 
-    private startDig(): void {
+    private async startDig(): Promise<void> {
         const ray = this.castRay();
         if (!ray) return;
+
+        if (this._connection && this.inventory[this._selectedSlot]?.itemId === 'bucket') {
+            const result = await this._connection.invoke('UseBucket', ray.blockX, ray.blockY, ray.blockZ, false);
+            if (result) return;
+        }
 
         const target = { x: ray.blockX, y: ray.blockY, z: ray.blockZ };
 
@@ -209,9 +214,24 @@ export class PlayerController {
         }
     }
 
-    private onPlace(): void {
+    private async onPlace(): Promise<void> {
         const ray = this.castRay();
         if (!ray) return;
+
+        if (this._connection) {
+            const selectedItem = this.inventory[this._selectedSlot];
+            if (selectedItem && (selectedItem.itemId === 'water_bucket' || selectedItem.itemId === 'lava_bucket')) {
+                const targetBlock = { x: ray.placeX, y: ray.placeY, z: ray.placeZ };
+                if (targetBlock) {
+                    const result = await this._connection.invoke('UseBucket', targetBlock.x, targetBlock.y, targetBlock.z, true);
+                    if (result) return;
+                }
+            }
+            if (selectedItem && selectedItem.itemId === 'milk_bucket') {
+                const result = await this._connection.invoke('UseBucket', 0, 0, 0, false);
+                if (result) return;
+            }
+        }
 
         if (this._worldManager) {
             const blockId = this._worldManager.getBlock(ray.blockX, ray.blockY, ray.blockZ);

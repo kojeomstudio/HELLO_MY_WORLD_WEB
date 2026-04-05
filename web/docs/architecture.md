@@ -154,7 +154,7 @@ Integrates all subsystems via constructor injection:
 
 | Dependency | Type | Purpose |
 |-----------|------|---------|
-| `PrivilegeSystem` | Singleton | 15 Minetest-compatible privileges (loaded from JSON) |
+| `PrivilegeSystem` | Singleton | 19 Minetest-compatible privileges (15 built-in + additional from JSON) |
 | `ActiveBlockModifierSystem` | Singleton | Periodic block modifications (falling sand/gravel ABMs) |
 | `KnockbackSystem` | Singleton | PvP knockback physics |
 | `BlockDefinitionManager` | Singleton | 68 block type definitions |
@@ -404,8 +404,9 @@ Gravity, collision detection, movement simulation, server-authoritative validati
 
 ### Auth & Privileges (Core/Auth/)
 - **AuthSystem** — Name validation, banning
-- **PrivilegeSystem** — 15 Minetest-compatible privileges with grant/revoke/query
-- **LoadFromFile()** — Parses `data/privileges.json` to override built-in privilege definitions
+- **PrivilegeSystem** — 15 built-in Minetest-compatible privileges with grant/revoke/query
+- **LoadFromFile()** — Parses `data/privileges.json` to override/extend built-in privilege definitions
+- JSON file adds 4 extra privileges: `noclip`, `rollback`, `debug` (total 19 after load)
 
 | Privilege | Default | Description |
 |-----------|---------|-------------|
@@ -424,15 +425,35 @@ Gravity, collision detection, movement simulation, server-authoritative validati
 | `password` | no | Can change own password |
 | `privs` | no | Can grant any privilege |
 | `basic_privs` | no | Can grant interact and shout |
+| `noclip` | no | Can walk through walls (JSON only) |
+| `rollback` | no | Can use rollback functionality (JSON only) |
+| `debug` | no | Can enable debug/wireframe mode (JSON only) |
 
 ### Chat Commands (Core/Chat/ChatCommandManager.cs)
-Slash commands fully wired to game logic:
+20 slash commands fully wired to game logic:
 
 | Command | Aliases | Effect |
 |---------|---------|--------|
-| `/gamemode <mode>` | `/gm` | Switches game mode, fires `OnGameModeChanged` |
-| `/tp <x> <y> <z>` | — | Teleports player, fires `OnTeleported` |
+| `/help` | `/?` | Lists all available commands |
+| `/time` | — | Shows current game time and phase |
+| `/tps` | — | Shows server ticks per second |
+| `/status` | — | Shows TPS, online players, uptime |
+| `/gamemode <mode>` | `/gm` | Switches game mode (survival/creative/adventure/spectator) |
+| `/tp <x> <y> <z>` | `/teleport` | Teleports player, fires `OnTeleported` |
 | `/give <player> <item> [count]` | — | Adds items to target inventory |
+| `/kill [player]` | — | Kills target player (default: self) |
+| `/clear` | `/clearinventory`, `/clearinv` | Clears player inventory |
+| `/list` | `/online`, `/players` | Lists all online players |
+| `/kick <player>` | — | Kicks player from server |
+| `/ban <player>` | — | Bans player from server |
+| `/unban <player>` | — | Unbans player |
+| `/privileges [player]` | `/privs` | Lists player's privileges |
+| `/grant <player> <privilege>` | — | Grants a privilege to player |
+| `/revoke <player> <privilege>` | — | Revokes a privilege from player |
+| `/settime <time>` | `/timeofday` | Sets time of day |
+| `/stop` | `/shutdown` | Stops the server |
+| `/spawn <type> <x> <y> <z>` | `/summon`, `/spawnentity` | Spawns an entity at coordinates |
+| `/killall` | `/clearentities`, `/pulverize` | Removes all entities |
 
 ### GameHub (Services/GameHub.cs)
 SignalR hub bridging client actions to server systems. All injected via constructor DI:
@@ -445,7 +466,9 @@ SignalR hub bridging client actions to server systems. All injected via construc
 | `DigBlockStart(x,y,z)` | Validates block is breakable | — |
 | `DigBlock(x,y,z)` | Breaks block, spawns item entity, applies tool wear | 250ms |
 | `PlaceBlock(x,y,z,blockType)` | Places block in world | 250ms |
+| `InteractBlock(x,y,z)` | Placeholder (currently no-op) | — |
 | `InteractWithBlock(x,y,z)` | Opens UI for chest/furnace/crafting_table, toggles doors, handles bucket fluid pickup | — |
+| `UseBucket(x,y,z,place)` | Places/picks up fluids with bucket; milk_bucket heals 8 HP | 500ms |
 | `PunchPlayer(targetName)` | PvP: weapon damage + knockback | — |
 | `UseItem(slotIndex)` | Consumes food items, bucket items (water/lava/milk) | — |
 | `GetPrivileges()` | Returns caller's privilege list | — |
@@ -460,6 +483,8 @@ SignalR hub bridging client actions to server systems. All injected via construc
 | `SelectSlot(slot)` | Updates selected hotbar slot | — |
 | `Respawn()` | Respawns dead player | — |
 | `DropItem(slotIndex,count)` | Drops item as entity | — |
+| `RequestChunk(chunkX,chunkY,chunkZ)` | Sends chunk data to caller | — |
+| `RequestInventory()` | Re-sends full inventory | — |
 | `EquipArmor(slotIndex,armorSlot)` | Moves item from inventory to armor slot | — |
 | `UnequipArmor(armorSlot)` | Moves item from armor slot to inventory | — |
 
@@ -477,6 +502,7 @@ private static bool CheckRateLimit(string connectionId, string action, int coold
 | `chat` | 500ms | Prevent spam |
 | `dig` | 250ms | Limit block breaking speed |
 | `place` | 250ms | Limit block placement speed |
+| `bucket` | 500ms | Limit fluid interaction |
 
 Key format: `"{connectionId}:{action}"`. Requests within cooldown are silently ignored.
 
@@ -732,7 +758,7 @@ Auto-resumes suspended `AudioContext` (browser autoplay policy).
 Smelting recipes with input, result, cook time, and experience yield.
 
 ### privileges.json
-15 privilege definitions matching Minetest's built-in privilege set. Each privilege has a `description` and `default` flag. Loaded at startup via `PrivilegeSystem.LoadFromFile()`.
+19 privilege definitions extending Minetest's built-in privilege set. 15 built-in privileges registered in code, with 3 additional privileges added via JSON (`noclip`, `rollback`, `debug`). Each privilege has a `description` and `default` flag. Loaded at startup via `PrivilegeSystem.LoadFromFile()`.
 
 ### server_config.json
 Server configuration: max players, world size, tick rate, spawn point, network settings, etc.

@@ -120,7 +120,30 @@
         "dye_blue": { "name": "Blue Dye", "type": "resource", "stackable": true, "maxStack": 64 },
         "dye_green": { "name": "Green Dye", "type": "resource", "stackable": true, "maxStack": 64 },
         "dye_yellow": { "name": "Yellow Dye", "type": "resource", "stackable": true, "maxStack": 64 },
-        "dye_black": { "name": "Black Dye", "type": "resource", "stackable": true, "maxStack": 64 }
+        "dye_black": { "name": "Black Dye", "type": "resource", "stackable": true, "maxStack": 64 },
+        "steel_pickaxe": { "name": "Steel Pickaxe", "type": "tool", "durability": 400, "damage": 4, "miningSpeed": 6.0 },
+        "steel_sword": { "name": "Steel Sword", "type": "weapon", "durability": 400, "damage": 6 },
+        "steel_axe": { "name": "Steel Axe", "type": "tool", "durability": 400, "damage": 5, "miningSpeed": 6.0 },
+        "steel_shovel": { "name": "Steel Shovel", "type": "tool", "durability": 400, "damage": 3, "miningSpeed": 6.0 },
+        "wood_shears": { "name": "Wooden Shears", "type": "tool", "durability": 60, "damage": 1 },
+        "stone_shears": { "name": "Stone Shears", "type": "tool", "durability": 132, "damage": 1 },
+        "steel_ingot": { "name": "Steel Ingot", "type": "resource", "stackable": true, "maxStack": 64 },
+        "mese_crystal": { "name": "Mese Crystal", "type": "resource", "stackable": true, "maxStack": 64 },
+        "bone_meal": { "name": "Bone Meal", "type": "resource", "stackable": true, "maxStack": 64 },
+        "brick_stairs": { "name": "Brick Stairs", "type": "block", "stackable": true, "maxStack": 64 },
+        "nether_brick_item": { "name": "Nether Brick", "type": "block", "stackable": true, "maxStack": 64 },
+        "redstone_item": { "name": "Redstone Dust", "type": "resource", "stackable": true, "maxStack": 64 },
+        "glowstone_dust": { "name": "Glowstone Dust", "type": "resource", "stackable": true, "maxStack": 64 },
+        "prismarine_shard": { "name": "Prismarine Shard", "type": "resource", "stackable": true, "maxStack": 64 },
+        "prismarine_crystals": { "name": "Prismarine Crystals", "type": "resource", "stackable": true, "maxStack": 64 },
+        "chorus_fruit": { "name": "Chorus Fruit", "type": "food", "stackable": true, "maxStack": 64, "nutrition": 4 },
+        "beetroot": { "name": "Beetroot", "type": "food", "stackable": true, "maxStack": 64, "nutrition": 1 },
+        "beetroot_soup": { "name": "Beetroot Soup", "type": "food", "stackable": true, "maxStack": 1, "nutrition": 6 },
+        "rabbit_stew": { "name": "Rabbit Stew", "type": "food", "stackable": true, "maxStack": 1, "nutrition": 10 },
+        "mutton_raw": { "name": "Raw Mutton", "type": "food", "stackable": true, "maxStack": 64, "nutrition": 2 },
+        "mutton_cooked": { "name": "Cooked Mutton", "type": "food", "stackable": true, "maxStack": 64, "nutrition": 6 },
+        "fish_raw": { "name": "Raw Fish", "type": "food", "stackable": true, "maxStack": 64, "nutrition": 2 },
+        "fish_cooked": { "name": "Cooked Fish", "type": "food", "stackable": true, "maxStack": 64, "nutrition": 5 }
     },
     "craftingRecipes": [
         { "result": "planks", "resultCount": 4, "ingredients": [["wood", 1]] },
@@ -220,7 +243,21 @@
         { "result": "melon_slice", "resultCount": 1, "ingredients": [["melon", 1]] },
         { "result": "pumpkin", "resultCount": 1, "ingredients": [["melon_slice", 1]] },
         { "result": "glowing_obsidian", "resultCount": 1, "ingredients": [["obsidian", 1], ["torch", 1]] },
-        { "result": "mossy_cobblestone", "resultCount": 1, "ingredients": [["cobblestone", 1], ["mushroom_brown", 1]] }
+        { "result": "mossy_cobblestone", "resultCount": 1, "ingredients": [["cobblestone", 1], ["mushroom_brown", 1]] },
+        { "result": "steel_pickaxe", "resultCount": 1, "ingredients": [["steel_ingot", 3], ["stick", 2]] },
+        { "result": "steel_sword", "resultCount": 1, "ingredients": [["steel_ingot", 2], ["stick", 1]] },
+        { "result": "steel_axe", "resultCount": 1, "ingredients": [["steel_ingot", 3], ["stick", 2]] },
+        { "result": "steel_shovel", "resultCount": 1, "ingredients": [["steel_ingot", 1], ["stick", 2]] },
+        { "result": "wood_shears", "resultCount": 1, "ingredients": [["planks", 2]] },
+        { "result": "stone_shears", "resultCount": 1, "ingredients": [["cobblestone", 2]] },
+        { "result": "bone_meal", "resultCount": 3, "ingredients": [["bone", 1]] },
+        { "result": "nether_brick_item", "resultCount": 1, "ingredients": [["brick_item", 4]] },
+        { "result": "glowstone", "resultCount": 1, "ingredients": [["glowstone_dust", 4]] },
+        { "result": "sea_lantern", "resultCount": 1, "ingredients": [["prismarine_shard", 4], ["prismarine_crystals", 3]] },
+        { "result": "redstone_lamp", "resultCount": 1, "ingredients": [["redstone_item", 4], ["glowstone_dust", 1]] },
+        { "result": "rabbit_stew", "resultCount": 1, "ingredients": [["cooked_porkchop", 1], ["carrot", 1], ["baked_potato", 1], ["mushroom_brown", 1], ["bowl", 1]] },
+        { "result": "beetroot_soup", "resultCount": 1, "ingredients": [["beetroot", 6], ["bowl", 1]] },
+        { "result": "nether_brick_item", "resultCount": 1, "ingredients": [["nether_brick", 1]] }
     ],
     "foodValues": {
         "apple": { "nutrition": 4, "saturation": 2.4 },
@@ -238,13 +275,22 @@
         "raw_chicken": { "nutrition": 2, "saturation": 1.2 },
         "cooked_chicken": { "nutrition": 6, "saturation": 7.2 },
         "raw_pork": { "nutrition": 3, "saturation": 1.8 },
-        "cooked_pork": { "nutrition": 8, "saturation": 12.8 }
+        "cooked_pork": { "nutrition": 8, "saturation": 12.8 },
+        "chorus_fruit": { "nutrition": 4, "saturation": 2.4 },
+        "beetroot": { "nutrition": 1, "saturation": 1.2 },
+        "beetroot_soup": { "nutrition": 6, "saturation": 7.2 },
+        "rabbit_stew": { "nutrition": 10, "saturation": 12.0 },
+        "mutton_raw": { "nutrition": 2, "saturation": 1.2 },
+        "mutton_cooked": { "nutrition": 6, "saturation": 9.6 },
+        "fish_raw": { "nutrition": 2, "saturation": 0.4 },
+        "fish_cooked": { "nutrition": 5, "saturation": 6.0 }
     },
     "toolCapabilities": {
         "wooden": { "maxLevel": 1, "uses": 60, "speed": 2.0, "damageGroups": { "fleshy": 1 } },
         "stone": { "maxLevel": 2, "uses": 132, "speed": 4.0, "damageGroups": { "fleshy": 2 } },
         "iron": { "maxLevel": 3, "uses": 251, "speed": 6.0, "damageGroups": { "fleshy": 3 } },
         "diamond": { "maxLevel": 4, "uses": 1562, "speed": 8.0, "damageGroups": { "fleshy": 4 } },
-        "mese": { "maxLevel": 255, "uses": 1337, "speed": 10.0, "damageGroups": { "fleshy": 100 } }
+        "mese": { "maxLevel": 255, "uses": 1337, "speed": 10.0, "damageGroups": { "fleshy": 100 } },
+        "steel": { "maxLevel": 3, "uses": 400, "speed": 6.0, "damageGroups": { "fleshy": 4 } }
     }
 }

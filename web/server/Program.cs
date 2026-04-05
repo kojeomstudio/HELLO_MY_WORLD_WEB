@@ -117,12 +117,28 @@ builder.Services.AddSingleton<AuthenticationService>();
 builder.Services.AddSingleton<ChatCommandManager>(sp =>
 {
     var gameServer = sp.GetRequiredService<GameServer>();
+    var authService = sp.GetRequiredService<AuthenticationService>();
+    var privilegeSystem = sp.GetRequiredService<PrivilegeSystem>();
+    var entityManager = sp.GetRequiredService<EntityManager>();
     return new ChatCommandManager(
         () => gameServer.GameTime,
         () => gameServer.TickRate,
         (playerName, mode) => { gameServer.SetGameMode(playerName, mode); },
         (playerName, pos) => { gameServer.TeleportPlayer(playerName, pos); },
-        (playerName, targetPlayer, itemId, count) => { gameServer.GiveItem(targetPlayer, itemId, count); });
+        (playerName, targetPlayer, itemId, count) => { gameServer.GiveItem(targetPlayer, itemId, count); },
+        (playerName) => { gameServer.KillPlayer(playerName); },
+        (playerName) => { gameServer.ClearInventory(playerName); },
+        () => gameServer.OnlinePlayers.Select(p => p.Name).ToArray(),
+        (playerName) => { gameServer.KickPlayer(gameServer.GetPlayerConnectionId(playerName) ?? ""); },
+        (playerName) => { gameServer.BanPlayer(playerName); },
+        (playerName) => { gameServer.UnbanPlayer(playerName); },
+        (playerName) => gameServer.GetPlayerPrivilegeList(playerName),
+        (playerName, priv) => { privilegeSystem.GrantPrivilege(playerName, priv); },
+        (playerName, priv) => { privilegeSystem.RevokePrivilege(playerName, priv); },
+        (time) => { gameServer.SetTimeOfDay(time); },
+        () => { gameServer.Stop(); },
+        (entityType, pos) => { gameServer.SpawnEntity(entityType, pos); },
+        () => { gameServer.ClearAllEntities(); });
 });
 builder.Services.AddSingleton<CraftingSystem>(sp =>
 {

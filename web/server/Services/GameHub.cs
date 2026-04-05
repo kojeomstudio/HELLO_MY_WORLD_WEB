@@ -219,6 +219,27 @@ public class GameHub : Hub<IGameClient>
 
         if (blockData == 0) return;
 
+        var toolItem = player.GetSelectedHotbarItem();
+        if (toolItem != null && toolItem.ItemId == "bucket")
+        {
+            if (oldBlock.Type == BlockType.Water)
+            {
+                _gameServer.DefaultWorld.SetBlock(blockPos, Block.Air);
+                await Clients.All.OnBlockUpdate(x, y, z, 0);
+                player.Inventory[player.SelectedHotbarSlot] = new ItemStack("water_bucket", 1);
+                await SendInventoryUpdate(player);
+                return;
+            }
+            else if (oldBlock.Type == BlockType.Lava)
+            {
+                _gameServer.DefaultWorld.SetBlock(blockPos, Block.Air);
+                await Clients.All.OnBlockUpdate(x, y, z, 0);
+                player.Inventory[player.SelectedHotbarSlot] = new ItemStack("lava_bucket", 1);
+                await SendInventoryUpdate(player);
+                return;
+            }
+        }
+
         var blockDef = _blockDefinitionManager.Get(blockData);
         if (blockDef != null && !blockDef.Breakable)
         {
@@ -232,16 +253,16 @@ public class GameHub : Hub<IGameClient>
         var itemEntity = new ItemEntity(dropName, 1, new Vector3(x + 0.5f, y + 0.5f, z + 0.5f));
         _entityManager.Add(itemEntity);
 
-        var toolItem = player.GetSelectedHotbarItem();
-        if (toolItem != null)
+        var heldItem = player.GetSelectedHotbarItem();
+        if (heldItem != null)
         {
-            var toolName = toolItem.ItemId.ToLowerInvariant();
+            var toolName = heldItem.ItemId.ToLowerInvariant();
             var isTool = toolName.Contains("sword") || toolName.Contains("pickaxe") ||
                 toolName.Contains("axe") || toolName.Contains("shovel") || toolName.Contains("hoe");
 
             if (isTool)
             {
-                var durabilityStr = toolItem.Metadata;
+                var durabilityStr = heldItem.Metadata;
                 int maxDurability = toolName switch
                 {
                     var n when n.StartsWith("wooden_") => 59,
@@ -301,6 +322,80 @@ public class GameHub : Hub<IGameClient>
 
         var digTime = hardness / toolMultiplier;
         return Math.Max(digTime, 0.1f);
+    }
+
+    public async Task<bool> UseBucket(int x, int y, int z, bool place)
+    {
+        if (!CheckRateLimit(Context.ConnectionId, "bucket", 500)) return false;
+
+        var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        if (player == null) return false;
+
+        var hotbarItem = player.GetSelectedHotbarItem();
+        if (hotbarItem == null) return false;
+
+        var blockPos = new Vector3s((short)x, (short)y, (short)z);
+
+        if (place)
+        {
+            if (hotbarItem.ItemId == "water_bucket")
+            {
+                var targetBlock = _gameServer.DefaultWorld.GetBlock(blockPos);
+                if (targetBlock.Type == BlockType.Air || targetBlock.Type == BlockType.WaterFlowing)
+                {
+                    _gameServer.DefaultWorld.SetBlock(blockPos, new Block(BlockType.Water));
+                    await Clients.All.OnBlockUpdate(x, y, z, (ushort)BlockType.Water);
+                    player.Inventory[player.SelectedHotbarSlot] = new ItemStack("bucket", 1);
+                    await SendInventoryUpdate(player);
+                    return true;
+                }
+            }
+            else if (hotbarItem.ItemId == "lava_bucket")
+            {
+                var targetBlock = _gameServer.DefaultWorld.GetBlock(blockPos);
+                if (targetBlock.Type == BlockType.Air || targetBlock.Type == BlockType.LavaFlowing)
+                {
+                    _gameServer.DefaultWorld.SetBlock(blockPos, new Block(BlockType.Lava));
+                    await Clients.All.OnBlockUpdate(x, y, z, (ushort)BlockType.Lava);
+                    player.Inventory[player.SelectedHotbarSlot] = new ItemStack("bucket", 1);
+                    await SendInventoryUpdate(player);
+                    return true;
+                }
+            }
+        }
+        else
+        {
+            if (hotbarItem.ItemId == "bucket")
+            {
+                var targetBlock = _gameServer.DefaultWorld.GetBlock(blockPos);
+                if (targetBlock.Type == BlockType.Water)
+                {
+                    _gameServer.DefaultWorld.SetBlock(blockPos, Block.Air);
+                    await Clients.All.OnBlockUpdate(x, y, z, 0);
+                    player.Inventory[player.SelectedHotbarSlot] = new ItemStack("water_bucket", 1);
+                    await SendInventoryUpdate(player);
+                    return true;
+                }
+                else if (targetBlock.Type == BlockType.Lava)
+                {
+                    _gameServer.DefaultWorld.SetBlock(blockPos, Block.Air);
+                    await Clients.All.OnBlockUpdate(x, y, z, 0);
+                    player.Inventory[player.SelectedHotbarSlot] = new ItemStack("lava_bucket", 1);
+                    await SendInventoryUpdate(player);
+                    return true;
+                }
+            }
+            else if (hotbarItem.ItemId == "milk_bucket")
+            {
+                _gameServer.FeedPlayer(player, 8.0f);
+                player.Inventory[player.SelectedHotbarSlot] = new ItemStack("bucket", 1);
+                await SendInventoryUpdate(player);
+                await Clients.Caller.OnHealthUpdate(player.Health, player.MaxHealth);
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static float GetToolMultiplier(string toolName, BlockDefinition blockDef)

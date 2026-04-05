@@ -888,6 +888,93 @@ public class GameServer
             }
         }
     }
+
+    public bool KillPlayer(string playerName)
+    {
+        var player = GetPlayer(playerName);
+        if (player == null) return false;
+        player.Health = 0;
+        player.IsDead = true;
+        if (_hubContext != null)
+        {
+            _ = _hubContext.Clients.All.OnDeath($"{player.Name} was killed");
+        }
+        DropPlayerInventory(player);
+        return true;
+    }
+
+    public bool ClearInventory(string playerName)
+    {
+        var player = GetPlayer(playerName);
+        if (player == null) return false;
+        for (int i = 0; i < player.Inventory.Size; i++)
+        {
+            player.Inventory[i] = null;
+        }
+        if (_hubContext != null)
+        {
+            _ = _hubContext.Clients.Client(player.ConnectionId)
+                .OnInventoryUpdate(Array.Empty<object>());
+        }
+        return true;
+    }
+
+    public bool KickPlayer(string connectionId, string reason = "Kicked from server")
+    {
+        var player = GetPlayerByConnection(connectionId);
+        if (player == null) return false;
+        PlayerLeave(connectionId);
+        return true;
+    }
+
+    public string[] GetPlayerPrivilegeList(string playerName)
+    {
+        return _privilegeSystem.GetPlayerPrivileges(playerName);
+    }
+
+    public void BanPlayer(string playerName)
+    {
+        var player = GetPlayer(playerName);
+        if (player != null)
+        {
+            PlayerLeave(GetConnectionId(playerName) ?? player.ConnectionId);
+        }
+        _privilegeSystem.RevokePrivilege(playerName, "interact");
+        _privilegeSystem.RevokePrivilege(playerName, "shout");
+    }
+
+    public void UnbanPlayer(string playerName)
+    {
+        _privilegeSystem.GrantDefaultPrivileges(playerName);
+    }
+
+    public void SetTimeOfDay(long time)
+    {
+        GameTime = time % 24000;
+    }
+
+    public bool SpawnEntity(string entityType, Vector3 position)
+    {
+        if (entityType.Equals("item", StringComparison.OrdinalIgnoreCase))
+        {
+            var entity = new ItemEntity("torch", 1, position);
+            _entityManager.Add(entity);
+            return true;
+        }
+        var mob = new MobEntity(entityType, position);
+        return _entityManager.Add(mob) != null;
+    }
+
+    public int ClearAllEntities()
+    {
+        var count = 0;
+        foreach (var entity in _entityManager.GetByType<ItemEntity>().ToList())
+        {
+            _entityManager.Remove(entity.Id);
+            count++;
+        }
+        return count;
+    }
 }
 
 public record FurnaceOperation(
