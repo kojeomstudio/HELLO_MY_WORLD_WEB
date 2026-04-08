@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Text.Json;
 using Microsoft.AspNetCore.SignalR;
 using WebGameServer.Core.Auth;
 using WebGameServer.Core.Entities;
@@ -23,6 +24,8 @@ public class GameServer
     private readonly ConcurrentDictionary<string, string> _connectionToPlayerId = new();
     private readonly ConcurrentDictionary<string, ItemStack?[]> _chestInventories = new();
     private readonly ConcurrentDictionary<string, FurnaceOperation> _activeFurnaces = new();
+
+    private readonly Dictionary<string, FoodValue> _foodValues = new();
 
     private readonly ServerConfig _config;
     private readonly BlockDefinitionManager _blockDefinitionManager;
@@ -98,6 +101,16 @@ public class GameServer
         _nodeTimerSystem = new NodeTimerSystem(DefaultWorld, OnNodeTimerExpired);
         DefaultWorld.WaterFlowInterval = config.Liquid.WaterFlowInterval;
         DefaultWorld.LavaFlowInterval = config.Liquid.LavaFlowInterval;
+
+        Agriculture = new AgricultureSystem(DefaultWorld, _blockDefinitionManager);
+
+        _entityManager.OnEntityDespawned += entity =>
+        {
+            if (_hubContext != null)
+            {
+                _ = _hubContext.Clients.All.OnEntityDespawned(entity.Id);
+            }
+        };
     }
 
     public void SetHubContext(IHubContext<GameHub, IGameClient> hubContext)
@@ -118,6 +131,16 @@ public class GameServer
             return nearest;
         };
         MobEntity.DamagePlayer = (player, damage) => { DamagePlayer(player, damage, "mob"); };
+
+        MobEntity.MobDeathDrops = (mob) =>
+        {
+            var drops = GetMobDrops(mob.MobType);
+            foreach (var drop in drops)
+            {
+                var entity = new ItemEntity(drop.itemId, drop.count, mob.Position);
+                _entityManager.Add(entity);
+            }
+        };
 
         IsRunning = true;
         StartTime = DateTime.UtcNow;
@@ -425,10 +448,10 @@ public class GameServer
         }
     }
 
-    public void FeedPlayer(PlayerEnt player, float amount)
+    public void FeedPlayer(PlayerEnt player, float nutrition, float saturation = 0f)
     {
         if (player.IsDead) return;
-        player.ConsumeFood(amount);
+        player.ConsumeFood(nutrition, saturation);
     }
 
     public bool SetGameMode(string playerName, GameMode mode)
@@ -695,10 +718,15 @@ public class GameServer
             if (updated.Progress >= 1.0f)
             {
                 completed.Add(posKey);
+                var recipe = _smeltingSystem.GetRecipe(op.InputItemId);
                 var player = GetPlayerByConnection(op.ConnectionId);
                 if (player != null)
                 {
                     player.Inventory.AddItem(new ItemStack(updated.ResultItemId, 1));
+                    if (recipe != null)
+                    {
+                        AwardExperience(player, (int)Math.Ceiling(recipe.Experience));
+                    }
                     _ = _hubContext.Clients.Client(op.ConnectionId)
                         .OnInventoryUpdate(player.Inventory.GetAll()
                             .Select(i => i == null ? null : (object)new { itemId = i.ItemId, count = i.Count, metadata = i.Metadata })
@@ -723,6 +751,59 @@ public class GameServer
             _activeFurnaces.TryRemove(key, out _);
         }
     }
+
+    public FoodValue? GetFoodValue(string itemId) =>
+        _foodValues.TryGetValue(itemId, out var value) ? value : null;
+
+    public void LoadFoodValues(string filePath)
+    {
+        if (!File.Exists(filePath)) return;
+        var json = File.ReadAllText(filePath);
+        var doc = JsonDocument.Parse(json);
+        if (!doc.RootElement.TryGetProperty("foodValues", out var foodValuesEl)) return;
+
+        foreach (var prop in foodValuesEl.EnumerateObject())
+        {
+            var nutrition = prop.Value.GetProperty("nutrition").GetInt32();
+            var saturation = prop.Value.GetProperty("saturation").GetSingle();
+            _foodValues[prop.Name] = new FoodValue(nutrition, saturation);
+        }
+    }
+
+    public void AwardExperience(PlayerEnt player, int xp)
+    {
+        player.TotalExperience += xp;
+        player.ExperienceLevel = CalculateLevel(player.TotalExperience);
+        if (_hubContext != null)
+        {
+            _ = _hubContext.Clients.Client(player.ConnectionId)
+                .OnExperienceUpdate(player.ExperienceLevel, player.TotalExperience);
+        }
+    }
+
+    private static int CalculateLevel(int totalExp)
+    {
+        var level = 0;
+        var required = 10;
+        while (totalExp >= required)
+        {
+            totalExp -= required;
+            level++;
+            required = (int)(10 + level * 5.0);
+        }
+        return level;
+    }
+
+    private static (string itemId, int count)[] GetMobDrops(string mobType) => mobType switch
+    {
+        "Zombie" => new[] { ("iron_ingot", 1) },
+        "Skeleton" => new[] { ("bone", 2), ("flint", 1) },
+        "Spider" => new[] { ("string", 1) },
+        "Cow" => new[] { ("leather", 1), ("raw_beef", 2) },
+        "Pig" => new[] { ("raw_pork", 2) },
+        "Chicken" => new[] { ("feather", 1) },
+        _ => Array.Empty<(string, int)>()
+    };
 
     public static string PositionKey(int x, int y, int z) => $"{x},{y},{z}";
 
@@ -983,3 +1064,5 @@ public record FurnaceOperation(
     float CookTime,
     float Progress,
     string ConnectionId);
+
+public record FoodValue(int Nutrition, float Saturation);

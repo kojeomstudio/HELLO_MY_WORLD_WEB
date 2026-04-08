@@ -47,6 +47,8 @@ public class EntityManager
         return _entities.Values.OfType<T>();
     }
 
+    public IEnumerable<Entity> GetAll() => _entities.Values;
+
     public void UpdateAll(float dt)
     {
         foreach (var entity in _entities.Values)

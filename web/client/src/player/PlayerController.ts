@@ -101,6 +101,7 @@ export class PlayerController {
                 case 'Digit1': case 'Digit2': case 'Digit3': case 'Digit4':
                 case 'Digit5': case 'Digit6': case 'Digit7': case 'Digit8':
                     this._selectedSlot = parseInt(e.code.replace('Digit', '')) - 1;
+                    this._connection?.invoke('SelectSlot', this._selectedSlot);
                     break;
             }
         });
@@ -313,6 +314,40 @@ export class PlayerController {
         this.updateDig();
     }
 
+    private isInLiquid(): boolean {
+        if (!this._worldManager) return false;
+        const px = Math.floor(this._position.x);
+        const py = Math.floor(this._position.y);
+        const pz = Math.floor(this._position.z);
+        const registry = this._worldManager.getBlockRegistry();
+        const feetId = this._worldManager.getBlock(px, py, pz);
+        if (registry.isLiquid(feetId)) return true;
+        const torsoId = this._worldManager.getBlock(px, py + 1, pz);
+        if (registry.isLiquid(torsoId)) return true;
+        return false;
+    }
+
+    private isOnSlipperyBlock(): boolean {
+        if (!this._worldManager) return false;
+        const px = Math.floor(this._position.x);
+        const py = Math.floor(this._position.y - 0.1);
+        const pz = Math.floor(this._position.z);
+        const blockId = this._worldManager.getBlock(px, py, pz);
+        const blockDef = this._worldManager.getBlockRegistry().get(blockId);
+        return blockDef?.slippery === true;
+    }
+
+    private getMoveResistance(): number {
+        if (!this._worldManager) return 0;
+        if (!this._onGround) return 0;
+        const px = Math.floor(this._position.x);
+        const py = Math.floor(this._position.y - 0.1);
+        const pz = Math.floor(this._position.z);
+        const blockId = this._worldManager.getBlock(px, py, pz);
+        const blockDef = this._worldManager.getBlockRegistry().get(blockId);
+        return blockDef?.moveResistance ?? 0;
+    }
+
     private updateMovement(dt: number): void {
         const forward = new THREE.Vector3(-Math.sin(this._yaw), 0, -Math.cos(this._yaw));
         const right = new THREE.Vector3(Math.cos(this._yaw), 0, -Math.sin(this._yaw));
@@ -323,8 +358,19 @@ export class PlayerController {
         if (this._input.isKeyDown('KeyA')) moveDir.sub(right);
         if (this._input.isKeyDown('KeyD')) moveDir.add(right);
 
-        const speed = this._isFlying ? FLY_SPEED :
+        let speed = this._isFlying ? FLY_SPEED :
             (this._input.isKeyDown('ShiftLeft') ? SPRINT_SPEED : WALK_SPEED);
+
+        const inLiquid = this.isInLiquid();
+        const onSlippery = this.isOnSlipperyBlock();
+        const moveResistance = this.getMoveResistance();
+
+        if (inLiquid) {
+            speed *= 0.4;
+        }
+        if (moveResistance > 0) {
+            speed *= (1 - moveResistance);
+        }
 
         if (this._isFlying) {
             this._velocity.x = moveDir.x * speed;
@@ -345,9 +391,33 @@ export class PlayerController {
                 this._velocity.y = 0;
             }
             this._onGround = true;
+        } else if (inLiquid) {
+            const targetVelX = moveDir.x * speed;
+            const targetVelZ = moveDir.z * speed;
+            const lerpFactor = onSlippery ? 0.02 : 0.1;
+            this._velocity.x += (targetVelX - this._velocity.x) * lerpFactor;
+            this._velocity.z += (targetVelZ - this._velocity.z) * lerpFactor;
+            this._velocity.y -= GRAVITY * 0.2 * dt;
+            this._velocity.y = Math.max(this._velocity.y, -2);
+            if (this._input.isKeyDown('Space')) {
+                this._velocity.y = Math.max(this._velocity.y, 2.0);
+            }
         } else {
-            this._velocity.x = moveDir.x * speed;
-            this._velocity.z = moveDir.z * speed;
+            if (onSlippery) {
+                const targetVelX = moveDir.x * speed;
+                const targetVelZ = moveDir.z * speed;
+                const isMoving = moveDir.lengthSq() > 0;
+                if (isMoving) {
+                    this._velocity.x += (targetVelX - this._velocity.x) * 0.05;
+                    this._velocity.z += (targetVelZ - this._velocity.z) * 0.05;
+                } else {
+                    this._velocity.x *= 0.98;
+                    this._velocity.z *= 0.98;
+                }
+            } else {
+                this._velocity.x = moveDir.x * speed;
+                this._velocity.z = moveDir.z * speed;
+            }
             this._velocity.y -= GRAVITY * dt;
         }
 

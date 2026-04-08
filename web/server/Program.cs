@@ -191,8 +191,10 @@ var hubContext = app.Services.GetRequiredService<IHubContext<GameHub, IGameClien
 gameServer.SetHubContext(hubContext);
 gameServer.Start();
 
-var agricultureSystem = new AgricultureSystem(gameServer.DefaultWorld, app.Services.GetRequiredService<BlockDefinitionManager>());
-gameServer.Agriculture = agricultureSystem;
+var itemsDataPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "data", "items.json");
+if (!File.Exists(itemsDataPath))
+    itemsDataPath = Path.Combine(Directory.GetCurrentDirectory(), "data", "items.json");
+gameServer.LoadFoodValues(itemsDataPath);
 
 var worldDataPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "data", "worlds", "default");
 if (!Directory.Exists(worldDataPath))

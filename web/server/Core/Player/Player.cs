@@ -80,9 +80,10 @@ public class Player
         Health = Math.Min(MaxHealth, Health + amount);
     }
 
-    public void ConsumeFood(float amount)
+    public void ConsumeFood(float nutrition, float saturation = 0f)
     {
-        FoodLevel = Math.Min(20f, FoodLevel + amount);
+        FoodLevel = Math.Min(20f, FoodLevel + nutrition);
+        FoodSaturation = Math.Min(FoodLevel, FoodSaturation + saturation);
     }
 
     public void Respawn()

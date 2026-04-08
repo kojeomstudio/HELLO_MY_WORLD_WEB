@@ -195,6 +195,26 @@ public class GameHub : Hub<IGameClient>
         var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
         if (player == null) return;
 
+        var cropType = blockType switch
+        {
+            64 => BlockType.WheatCrop,
+            65 => BlockType.CarrotCrop,
+            66 => BlockType.PotatoCrop,
+            _ => (BlockType?)null
+        };
+
+        if (cropType != null)
+        {
+            if (_gameServer.Agriculture == null) return;
+            if (!_gameServer.Agriculture.PlantCrop(x, y, z, cropType.Value))
+            {
+                return;
+            }
+            var plantedBlock = _gameServer.DefaultWorld.GetBlock(new Vector3s((short)x, (short)y, (short)z));
+            await Clients.All.OnBlockUpdate(x, y, z, plantedBlock.ToUInt16());
+            return;
+        }
+
         var blockDef = _blockDefinitionManager.Get(blockType);
         if (blockDef == null || blockDef.Id == (ushort)BlockType.Air)
         {
@@ -212,6 +232,10 @@ public class GameHub : Hub<IGameClient>
 
         var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
         if (player == null) return;
+
+        var blockCenter = new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
+        var distance = Vector3.Distance(player.Position, blockCenter);
+        if (distance > 6.0f) return;
 
         var blockPos = new Vector3s((short)x, (short)y, (short)z);
         var oldBlock = _gameServer.DefaultWorld.GetBlock(blockPos);
@@ -291,6 +315,8 @@ public class GameHub : Hub<IGameClient>
                 await SendInventoryUpdate(player);
             }
         }
+
+        _gameServer.AwardExperience(player, 1);
     }
 
     public async Task<float> DigBlockStart(int x, int y, int z)
@@ -442,17 +468,14 @@ public class GameHub : Hub<IGameClient>
         if (item == null) return;
 
         var itemId = item.ItemId.ToLowerInvariant();
-        var isFood = itemId is "bread" or "apple" or "cooked_beef" or "cooked_pork" or
-            "raw_beef" or "raw_pork" or "carrot" or "potato" or "baked_potato" or
-            "mushroom_stew" or "melon_slice" or "cookie" or "cake";
 
-        if (isFood)
+        var foodInfo = _gameServer.GetFoodValue(itemId);
+        if (foodInfo != null)
         {
             var removed = player.Inventory.RemoveItem(slotIndex, 1);
             if (removed != null)
             {
-                _gameServer.FeedPlayer(player, 4.0f);
-                _gameServer.HealPlayer(player, 2.0f);
+                _gameServer.FeedPlayer(player, foodInfo.Nutrition, foodInfo.Saturation);
                 await SendInventoryUpdate(player);
             }
         }
@@ -682,6 +705,8 @@ public class GameHub : Hub<IGameClient>
         }
         player.Inventory.AddItem(new ItemStack(recipe.ResultItemId, recipe.ResultCount));
 
+        _gameServer.AwardExperience(player, 1);
+
         await SendInventoryUpdate(player);
         await Clients.Caller.OnCraftResult(recipe.ResultItemId, recipe.ResultCount);
     }
@@ -738,6 +763,8 @@ public class GameHub : Hub<IGameClient>
             }
         }
         player.Inventory.AddItem(new ItemStack(recipe.ResultItemId, recipe.ResultCount));
+
+        _gameServer.AwardExperience(player, 1);
 
         await SendInventoryUpdate(player);
         await Clients.Caller.OnCraftResult(recipe.ResultItemId, recipe.ResultCount);

@@ -454,7 +454,7 @@ export class GameClient {
                     if (dx * dx + dy * dy + dz * dz > range * range) continue;
                     const blockId = this.worldManager.getBlock(px + dx, py + dy, pz + dz);
                     const blockDef = this.worldManager.getBlockRegistry().get(blockId);
-                    if (blockDef && (blockDef.name === 'default:lava' || blockDef.name === 'default:lava_source')) {
+                    if (blockDef && (blockDef.name === 'lava' || blockDef.name === 'lava_flowing')) {
                         return true;
                     }
                 }

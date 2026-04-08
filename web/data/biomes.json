@@ -1,0 +1,68 @@
+{
+    "biomes": [
+        {
+            "name": "grassland",
+            "yMin": 4,
+            "yMax": 31000,
+            "heatPoint": 50,
+            "humidityPoint": 50,
+            "topBlock": "grass",
+            "fillerBlock": "dirt",
+            "fillerDepth": 1,
+            "stoneBlock": "stone",
+            "waterBlock": "water",
+            "dungeonBlock": "cobblestone",
+            "dungeonAltBlock": "mossy_cobblestone"
+        },
+        {
+            "name": "grassland_ocean",
+            "yMin": -255,
+            "yMax": 3,
+            "heatPoint": 50,
+            "humidityPoint": 50,
+            "topBlock": "sand",
+            "fillerBlock": "sand",
+            "fillerDepth": 3,
+            "stoneBlock": "stone",
+            "waterBlock": "water",
+            "dungeonBlock": "cobblestone",
+            "dungeonAltBlock": "mossy_cobblestone"
+        },
+        {
+            "name": "desert",
+            "yMin": 4,
+            "yMax": 31000,
+            "heatPoint": 90,
+            "humidityPoint": 10,
+            "topBlock": "sand",
+            "fillerBlock": "sand",
+            "fillerDepth": 3,
+            "stoneBlock": "desert_stone",
+            "waterBlock": "water",
+            "dungeonBlock": "cobblestone",
+            "dungeonAltBlock": "mossy_cobblestone"
+        },
+        {
+            "name": "snow",
+            "yMin": 4,
+            "yMax": 31000,
+            "heatPoint": 10,
+            "humidityPoint": 40,
+            "topBlock": "snow",
+            "fillerBlock": "dirt",
+            "fillerDepth": 1,
+            "stoneBlock": "stone",
+            "waterBlock": "water",
+            "dungeonBlock": "cobblestone",
+            "dungeonAltBlock": "mossy_cobblestone"
+        }
+    ],
+    "noise": {
+        "heatOffset": 50,
+        "heatScale": 50,
+        "heatSpread": [1000, 1000, 1000],
+        "humidityOffset": 50,
+        "humidityScale": 50,
+        "humiditySpread": [1000, 1000, 1000]
+    }
+}

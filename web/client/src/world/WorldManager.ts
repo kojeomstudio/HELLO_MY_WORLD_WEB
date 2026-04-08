@@ -239,6 +239,9 @@ export class WorldManager {
             const neighborKey = `${nx},${ny},${nz}`;
             if (this.chunks.has(neighborKey)) {
                 this.rebuildChunkMesh(neighborKey);
+            } else if (this.connection && !this.pendingChunks.has(neighborKey)) {
+                this.pendingChunks.add(neighborKey);
+                this.connection.invoke('RequestChunk', nx, ny, nz);
             }
         }
     }

@@ -10,8 +10,9 @@ A web-based voxel game ported from the minetest_sub_project (Luanti engine) to a
 - **Crafting System**: 112+ recipes including shaped crafting, tool creation, armor, building blocks, and food
 - **Smelting System**: 25+ smelting recipes via furnace with fuel consumption
 - **Bucket System**: Place and pick up water/lava, drink milk for healing
-- **Player Mechanics**: Health, hunger, breath, fall damage, knockback, swimming, climbing, sprinting, flying
-- **Mob System**: Hostile mobs (Zombie, Skeleton, Spider) and passive mobs (Cow, Pig, Chicken) with AI
+- **Player Mechanics**: Health, hunger, breath, fall damage, knockback, swimming (liquid physics), climbing, sprinting, flying, slippery blocks (ice), move resistance (soul sand)
+- **Experience System**: XP gains from mining, crafting, smelting, and mob kills with level progression
+- **Mob System**: Hostile mobs (Zombie, Skeleton, Spider) and passive mobs (Cow, Pig, Chicken) with AI and death drops
 - **Entity System**: Dropped items, mob entities, with physics and lifespan
 - **Day/Night Cycle**: Full day/night cycle with sky brightness transitions
 - **Weather**: Rain particle system with day/night color transitions
@@ -24,7 +25,9 @@ A web-based voxel game ported from the minetest_sub_project (Luanti engine) to a
 - **Active Block Modifiers**: Sand/gravel falling, farmland decay, grass spreading, ice melting
 - **Agriculture**: Farmable crops (wheat, carrot, potato), farmland hydration from nearby water
 - **Node Timers**: Timed block transformations with persistence
-- **Persistence**: Player data, world chunks, block metadata, and chest inventories saved to disk
+- **Persistence**: Player data, world chunks, block metadata, chest inventories, and node timers saved to disk
+- **Crop Planting**: Plant wheat, carrot, and potato seeds on farmland via block placement
+- **Server-Authoritative Physics**: Speed validation, dig range verification, and position clamping
 - **Procedural Audio**: Web Audio API generated sounds (no audio files needed)
 - **Settings**: Mouse sensitivity, render distance, FOV, volume controls, cloud/AO toggles
 - **Debug Info**: FPS counter, position display, chunk count
@@ -80,7 +83,9 @@ web/
 │       └── GameLoopService.cs    # Background game loop
 ├── data/                # JSON configuration
 │   ├── blocks.json       # 101 block definitions
-│   ├── items.json        # 120+ items, 112+ recipes
+│   ├── items.json        # 120+ items, 112+ recipes, food values, tool capabilities
+│   ├── biomes.json       # Biome definitions and noise parameters
+│   ├── physics_constants.json  # Physics constants
 │   ├── privileges.json   # 19 privileges
 │   ├── server_config.json
 │   └── smelting.json     # 25+ smelting recipes

@@ -1,847 +1,345 @@
-# Server API Reference
+# Server API — SignalR Hub Methods & Client Events
 
-## SignalR Hub Connection
+Hub endpoint: `/game` (WebSocket via SignalR)
 
-**Endpoint:** `/game`
+Strongly-typed interface: `IGameClient` (server-to-client), `GameHub` (client-to-server).
 
-**Protocol:** WebSocket (SignalR)
-
-## Rate Limiting
-
-The following Hub methods are rate-limited per connection:
-
-| Method | Cooldown | Action Key |
-|--------|----------|------------|
-| `SendChat` | 500ms | `chat` |
-| `DigBlock` | 250ms | `dig` |
-| `PlaceBlock` | 250ms | `place` |
-
-Requests within the cooldown window are silently ignored. Rate limits are tracked via a static `Dictionary<string, DateTime>` keyed by `"{connectionId}:{action}"`.
-
-## Client Methods
+## Hub Methods (Client → Server)
 
 ### Join
-Register player in the game world.
-
-```typescript
-connection.invoke("Join", playerName: string): Promise<void>
 ```
-
-**Triggers:**
-- `OnPlayerJoined` to all clients
-- `OnPlayerListUpdate` to caller
-- `OnHealthUpdate` to caller
-- `OnInventoryUpdate` to caller (starter items: wooden_pickaxe, wooden_sword, torch x16, bread x5)
-- `OnTimeUpdate` to caller
-- `OnBlockDefinitions` to caller
-- `OnArmorUpdate` to caller (if returning player with saved armor)
-- `OnExperienceUpdate` to caller (if returning player with saved XP)
-- Initial chunk delivery (7x4x7 around player position)
-
-**Behavior:** If player exists in SQLite database, loads saved position, inventory, armor, XP, and game mode. Otherwise spawns at world origin.
-
----
+Task Join(string playerName)
+```
+Authenticates and registers the player. Server sends initial state (chunks, inventory, block definitions, time).
 
 ### UpdatePosition
-Synchronize player position and movement.
-
-```typescript
-connection.invoke(
-  "UpdatePosition",
-  x: number, y: number, z: number,
-  vx: number, vy: number, vz: number,
-  yaw: number, pitch: number
-): Promise<void>
 ```
-
-**Server behavior:** Stores position and previous position for speed validation via `ValidatePlayerPosition()`, which caps distance per tick to `maxSpeed * dt * 1.5f`. Broadcasts to players within 64-block range.
-
----
-
-### SendChat
-Broadcast chat message or execute slash command.
-
-```typescript
-connection.invoke("SendChat", message: string): Promise<void>
+Task UpdatePosition(float x, float y, float z, float vx, float vy, float vz, float yaw, float pitch)
 ```
-
-**Rate limited:** 500ms cooldown. Messages starting with `/` are routed to `ChatCommandManager`.
-
----
-
-### PlaceBlock
-Place a block in the world.
-
-```typescript
-connection.invoke(
-  "PlaceBlock",
-  x: number, y: number, z: number,
-  blockType: number
-): Promise<void>
-```
-
-**Rate limited:** 250ms cooldown.
-
-**Validation:** Block definition must exist and not be Air.
-
-**Triggers:** `OnBlockUpdate` to all clients.
-
----
+Sent every frame. Server validates position and broadcasts to nearby players (64 block range).
 
 ### DigBlock
-Remove a block from the world.
-
-```typescript
-connection.invoke("DigBlock", x: number, y: number, z: number): Promise<void>
 ```
-
-**Rate limited:** 250ms cooldown.
-
-**Validation:** Block must be non-zero and breakable.
-
-**Side effects:**
-1. Removes block from world
-2. Spawns `ItemEntity` with drop item at block position
-3. Applies tool wear (decrements durability)
-4. Destroys tool if durability reaches 0
-5. Updates player inventory
-
-**Triggers:** `OnBlockUpdate` to all clients, `OnInventoryUpdate` to caller.
-
----
+Task DigBlock(int x, int y, int z)
+```
+Removes block, drops item entity, checks tool durability. Rate limited: 250ms.
 
 ### DigBlockStart
-Validate that a block can be dug.
-
-```typescript
-connection.invoke("DigBlockStart", x: number, y: number, z: number): Promise<boolean>
 ```
+Task<float> DigBlockStart(int x, int y, int z)
+```
+Returns dig time in seconds based on block hardness and tool multiplier. Returns -1 if unbreakable.
 
-**Returns:** `true` if block is non-air and breakable (returns dig time as float), `false` (-1) otherwise.
+### PlaceBlock
+```
+Task PlaceBlock(int x, int y, int z, ushort blockType)
+```
+Places block at position. Validates block definition exists and is not air. Rate limited: 250ms.
 
----
+### UseBucket
+```
+Task<bool> UseBucket(int x, int y, int z, bool place)
+```
+Place mode: places water/lava from bucket. Non-place mode: picks up liquid with empty bucket, or drinks milk. Rate limited: 500ms.
 
 ### InteractWithBlock
-Open UI for interactive blocks or handle special interactions.
-
-```typescript
-connection.invoke("InteractWithBlock", x: number, y: number, z: number): Promise<void>
 ```
-
-**Behavior by block type:**
-
-| Block | Action |
-|-------|--------|
-| `chest` | Sends `OnChestInventory` with 27-slot contents |
-| `furnace` | Sends `OnSmeltingRecipes` + existing `OnFurnaceUpdate` if active |
-| `crafting_table` | Sends `OnCraftingRecipes` with all recipes |
-| `door_wood` | Toggles open/close via Param2 bit 0, broadcasts `OnBlockUpdate` |
-
-**Fluid bucket interaction (by held item):**
-
-| Held Item | Target Block | Action |
-|-----------|-------------|--------|
-| `bucket` | water / water_flowing | Converts to `water_bucket`, removes block |
-| `bucket` | lava / lava_flowing | Converts to `lava_bucket`, removes block |
-
----
-
-### RequestChunk
-Request chunk data from server.
-
-```typescript
-connection.invoke(
-  "RequestChunk",
-  chunkX: number, chunkY: number, chunkZ: number
-): Promise<void>
+Task InteractWithBlock(int x, int y, int z)
 ```
-
-**Triggers:** `OnChunkReceived` to caller with 16KB binary data.
-
----
-
-### SelectSlot
-Change selected hotbar slot.
-
-```typescript
-connection.invoke("SelectSlot", slot: number): Promise<void>
-```
-
----
-
-### PunchPlayer
-Attack another player.
-
-```typescript
-connection.invoke("PunchPlayer", targetName: string): Promise<void>
-```
-
-**Damage calculation:** Based on held tool type:
-
-| Tool | Damage |
-|------|--------|
-| Wooden sword | 4 |
-| Stone sword | 5 |
-| Iron sword | 6 |
-| Diamond sword | 7 |
-| Wooden axe | 3 |
-| Stone axe | 4 |
-| Iron axe | 5 |
-| Diamond axe | 6 |
-| Wooden pickaxe | 2 |
-| Stone pickaxe | 3 |
-| Iron pickaxe | 4 |
-| Diamond pickaxe | 5 |
-| Other tool / bare hand | 1 |
-
-**Damage reduction:** Target's armor defense reduces damage: `finalDamage = max(0, damage - totalDefense * 0.04)`
-
-**Triggers:** `OnKnockback` to target, `OnHealthUpdate` if killed. On death, drops all inventory and armor as entities.
-
----
-
-### GetPrivileges
-Query caller's privilege list.
-
-```typescript
-connection.invoke("GetPrivileges"): Promise<void>
-```
-
-**Triggers:** `OnPrivilegeList` to caller.
-
----
+Context-sensitive interaction based on block type:
+- **chest**: sends `OnChestInventory`
+- **furnace**: sends `OnSmeltingRecipes` + current state
+- **door_wood**: toggles open/close
+- **crafting_table**: sends `OnCraftingRecipes`
+- Also handles bucket pickup on water/lava blocks
 
 ### UseItem
-Consume an item from inventory (food or bucket).
-
-```typescript
-connection.invoke("UseItem", slotIndex: number): Promise<void>
 ```
-
-**Food items:** bread, apple, cooked_beef, cooked_pork, raw_beef, raw_pork, carrot, potato, baked_potato, mushroom_stew, melon_slice, cookie, cake.
-
-**Food effects:** Heals 2.0 HP, feeds 4.0 food.
-
-**Bucket items:**
-
-| Item | Effect |
-|------|--------|
-| `water_bucket` | Consumes, gives `bucket` |
-| `lava_bucket` | Consumes, gives `bucket` |
-| `milk_bucket` | Consumes, gives `bucket`, heals 4.0 HP |
-
----
-
-### Craft
-Auto-match and craft a recipe from available inventory items.
-
-```typescript
-connection.invoke("Craft", recipeId: string): Promise<void>
+Task UseItem(int slotIndex)
 ```
-
----
-
-### GetCraftingRecipes
-Request all available crafting recipes.
-
-```typescript
-connection.invoke("GetCraftingRecipes"): Promise<void>
-```
-
-**Triggers:** `OnCraftingRecipes` to caller with array of recipe objects.
-
----
-
-### CraftRecipe
-Craft a specific recipe by index.
-
-```typescript
-connection.invoke("CraftRecipe", recipeIndex: number): Promise<void>
-```
-
-**Validation:**
-- `recipeIndex` must be within recipe list bounds
-- Player must have all required ingredients
-
-**Error responses:** `OnChatMessage` with error description.
-
-**Triggers:** `OnInventoryUpdate`, `OnCraftResult`.
-
----
-
-### GetSmeltingRecipes
-Request all available smelting recipes.
-
-```typescript
-connection.invoke("GetSmeltingRecipes"): Promise<void>
-```
-
-**Triggers:** `OnSmeltingRecipes` to caller with array of smelting recipe objects.
-
----
-
-### StartSmelting
-Begin a smelting operation in a furnace.
-
-```typescript
-connection.invoke(
-  "StartSmelting",
-  inputItemId: string,
-  resultItemId: string,
-  x: number, y: number, z: number
-): Promise<void>
-```
-
-**Validation:**
-- No existing active furnace at position
-- Valid smelting recipe exists for input
-- Player has input item in inventory
-- Player has fuel (coal or charcoal) in inventory
-
-**Side effects:**
-1. Consumes 1 input item and 1 fuel from player inventory
-2. Creates `FurnaceOperation` tracked on server
-3. Progress updates sent via `OnFurnaceUpdate` every ~0.5s
-
-**Triggers:** `OnInventoryUpdate`, `OnFurnaceUpdate`, `OnChatMessage`.
-
----
-
-### GetChestInventory
-Request contents of a chest at specific coordinates.
-
-```typescript
-connection.invoke("GetChestInventory", x: number, y: number, z: number): Promise<void>
-```
-
-**Triggers:** `OnChestInventory` with 27-slot array to caller. Creates empty chest if none exists (loads from SQLite if previously saved).
-
----
-
-### MoveItemToChest
-Move an item from player inventory to a chest.
-
-```typescript
-connection.invoke(
-  "MoveItemToChest",
-  slotIndex: number,
-  chestSlot: number,
-  x: number, y: number, z: number
-): Promise<void>
-```
-
-**Parameters:**
-- `slotIndex` — Player inventory slot (0-31)
-- `chestSlot` — Target chest slot (-1 for auto-find first available)
-- `x, y, z` — Chest block position
-
-**Behavior:**
-- If `chestSlot >= 0`: attempts to place in that specific slot
-- If `chestSlot == -1`: auto-finds empty slot or stackable slot (max 64)
-- Stacks with existing items of same type when possible
-
-**Triggers:** `OnInventoryUpdate`, `OnChestInventory`.
-
----
-
-### TakeItemFromChest
-Move an item from a chest to player inventory.
-
-```typescript
-connection.invoke(
-  "TakeItemFromChest",
-  chestSlot: number,
-  slotIndex: number,
-  x: number, y: number, z: number
-): Promise<void>
-```
-
-**Parameters:**
-- `chestSlot` — Source chest slot (0-26)
-- `slotIndex` — Target player inventory slot (-1 for auto-find)
-- `x, y, z` — Chest block position
-
-**Behavior:**
-- If `slotIndex >= 0`: attempts to place in that specific slot
-- If `slotIndex == -1`: auto-finds empty slot or stackable slot
-- Stacks with existing items of same type when possible
-
-**Triggers:** `OnInventoryUpdate`, `OnChestInventory`.
-
----
-
-### EquipArmor
-Move an item from inventory to an armor slot.
-
-```typescript
-connection.invoke(
-  "EquipArmor",
-  slotIndex: number,
-  armorSlot: number
-): Promise<void>
-```
-
-**Parameters:**
-- `slotIndex` — Player inventory slot (0-31)
-- `armorSlot` — Target armor slot: 0 (helmet), 1 (chestplate), 2 (leggings), 3 (boots)
-
-**Behavior:**
-- Swaps item from inventory into armor slot
-- If armor slot is occupied, moves existing armor item to inventory slot
-
-**Triggers:** `OnInventoryUpdate`, `OnArmorUpdate`.
-
----
-
-### UnequipArmor
-Move an item from an armor slot to inventory.
-
-```typescript
-connection.invoke(
-  "UnequipArmor",
-  armorSlot: number
-): Promise<void>
-```
-
-**Parameters:**
-- `armorSlot` — Source armor slot: 0 (helmet), 1 (chestplate), 2 (leggings), 3 (boots)
-
-**Behavior:**
-- Moves armor item from armor slot to first available inventory slot
-- Clears armor slot
-
-**Triggers:** `OnInventoryUpdate`, `OnArmorUpdate`.
-
----
+Uses item in inventory slot. Handles food consumption (heals 2 HP, feeds 4), bucket conversions.
 
 ### Respawn
-Respawn a dead player.
-
-```typescript
-connection.invoke("Respawn"): Promise<void>
 ```
+Task Respawn()
+```
+Respawns dead player at world spawn. Resets health, re-sends chunks.
 
-**Side effects:** Resets health, teleports to spawn point, re-sends chunks.
+### SendChat
+```
+Task SendChat(string message)
+```
+Broadcasts chat message to all players. Commands starting with `/` are dispatched to `ChatCommandManager`. Rate limited: 500ms.
 
-**Triggers:** `OnHealthUpdate`, `OnChunkReceived`.
+### PunchPlayer
+```
+Task PunchPlayer(string targetName)
+```
+Deals damage based on held tool (1-7). Applies knockback to target.
 
----
+### SelectSlot
+```
+Task SelectSlot(int slot)
+```
+Updates player's selected hotbar slot on server.
+
+### RequestChunk
+```
+Task RequestChunk(int chunkX, int chunkY, int chunkZ)
+```
+Sends serialized chunk data to requesting client.
+
+### Craft / CraftRecipe
+```
+Task Craft(string recipeId)
+Task CraftRecipe(int recipeIndex)
+```
+Crafts item from recipe. Removes ingredients from inventory, adds result.
+
+### GetCraftingRecipes / GetSmeltingRecipes
+```
+Task GetCraftingRecipes()
+Task GetSmeltingRecipes()
+```
+Returns all available recipes as arrays of `{result, resultCount, ingredients}` or `{input, result, cookTime, experience}`.
+
+### StartSmelting
+```
+Task StartSmelting(string inputItemId, string resultItemId, int x, int y, int z)
+```
+Starts furnace operation. Consumes 1 input item + 1 fuel (coal/charcoal) from player inventory.
+
+### GetChestInventory
+```
+Task GetChestInventory(int x, int y, int z)
+```
+Returns chest's 27-slot inventory as array of `{itemId, count, metadata}`.
+
+### MoveItemToChest / TakeItemFromChest
+```
+Task MoveItemToChest(int slotIndex, int chestSlot, int x, int y, int z)
+Task TakeItemFromChest(int chestSlot, int slotIndex, int x, int y, int z)
+```
+Moves items between player inventory and chest. Auto-finds slot if -1.
 
 ### DropItem
-Drop an item from inventory as an entity.
-
-```typescript
-connection.invoke("DropItem", slotIndex: number, count: number): Promise<void>
 ```
+Task DropItem(int slotIndex, int count)
+```
+Drops item from inventory as world entity.
 
-**Triggers:** `OnInventoryUpdate`, `OnEntitySpawned`.
+### EquipArmor / UnequipArmor
+```
+Task EquipArmor(int slotIndex, int armorSlot)
+Task UnequipArmor(int armorSlot)
+```
+Swaps armor between inventory and armor slots (0=helmet, 1=chestplate, 2=leggings, 3=boots).
 
----
+### GetPrivileges
+```
+Task GetPrivileges()
+```
+Returns player's privilege list.
 
 ### RequestInventory
-Request full inventory sync.
-
-```typescript
-connection.invoke("RequestInventory"): Promise<void>
 ```
+Task RequestInventory()
+```
+Re-sends current inventory to client.
 
-**Triggers:** `OnInventoryUpdate` to caller.
+### InteractBlock
+```
+Task InteractBlock(int x, int y, int z)
+```
+Stub interaction method (no-op).
 
----
-
-## Server Events
+## Client Events (Server → Client)
 
 ### OnChunkReceived
-Delivers chunk block data.
-
-```typescript
-connection.on("OnChunkReceived", (
-  chunkX: number,
-  chunkY: number,
-  chunkZ: number,
-  data: Uint8Array  // 16384 bytes: 4096 blocks × 4 bytes
-) => void)
 ```
-
-**Data Format (per block):**
-| Byte | Content |
-|------|---------|
-| 0 | BlockType (enum) |
-| 1 | Param1 |
-| 2 | Param2 (used for crop growth stages 0-7, door open/close, liquid levels) |
-| 3 | Light level |
-
----
-
-### OnPlayerJoined
-Notifies when a player joins.
-
-```typescript
-connection.on("OnPlayerJoined", (playerName: string) => void)
+Task OnChunkReceived(int chunkX, int chunkY, int chunkZ, byte[] data)
 ```
+Serialized chunk data (16,384 bytes = 16^3 blocks * 4 bytes each).
 
----
-
-### OnPlayerLeft
-Notifies when a player leaves.
-
-```typescript
-connection.on("OnPlayerLeft", (playerName: string) => void)
+### OnPlayerJoined / OnPlayerLeft
 ```
-
----
+Task OnPlayerJoined(string playerName)
+Task OnPlayerLeft(string playerName)
+```
+Broadcast to all players.
 
 ### OnPlayerListUpdate
-Full player list synchronization.
-
-```typescript
-connection.on("OnPlayerListUpdate", (players: string[]) => void)
 ```
-
----
+Task OnPlayerListUpdate(string[] players)
+```
+Sent to joining player with list of online player names.
 
 ### OnPlayerPositionUpdate
-Other player position updates.
-
-```typescript
-connection.on("OnPlayerPositionUpdate", (
-  playerName: string,
-  x: number, y: number, z: number,
-  yaw: number, pitch: number
-) => void)
 ```
-
----
+Task OnPlayerPositionUpdate(string playerName, float x, float y, float z, float yaw, float pitch)
+```
+Broadcast to nearby players (64 block range) for remote player rendering.
 
 ### OnChatMessage
-Chat message broadcast.
-
-```typescript
-connection.on("OnChatMessage", (sender: string, message: string) => void)
 ```
-
----
+Task OnChatMessage(string sender, string message)
+```
+Broadcast chat or server messages.
 
 ### OnBlockUpdate
-Block change notification.
-
-```typescript
-connection.on("OnBlockUpdate", (
-  x: number, y: number, z: number,
-  blockData: number  // ushort: (Type << 8) | Param1
-) => void)
 ```
-
----
+Task OnBlockUpdate(int x, int y, int z, ushort blockData)
+```
+Broadcast to all players when a block changes.
 
 ### OnHealthUpdate
-Player health synchronization.
-
-```typescript
-connection.on("OnHealthUpdate", (
-  health: number,
-  maxHealth: number
-) => void)
 ```
-
----
+Task OnHealthUpdate(float health, float maxHealth)
+```
+Sent to affected player when health changes.
 
 ### OnInventoryUpdate
-Inventory content synchronization.
+```
+Task OnInventoryUpdate(object[] items)
+```
+Each item: `{itemId: string, count: number, metadata: string}` or `null`.
 
-```typescript
-connection.on("OnInventoryUpdate", (items: object[]) => void)
+### OnArmorUpdate
+```
+Task OnArmorUpdate(object[] armorSlots)
+```
+4-element array (helmet, chestplate, leggings, boots).
+
+### OnBreathUpdate
+```
+Task OnBreathUpdate(float breath, float maxBreath)
 ```
 
-**Item format:**
+### OnTimeUpdate
+```
+Task OnTimeUpdate(long time, float speed, float skyBrightness)
+```
+Broadcast periodically (every 100 ticks).
+
+### OnEntitySpawned / OnEntityDespawned / OnEntityUpdate
+```
+Task OnEntitySpawned(Guid entityId, string entityType, float x, float y, float z)
+Task OnEntityDespawned(Guid entityId)
+Task OnEntityUpdate(Guid entityId, float x, float y, float z)
+```
+
+### OnCraftResult
+```
+Task OnCraftResult(string itemId, int count)
+```
+
+### OnDeath
+```
+Task OnDeath(string message)
+```
+Broadcast to all players.
+
+### OnKnockback
+```
+Task OnKnockback(float vx, float vy, float vz)
+```
+Sent to damaged player for client-side knockback animation.
+
+### OnBlockDefinitions
+```
+Task OnBlockDefinitions(string definitionsJson)
+```
+JSON array of `{id, name, solid, transparent, color, liquid, light, damage, breakable, interactive, drawType, hardness, drops, climbable, textureName}`.
+
+### OnPrivilegeList
+```
+Task OnPrivilegeList(string[] privileges)
+```
+
+### OnGameModeChanged
+```
+Task OnGameModeChanged(string mode)
+```
+
+### OnTeleported
+```
+Task OnTeleported(float x, float y, float z)
+```
+
+### OnCraftingRecipes / OnSmeltingRecipes
+```
+Task OnCraftingRecipes(object[] recipes)
+Task OnSmeltingRecipes(object[] recipes)
+```
+Crafting: `{result, resultCount, ingredients: [[itemId, count], ...]}`.
+Smelting: `{input, result, cookTime, experience}`.
+
+### OnChestInventory
+```
+Task OnChestInventory(object[] items)
+```
+27-element array of `{itemId, count, metadata}` or `null`.
+
+### OnFurnaceUpdate
+```
+Task OnFurnaceUpdate(string input, string fuel, string output, float progress)
+```
+
+### OnFallingBlock
+```
+Task OnFallingBlock(int fromX, int fromY, int fromZ, int toX, int toY, int toZ, ushort blockType)
+```
+
+### OnExperienceUpdate
+```
+Task OnExperienceUpdate(int level, int totalExp)
+```
+
+## REST API
+
+### GET /api/status
+```json
+{
+  "online": 5,
+  "maxPlayers": 100,
+  "isRunning": true,
+  "worldSeed": 12345
+}
+```
+
+## Data Formats
+
+### Block Data Packing
+Each block: 4 bytes serialized in order `[Type, Param1, Param2, Light]`.
+- `Type`: `BlockType` enum (0-100)
+- `Param1`: Reserved metadata
+- `Param2`: Liquid level (1-8) or door open state (0/1)
+- `Light`: `(sunLight << 4) | artificialLight`
+
+### Inventory Format
+Array of 32 items (or 8 for hotbar). Each item:
 ```json
 { "itemId": "wooden_pickaxe", "count": 1, "metadata": "59" }
 ```
+`null` for empty slots. `metadata` stores tool durability as string.
 
----
-
-### OnTimeUpdate
-Game time update.
-
-```typescript
-connection.on("OnTimeUpdate", (
-  time: number,     // DateTime ticks
-  speed: number,    // Time speed multiplier
-  skyBrightness: number  // 0.0 (night) to 1.0 (day)
-) => void)
-```
-
----
-
-### OnDeath
-Death notification.
-
-```typescript
-connection.on("OnDeath", (message: string) => void)
-```
-
----
-
-### OnKnockback
-PvP knockback impulse.
-
-```typescript
-connection.on("OnKnockback", (
-  vx: number,
-  vy: number,
-  vz: number
-) => void)
-```
-
----
-
-### OnGameModeChanged
-Game mode change notification.
-
-```typescript
-connection.on("OnGameModeChanged", (mode: string) => void)
-```
-
-Modes: `"survival"`, `"creative"`, `"adventure"`, `"spectator"`.
-
----
-
-### OnTeleported
-Player teleportation.
-
-```typescript
-connection.on("OnTeleported", (
-  x: number,
-  y: number,
-  z: number
-) => void)
-```
-
----
-
-### OnPrivilegeList
-Player privilege list.
-
-```typescript
-connection.on("OnPrivilegeList", (privileges: string[]) => void)
-```
-
----
-
-### OnBreathUpdate
-Player breath/drowning sync.
-
-```typescript
-connection.on("OnBreathUpdate", (
-  breath: number,
-  maxBreath: number
-) => void)
-```
-
----
-
-### OnCraftingRecipes
-Crafting recipe list.
-
-```typescript
-connection.on("OnCraftingRecipes", (recipes: object[]) => void)
-```
-
-**Recipe format:**
+### Block Definition (OnBlockDefinitions)
 ```json
 {
-  "result": "wooden_planks",
-  "resultCount": 4,
-  "ingredients": [["wood", 1]]
+  "id": 1,
+  "name": "default:stone",
+  "solid": true,
+  "transparent": false,
+  "color": "#808080",
+  "liquid": false,
+  "light": 0,
+  "damage": 0,
+  "breakable": true,
+  "interactive": false,
+  "drawType": "normal",
+  "hardness": 1.5,
+  "drops": "default:cobblestone",
+  "climbable": false,
+  "textureName": "default_stone"
 }
 ```
-
----
-
-### OnSmeltingRecipes
-Smelting recipe list.
-
-```typescript
-connection.on("OnSmeltingRecipes", (recipes: object[]) => void)
-```
-
-**Recipe format:**
-```json
-{
-  "input": "iron_ore",
-  "result": "iron_ingot",
-  "cookTime": 10.0,
-  "experience": 0.1
-}
-```
-
----
-
-### OnChestInventory
-Chest contents (27 slots).
-
-```typescript
-connection.on("OnChestInventory", (items: object[]) => void)
-```
-
-**Array length:** 27. Null entries = empty slots.
-
----
-
-### OnFurnaceUpdate
-Furnace smelting state update.
-
-```typescript
-connection.on("OnFurnaceUpdate", (
-  input: string,
-  fuel: string,
-  output: string,
-  progress: number
-) => void)
-```
-
-- `progress`: 0.0 to 1.0 (1.0 = complete)
-- Empty strings indicate no item in that slot
-
----
-
-### OnArmorUpdate
-Player armor slot synchronization.
-
-```typescript
-connection.on("OnArmorUpdate", (
-  armorSlots: object[]
-) => void)
-```
-
-**Array length:** 4. Slots: 0=helmet, 1=chestplate, 2=leggings, 3=boots.
-
-**Item format:**
-```json
-{ "itemId": "iron_chestplate", "count": 1, "metadata": null }
-```
-
-Null entries = empty armor slot.
-
----
-
-### OnExperienceUpdate
-Player experience and level synchronization.
-
-```typescript
-connection.on("OnExperienceUpdate", (
-  level: number,
-  totalExp: number
-) => void)
-```
-
-- `level`: Current experience level
-- `totalExp`: Total accumulated experience points
-
----
-
-### OnEntitySpawned
-New entity created in the world.
-
-```typescript
-connection.on("OnEntitySpawned", (
-  entityId: string,   // Guid
-  entityType: string, // "item" or "mob"
-  x: number,
-  y: number,
-  z: number
-) => void)
-```
-
----
-
-### OnEntityUpdate
-Entity position update.
-
-```typescript
-connection.on("OnEntityUpdate", (
-  entityId: string,
-  x: number,
-  y: number,
-  z: number
-) => void)
-```
-
----
-
-### OnEntityDespawned
-Entity removed from the world.
-
-```typescript
-connection.on("OnEntityDespawned", (entityId: string) => void)
-```
-
----
-
-### OnCraftResult
-Crafting completion notification.
-
-```typescript
-connection.on("OnCraftResult", (
-  itemId: string,
-  count: number
-) => void)
-```
-
----
-
-### OnBlockDefinitions
-Full block definition JSON from server.
-
-```typescript
-connection.on("OnBlockDefinitions", (definitionsJson: string) => void)
-```
-
----
-
-### OnFallingBlock
-Falling block animation.
-
-```typescript
-connection.on("OnFallingBlock", (
-  fromX: number, fromY: number, fromZ: number,
-  toX: number, toY: number, toZ: number,
-  blockType: number  // ushort
-) => void)
-```
-
----
-
-## Connection Lifecycle
-
-```
-┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│  Connect     │────>│    Join()    │────>│   Playing    │
-│  (WebSocket) │     │  (Register)  │     │   (Active)   │
-└──────────────┘     └──────────────┘     └──────────────┘
-                                                   │
-                                                   ▼
-                                            ┌──────────────┐
-                                            │ Disconnect   │
-                                            │ (Cleanup)    │
-                                            │ Save player  │
-                                            │ to SQLite    │
-                                            └──────────────┘
-```
-
-## Error Handling
-
-- **Join Failure:** `OnChatMessage("Server", "Failed to join...")`
-- **Invalid Actions:** Silently ignored (null player check)
-- **Rate Limited:** Silently ignored (no response)
-- **Craft Failure:** `OnChatMessage("Server", "No matching crafting recipe.")` or `"Missing ingredients for {item}."`
-- **Smelting Failure:** `OnChatMessage("Server", "Cannot start smelting...")`
-
-## Persistence
-
-Player data and block metadata are persisted to SQLite databases in `data/worlds/default/`:
-
-| Database | Tables | Save Triggers |
-|----------|--------|---------------|
-| `players.db` | `players` | On disconnect (`PlayerLeave`) |
-| `blockmeta.db` | `chest_inventories`, `furnace_operations`, `node_timers` | Auto-save (300s) + server shutdown |

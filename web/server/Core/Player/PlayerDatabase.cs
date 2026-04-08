@@ -105,8 +105,8 @@ public class PlayerDatabase
         player.TotalExperience = reader.GetInt32(10);
         player.ExperienceLevel = reader.GetInt32(11);
         player.Mode = (GameMode)reader.GetInt32(12);
-        player.SelectedHotbarSlot = reader.GetInt32(14);
-        player.LastGroundY = reader.GetFloat(15);
+        player.SelectedHotbarSlot = reader.GetInt32(15);
+        player.LastGroundY = reader.GetFloat(16);
 
         if (!reader.IsDBNull(13))
         {
