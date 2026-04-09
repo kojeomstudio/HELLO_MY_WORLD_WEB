@@ -27,6 +27,7 @@ public class Player
     public bool IsOnGround { get; set; } = true;
     public bool IsInLiquid { get; set; }
     public bool IsDead { get; set; }
+    public int AirTimeTicks { get; set; }
 
     public int SelectedHotbarSlot { get; set; } = 0;
     public Inventory Inventory { get; } = new();

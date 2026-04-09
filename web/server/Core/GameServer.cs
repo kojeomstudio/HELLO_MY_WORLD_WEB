@@ -282,6 +282,7 @@ public class GameServer
         {
             if (player.State != PlayerState.Playing) continue;
             UpdatePlayer(player);
+            ValidatePlayerPhysics(player, 1f / TickRate);
             ValidatePlayerPosition(player, 1f / TickRate);
         }
 
@@ -473,6 +474,32 @@ public class GameServer
         return true;
     }
 
+    private void ValidatePlayerPhysics(PlayerEnt player, float dt)
+    {
+        var playerBlockX = (short)Math.Floor(player.Position.X);
+        var playerBlockY = (short)Math.Floor(player.Position.Y);
+        var playerBlockZ = (short)Math.Floor(player.Position.Z);
+
+        var feetBlock = DefaultWorld.GetBlock(new Vector3s(playerBlockX, playerBlockY, playerBlockZ));
+        var headBlock = DefaultWorld.GetBlock(new Vector3s(playerBlockX, (short)(playerBlockY + 1), playerBlockZ));
+
+        var feetDef = _blockDefinitionManager.Get(feetBlock.ToUInt16());
+        var headDef = _blockDefinitionManager.Get(headBlock.ToUInt16());
+
+        bool insideSolid = (feetDef != null && feetDef.Solid && !feetDef.Transparent && feetDef.Climbable != true) ||
+                           (headDef != null && headDef.Solid && !headDef.Transparent && headDef.Climbable != true);
+
+        if (insideSolid && feetBlock.Type != BlockType.Water && feetBlock.Type != BlockType.WaterFlowing &&
+            feetBlock.Type != BlockType.Lava && feetBlock.Type != BlockType.LavaFlowing &&
+            feetBlock.Type != BlockType.Ladder)
+        {
+            if (!player.IsFlying && player.Mode != GameMode.Creative && player.Mode != GameMode.Spectator)
+            {
+                player.Position = new Vector3(player.Position.X, player.PreviousPosition.Y, player.Position.Z);
+            }
+        }
+    }
+
     private void ValidatePlayerPosition(PlayerEnt player, float dt)
     {
         var maxSpeed = player.IsFlying
@@ -491,6 +518,16 @@ public class GameServer
             player.Position = correctedPos;
         }
 
+        if (!player.IsFlying && player.Mode != GameMode.Creative && player.Mode != GameMode.Spectator)
+        {
+            if (distance > 10f && player.PreviousPosition.Length > 0)
+            {
+                player.Position = player.PreviousPosition;
+                player.Velocity = Vector3.Zero;
+                SendPositionCorrection(player);
+            }
+        }
+
         var feetBlockY = (short)Math.Floor(player.Position.Y - _physicsEngine.PlayerHeight);
         var groundBlock = DefaultWorld.GetBlock(
             new Vector3s((short)player.Position.X, feetBlockY, (short)player.Position.Z));
@@ -505,6 +542,55 @@ public class GameServer
         var liquidBlock = DefaultWorld.GetBlock(
             new Vector3s((short)player.Position.X, liquidCheckY, (short)player.Position.Z));
         player.IsInLiquid = liquidBlock.Type is BlockType.Water or BlockType.WaterFlowing or BlockType.Lava or BlockType.LavaFlowing;
+
+        if (!player.IsFlying && player.Mode != GameMode.Creative && player.Mode != GameMode.Spectator)
+        {
+            if (!player.IsOnGround && !player.IsInLiquid)
+            {
+                player.AirTimeTicks++;
+            }
+            else
+            {
+                player.AirTimeTicks = 0;
+            }
+
+            var maxAirTicks = (int)(3.0 * TickRate);
+            if (player.AirTimeTicks > maxAirTicks)
+            {
+                player.Velocity = new Vector3(player.Velocity.X, -_physicsEngine.Gravity, player.Velocity.Z);
+            }
+        }
+
+        var playerBlockX = (short)Math.Floor(player.Position.X);
+        var playerBlockY = (short)Math.Floor(player.Position.Y);
+        var playerBlockZ = (short)Math.Floor(player.Position.Z);
+
+        var noclipBlock = DefaultWorld.GetBlock(new Vector3s(playerBlockX, playerBlockY, playerBlockZ));
+        if (noclipBlock.Type != BlockType.Air &&
+            noclipBlock.Type != BlockType.Water &&
+            noclipBlock.Type != BlockType.WaterFlowing &&
+            noclipBlock.Type != BlockType.Lava &&
+            noclipBlock.Type != BlockType.LavaFlowing &&
+            noclipBlock.Type != BlockType.Ladder)
+        {
+            var noclipDef = _blockDefinitionManager.Get(noclipBlock.ToUInt16());
+            if (noclipDef != null && noclipDef.Solid && !noclipDef.Transparent && noclipDef.Climbable != true)
+            {
+                if (!player.IsFlying && player.Mode != GameMode.Creative && player.Mode != GameMode.Spectator)
+                {
+                    player.Position = player.PreviousPosition;
+                    player.Velocity = Vector3.Zero;
+                    SendPositionCorrection(player);
+                }
+            }
+        }
+    }
+
+    private void SendPositionCorrection(PlayerEnt player)
+    {
+        if (_hubContext == null) return;
+        _ = _hubContext.Clients.Client(player.ConnectionId)
+            .OnPositionCorrection(player.Position.X, player.Position.Y, player.Position.Z);
     }
 
     public bool GiveItem(string playerName, string itemId, int count)
@@ -796,7 +882,7 @@ public class GameServer
 
     private static (string itemId, int count)[] GetMobDrops(string mobType) => mobType switch
     {
-        "Zombie" => new[] { ("iron_ingot", 1) },
+        "Zombie" => new[] { ("rotten_flesh", 1), ("iron_ingot", 1) },
         "Skeleton" => new[] { ("bone", 2), ("flint", 1) },
         "Spider" => new[] { ("string", 1) },
         "Cow" => new[] { ("leather", 1), ("raw_beef", 2) },

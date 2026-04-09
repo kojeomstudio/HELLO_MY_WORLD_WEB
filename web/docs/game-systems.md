@@ -138,6 +138,12 @@ Tool types and their block groups:
 - **Sword**: `snappy` blocks (leaves)
 - **Hoe**: `crumbly` blocks
 
+### Tool Repair
+- Damaged tools can be repaired by combining two tools of the same type and material in the crafting grid
+- Result: one tool with combined durability plus a 10% bonus
+- Repairable via standard crafting (no special UI required)
+- Both input tools are consumed in the process
+
 ### Weapon Damage (PunchPlayer)
 | Weapon | Damage |
 |--------|--------|
@@ -229,6 +235,8 @@ Calculated by `KnockbackSystem` based on attacker-to-target distance and damage 
 - Spawn interval: 10 seconds
 - Max mobs: 50
 - Despawn distance: 128 blocks from all players
+- Spawn height validation: mobs only spawn at valid Y ranges and on solid ground
+- Spawn surface check: avoids spawning inside blocks or on invalid surfaces
 - Hostile mobs attack nearby players (AI pathfinding)
 
 ## Day/Night Cycle
@@ -272,3 +280,20 @@ From `server_config.json` / `PhysicsEngine.cs`:
 - **Flying**: No gravity, 6-directional movement at 12.0 m/s
 - **Climbing** (ladder): Reduced speed (50%), vertical movement only
 - **Swimming** (liquid): Reduced speed (50%), reduced gravity (20%), upward with jump
+
+## Server Physics Validation
+
+The server validates all client movement to prevent cheating and desync:
+
+### Validation Checks
+- **Speed limit**: Client position change per tick cannot exceed max speed (walk: 5.0, sprint: 8.0, fly: 12.0 m/s)
+- **Teleportation detection**: Large position deltas beyond speed limits are rejected
+- **Collision boundaries**: Server checks the target position for solid block collisions
+- **Flying consistency**: Clients must have fly privilege to move without gravity
+- **Fall damage**: Server tracks fall distance independently for accurate damage calculation
+
+### Position Correction
+- When validation fails, server sends `OnPositionCorrection` with the last known valid position
+- Client interpolates to the corrected position to avoid visual snapping
+- Correction threshold: 0.5 blocks positional difference triggers correction
+- Rotation (yaw/pitch) is client-authoritative (not validated by server)

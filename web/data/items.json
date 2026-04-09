@@ -143,7 +143,8 @@
         "mutton_raw": { "name": "Raw Mutton", "type": "food", "stackable": true, "maxStack": 64, "nutrition": 2 },
         "mutton_cooked": { "name": "Cooked Mutton", "type": "food", "stackable": true, "maxStack": 64, "nutrition": 6 },
         "fish_raw": { "name": "Raw Fish", "type": "food", "stackable": true, "maxStack": 64, "nutrition": 2 },
-        "fish_cooked": { "name": "Cooked Fish", "type": "food", "stackable": true, "maxStack": 64, "nutrition": 5 }
+        "fish_cooked": { "name": "Cooked Fish", "type": "food", "stackable": true, "maxStack": 64, "nutrition": 5 },
+        "rotten_flesh": { "name": "Rotten Flesh", "type": "food", "stackable": true, "maxStack": 64, "nutrition": 2 }
     },
     "craftingRecipes": [
         { "result": "planks", "resultCount": 4, "ingredients": [["wood", 1]] },
@@ -257,7 +258,19 @@
         { "result": "redstone_lamp", "resultCount": 1, "ingredients": [["redstone_item", 4], ["glowstone_dust", 1]] },
         { "result": "rabbit_stew", "resultCount": 1, "ingredients": [["cooked_porkchop", 1], ["carrot", 1], ["baked_potato", 1], ["mushroom_brown", 1], ["bowl", 1]] },
         { "result": "beetroot_soup", "resultCount": 1, "ingredients": [["beetroot", 6], ["bowl", 1]] },
-        { "result": "nether_brick_item", "resultCount": 1, "ingredients": [["nether_brick", 1]] }
+        { "result": "nether_brick_item", "resultCount": 1, "ingredients": [["nether_brick", 1]] },
+        { "result": "wooden_pickaxe", "resultCount": 1, "ingredients": [["wooden_pickaxe", 2]] },
+        { "result": "stone_pickaxe", "resultCount": 1, "ingredients": [["stone_pickaxe", 2]] },
+        { "result": "iron_pickaxe", "resultCount": 1, "ingredients": [["iron_pickaxe", 2]] },
+        { "result": "diamond_pickaxe", "resultCount": 1, "ingredients": [["diamond_pickaxe", 2]] },
+        { "result": "steel_pickaxe", "resultCount": 1, "ingredients": [["steel_pickaxe", 2]] },
+        { "result": "wooden_sword", "resultCount": 1, "ingredients": [["wooden_sword", 2]] },
+        { "result": "stone_sword", "resultCount": 1, "ingredients": [["stone_sword", 2]] },
+        { "result": "iron_sword", "resultCount": 1, "ingredients": [["iron_sword", 2]] },
+        { "result": "diamond_sword", "resultCount": 1, "ingredients": [["diamond_sword", 2]] },
+        { "result": "steel_sword", "resultCount": 1, "ingredients": [["steel_sword", 2]] },
+        { "result": "steel_ingot", "resultCount": 1, "ingredients": [["iron_ingot", 1], ["coal", 1]] },
+        { "result": "desert_stone", "resultCount": 4, "ingredients": [["sandstone", 4]] }
     ],
     "foodValues": {
         "apple": { "nutrition": 4, "saturation": 2.4 },
@@ -283,7 +296,8 @@
         "mutton_raw": { "nutrition": 2, "saturation": 1.2 },
         "mutton_cooked": { "nutrition": 6, "saturation": 9.6 },
         "fish_raw": { "nutrition": 2, "saturation": 0.4 },
-        "fish_cooked": { "nutrition": 5, "saturation": 6.0 }
+        "fish_cooked": { "nutrition": 5, "saturation": 6.0 },
+        "rotten_flesh": { "nutrition": 2, "saturation": 1.2 }
     },
     "toolCapabilities": {
         "wooden": { "maxLevel": 1, "uses": 60, "speed": 2.0, "damageGroups": { "fleshy": 1 } },

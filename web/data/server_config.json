@@ -28,7 +28,7 @@
         "hotbarSize": 8,
         "fallDamageThreshold": 3.0,
         "fallDamageMultiplier": 1.0,
-        "startItems": ["wooden_pickaxe", "wooden_sword", "torch", "bread"]
+        "startItems": ["wooden_pickaxe", "wooden_sword", "wooden_axe", "wooden_shovel", "torch", "bread", "bucket"]
     },
     "physics": {
         "gravity": 20.0,

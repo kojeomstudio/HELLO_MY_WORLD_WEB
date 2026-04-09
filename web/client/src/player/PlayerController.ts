@@ -571,6 +571,11 @@ export class PlayerController {
         this._velocity.set(0, 0, 0);
     }
 
+    applyServerCorrection(x: number, y: number, z: number): void {
+        this._position.set(x, y, z);
+        this._velocity.set(0, 0, 0);
+    }
+
     setFlying(flying: boolean): void {
         this._isFlying = flying;
     }

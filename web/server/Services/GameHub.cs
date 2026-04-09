@@ -45,6 +45,7 @@ public interface IGameClient
     Task OnFallingBlock(int fromX, int fromY, int fromZ, int toX, int toY, int toZ, ushort blockType);
     Task OnArmorUpdate(object[] armorSlots);
     Task OnExperienceUpdate(int level, int totalExp);
+    Task OnPositionCorrection(float x, float y, float z);
 }
 
 public class GameHub : Hub<IGameClient>

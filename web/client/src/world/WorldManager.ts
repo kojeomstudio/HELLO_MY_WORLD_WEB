@@ -4,20 +4,33 @@ import { Renderer } from '../rendering/Renderer';
 import { ChunkMesh, TextureAtlas } from './ChunkMesh';
 import { BlockRegistry } from './BlockRegistry';
 
-const ATLAS_COLS = 8;
+const ATLAS_COLS = 16;
 const TILE_SIZE = 16;
 
 const TEXTURE_NAMES: string[] = [
-    'default_stone', 'default_dirt', 'default_grass', 'default_water',
-    'default_sand', 'default_tree', 'default_leaves', 'default_snow',
-    'default_snow_side', 'default_ice', 'default_lava', 'default_lava_flowing',
+    'default_stone', 'default_dirt', 'default_grass', 'default_grass_top', 'default_grass_side',
+    'default_water', 'default_sand', 'default_tree', 'default_tree_top', 'default_leaves',
+    'default_snow', 'default_snow_side', 'default_ice', 'default_lava', 'default_lava_flowing',
     'default_water_flowing', 'default_cobble', 'default_gravel', 'default_mossycobble',
-    'default_desert_sand', 'default_desert_stone', 'default_tree_top',
-    'default_pine_tree', 'default_pine_tree_top', 'default_pine_needles',
+    'default_desert_sand', 'default_desert_stone', 'default_junglegrass',
     'default_jungletree', 'default_jungletree_top', 'default_jungleleaves',
-    'default_junglegrass', 'default_river_water', 'default_river_water_flowing',
-    'default_apple', 'basenodes_snow_sheet', 'basenodes_dirt_with_snow',
-    'basenodes_dirt_with_snow_bottom', 'basenodes_dirt_with_grass_bottom'
+    'default_pine_tree', 'default_pine_tree_top', 'default_pine_needles',
+    'default_river_water', 'default_river_water_flowing', 'default_apple',
+    'default_planks', 'default_brick', 'default_bookshelf', 'default_glass',
+    'default_obsidian', 'default_clay', 'default_sandstone',
+    'default_cactus', 'default_pumpkin', 'default_pumpkin_top', 'default_melon', 'default_melon_top',
+    'default_sugar_cane', 'default_fence', 'default_ladder', 'default_door_wood',
+    'default_chest', 'default_chest_top', 'default_crafting_table_top',
+    'default_furnace', 'default_furnace_front', 'default_torch',
+    'default_farmland', 'default_hay', 'default_wheat',
+    'default_iron_ore', 'default_coal_ore', 'default_gold_ore', 'default_diamond_ore',
+    'default_iron_block', 'default_gold_block', 'default_diamond_block',
+    'default_stone_brick', 'default_bedrock', 'default_burning_obsidian',
+    'default_mycelium_top', 'basenodes_snow_sheet',
+    'default_wool_white', 'default_wool_red', 'default_wool_blue', 'default_wool_green',
+    'default_wool_orange', 'default_wool_yellow', 'default_wool_cyan', 'default_wool_purple',
+    'default_wool_black', 'default_wool_brown', 'default_wool_pink', 'default_wool_lime',
+    'default_wool_light_blue', 'default_wool_magenta', 'default_wool_gray', 'default_wool_light_gray'
 ];
 
 const FALL_GRAVITY = 20.0;
@@ -438,14 +451,32 @@ export class WorldManager {
     }
 
     spawnEntity(entityId: string, entityType: string, x: number, y: number, z: number): void {
-        const geometry = entityType === 'Item'
-            ? new THREE.BoxGeometry(0.3, 0.3, 0.3)
-            : new THREE.BoxGeometry(0.8, 1.6, 0.8);
+        let geometry: THREE.BufferGeometry;
+        let color: number;
+        let yOffset = 0;
 
-        const color = entityType === 'Item' ? 0xFFAA00 : 0xFF4444;
+        if (entityType === 'Item') {
+            geometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+            color = 0xFFAA00;
+        } else {
+            const mobConfig: Record<string, { color: number; width: number; height: number; yOffset: number }> = {
+                'Zombie': { color: 0x448844, width: 0.6, height: 1.8, yOffset: 0.9 },
+                'Skeleton': { color: 0xCCCCCC, width: 0.5, height: 1.8, yOffset: 0.9 },
+                'Spider': { color: 0x443344, width: 1.0, height: 0.5, yOffset: 0.25 },
+                'Cow': { color: 0x886644, width: 0.8, height: 1.2, yOffset: 0.6 },
+                'Pig': { color: 0xFFAAAA, width: 0.7, height: 0.8, yOffset: 0.4 },
+                'Chicken': { color: 0xFFFFFF, width: 0.4, height: 0.6, yOffset: 0.3 }
+            };
+
+            const config = mobConfig[entityType] || { color: 0xFF4444, width: 0.8, height: 1.6, yOffset: 0.8 };
+            geometry = new THREE.BoxGeometry(config.width, config.height, config.width);
+            color = config.color;
+            yOffset = config.yOffset;
+        }
+
         const material = new THREE.MeshLambertMaterial({ color });
         const mesh = new THREE.Mesh(geometry, material);
-        mesh.position.set(x, y, z);
+        mesh.position.set(x, y + yOffset, z);
         mesh.userData.entityId = entityId;
         this.renderer.addToScene(mesh);
         this.entityMeshes.set(entityId, mesh);
@@ -514,9 +545,11 @@ export class WorldManager {
     }
 
     update(dt: number): void {
-        for (const mesh of this.entityMeshes.values()) {
+        for (const [entityId, mesh] of this.entityMeshes) {
             mesh.position.y += Math.sin(Date.now() * 0.003) * 0.002;
-            mesh.rotation.y += dt;
+            if (entityId.startsWith('mob_')) {
+                mesh.rotation.y += dt * 0.5;
+            }
         }
 
         for (let i = this.fallingBlocks.length - 1; i >= 0; i--) {

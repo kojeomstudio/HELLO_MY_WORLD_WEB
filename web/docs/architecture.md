@@ -94,9 +94,9 @@ See [server-api.md](server-api.md) for full method/event signatures.
 
 **EntityManager** (`Entities/EntityManager.cs`) — Tracks all entities:
 - `ItemEntity`: Dropped items with position, lifetime, magnet range
-- `MobEntity`: Hostile (Zombie, Skeleton, Spider) and passive (Cow, Pig, Chicken) mobs with AI pathfinding and attack
+- `MobEntity`: Hostile (Zombie, Skeleton, Spider) and passive (Cow, Pig, Chicken) mobs with AI pathfinding, attack, and mob-specific render properties (color, size)
 
-**MobSpawner** (`Entities/MobSpawner.cs`) — Spawns mobs every 10s (max 50), weighted random selection, despawns distant mobs (>128 blocks).
+**MobSpawner** (`Entities/MobSpawner.cs`) — Spawns mobs every 10s (max 50), weighted random selection with spawn height validation, despawns distant mobs (>128 blocks).
 
 ### Crafting & Smelting
 
@@ -112,7 +112,7 @@ See [server-api.md](server-api.md) for full method/event signatures.
 - **ChatCommandManager** (`Chat/ChatCommandManager.cs`) — Commands: /time, /gamemode, /tp, /give, /kill, /clear, /kick, /ban, /spawn, /privs
 - **PrivilegeSystem** (`Auth/PrivilegeSystem.cs`) — Permission management (interact, shout, fly, etc.)
 - **AuthenticationService** (`Auth/AuthenticationService.cs`) — Name validation, ban checks, server capacity
-- **PhysicsEngine** (`Physics/PhysicsEngine.cs`) — Server-side movement validation
+- **PhysicsEngine** (`Physics/PhysicsEngine.cs`) — Server-authoritative movement validation with position correction
 - **KnockbackSystem** (`Physics/KnockbackSystem.cs`) — Damage knockback calculation
 
 ## Client Architecture
@@ -131,6 +131,7 @@ Creates `UIManager`, then `GameClient`, connects to server.
 - Pointer lock camera with yaw/pitch
 - WASD movement, space jump, shift sneak, ctrl sprint
 - Client-side physics: gravity (20 m/s^2), collision detection, stepping
+- Server-authoritative position correction: server validates movement and sends corrected positions when client deviates
 - Block raycasting (DDA algorithm) for dig/place targeting
 - Dig timing with server-confirmed duration
 - Flying mode toggle (double-space)
@@ -148,7 +149,8 @@ Creates `UIManager`, then `GameClient`, connects to server.
 - Ambient occlusion per vertex (configurable)
 - Light interpolation from 4 neighbor light values
 - Vegetation wind animation (leaves, pine needles, sugar cane)
-- Texture atlas UV mapping support
+- Texture atlas UV mapping (89 textures from Minetest DevTest, packed into atlas)
+- Animated textures for water and lava (frame cycling)
 
 ### Renderer (`rendering/Renderer.ts`) — Three.js scene management
 - Scene, camera, WebGL renderer
@@ -175,7 +177,7 @@ Creates `UIManager`, then `GameClient`, connects to server.
 - **ParticleSystem** (`world/ParticleSystem.ts`) — Block break/place/damage particles
 - **WieldItem** (`rendering/WieldItem.ts`) — First-person held item display
 - **SelectionBox** (`rendering/SelectionBox.ts`) — Block targeting highlight
-- **BlockRegistry** (`world/BlockRegistry.ts`) — Block definitions loaded from server
+- **BlockRegistry** (`world/BlockRegistry.ts`) — Block definitions loaded from server, maps block types to texture atlas regions (101 block types with textures)
 - **SettingsPanel** (`ui/SettingsPanel.ts`) — Settings UI with persistence
 
 ## World System
@@ -200,7 +202,7 @@ Each block has:
 - Greedy meshing: adjacent same-color faces merged (implied by vertex count optimization)
 - Ambient occlusion: 3-level AO per vertex using neighbor solid checks
 - Light interpolation: samples 4 neighbor light values per face vertex
-- Texture atlas: optional UV mapping for block textures
+- Texture atlas: UV mapping into packed atlas (89 Minetest DevTest textures)
 - Vegetation animation: top-face vertices displaced by sine wave
 
 ### Liquid Flow
@@ -311,11 +313,29 @@ Client                          Server
 All configuration loaded from `web/data/server_config.json`:
 - Server: max players (100), tick rate (20), port (5000)
 - World: generator type, chunk size (16), render distance (4), seed, tree/cave/ore generation
-- Player: health (20), breath (10), inventory size (32), hotbar size (8), fall damage
+- Player: health (20), breath (10), inventory size (32), hotbar size (8), fall damage, start items
 - Physics: gravity, jump force, speeds, terminal velocity
 - Day/night: cycle length, phase start times
 - Network: protocol version, broadcast intervals
 - Liquid: flow intervals
+
+## Texture System
+
+- **Texture atlas**: All block textures packed into a single atlas texture (89 textures from Minetest DevTest)
+- **Runtime loading**: Atlas generated at startup from individual texture images
+- **UV mapping**: Each block face maps to its region in the atlas via normalized UV coordinates
+- **Animated textures**: Water and lava cycle through texture frames for flow animation
+- **Block-face mapping**: 101 block types each have tile references for top, bottom, and side faces
+
+## Server Physics Validation
+
+The server performs authoritative movement validation to prevent cheating:
+
+1. Client sends position updates via `UpdatePosition` hub method
+2. Server's `PhysicsEngine` validates the move is physically possible (speed checks, collision checks)
+3. If the client position deviates beyond a threshold, the server sends a corrected position via `OnPositionCorrection`
+4. Client snaps to the corrected position seamlessly
+5. Validation checks: max speed, teleportation detection, flying mode consistency, collision boundaries
 
 ## Dependency Injection
 

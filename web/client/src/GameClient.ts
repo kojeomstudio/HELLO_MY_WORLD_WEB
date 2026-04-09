@@ -192,6 +192,12 @@ export class GameClient {
             this.playerController.setPosition(x, y, z);
         });
 
+        this.connection.on('OnPositionCorrection', (x: number, y: number, z: number) => {
+            if (this.playerController) {
+                this.playerController.applyServerCorrection(x, y, z);
+            }
+        });
+
         this.connection.on('OnCraftingRecipes', (recipes: any[]) => {
             this.uiManager.populateCraftingRecipes(recipes);
         });
