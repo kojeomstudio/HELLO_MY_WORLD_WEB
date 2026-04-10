@@ -42,7 +42,7 @@ web/server/
       KnockbackSystem.cs        Knockback calculation
     Auth/
       AuthenticationService.cs Name/IP validation, ban check
-      PrivilegeSystem.cs       15 built-in privileges
+       PrivilegeSystem.cs       19 privileges loaded from JSON
     Chat/
       ChatCommandManager.cs     6 commands (help, time, tps, gm, tp, give)
     Crafting/
@@ -79,7 +79,7 @@ All services registered as **Singletons** in `Program.cs`:
 
 ## Startup Sequence
 
-1. Load configs: `ServerConfig`, `BlockDefinitionManager`, `SmeltingSystem`, `PrivilegeSystem`
+1. Load configs: `ServerConfig` (including `physics_constants.json`), `BlockDefinitionManager`, `SmeltingSystem`, `PrivilegeSystem` (from `privileges.json`)
 2. Register ABMs (sand_falling, gravel_falling)
 3. Create SQLite databases in `data/worlds/default/`
 4. Create `GameServer` (creates World with generator)
@@ -156,9 +156,9 @@ Static lighting with 4-bit packing:
 Procedural terrain generation:
 - **Perlin noise** with 512-entry permutation table
 - **Terrain:** Base Y=32, Height=20, WaterLevel=28
-- **Biomes:** Sandy (desert) when noise > 0.3
+- **Biomes:** 4 biomes (grassland, desert, snow, ocean) selected by heat/humidity noise, loaded from `biomes.json`
 - **Caves:** Dual-noise worm (`c1^2 + c2^2 < 0.015`), caverns below Y=20
-- **Ores:** Diamond (Y<16), Gold (Y<32), Iron (Y<48), Coal (Y<64)
+- **Ores:** 9 types — Diamond (Y<16), Gold (Y<32), Iron (Y<48), Coal (Y<64), Redstone (Y<16), Emerald (Y<32), Lapis (Y<32), Copper (Y<48)
 - **Trees:** Oak, Pine, Birch (noise threshold > 0.35)
 - **Dungeons:** Below Y=30, 3-6 size rooms, mossy_cobblestone walls
 

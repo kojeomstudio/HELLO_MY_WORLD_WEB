@@ -21,6 +21,11 @@ export interface BlockDefinition {
     postEffectColor?: string;
     groups?: Record<string, number>;
     soundGroup?: string;
+    liquidRange?: number;
+    liquidViscosity?: number;
+    liquidRenewable?: boolean;
+    level?: number;
+    maxLevel?: number;
 }
 
 export class BlockRegistry {
@@ -133,7 +138,67 @@ export class BlockRegistry {
             { id: 97, name: 'purpur_pillar', solid: true, transparent: false, color: '#8B5CBF', hardness: 1.5, groups: { cracky: 2 }, soundGroup: 'stone' },
             { id: 98, name: 'mycelium', solid: true, transparent: false, color: '#6B5A8A', hardness: 0.6, drops: 'dirt', groups: { crumbly: 3 }, soundGroup: 'dirt', textureName: 'default_mycelium_top' },
             { id: 99, name: 'podzol', solid: true, transparent: false, color: '#5C4827', hardness: 0.5, drops: 'dirt', groups: { crumbly: 3 }, soundGroup: 'dirt' },
-            { id: 100, name: 'coarse_dirt', solid: true, transparent: false, color: '#6B5C48', hardness: 0.5, groups: { crumbly: 3 }, soundGroup: 'dirt' }
+            { id: 100, name: 'coarse_dirt', solid: true, transparent: false, color: '#6B5C48', hardness: 0.5, groups: { crumbly: 3 }, soundGroup: 'dirt' },
+            { id: 101, name: 'desert_sand', solid: true, transparent: false, color: '#E8D5A3', hardness: 0.5, falling: true, textureName: 'default_sand', groups: { crumbly: 3 }, soundGroup: 'sand' },
+            { id: 102, name: 'river_water_flowing', solid: false, transparent: true, color: '#3060C0', liquid: true, drowning: true, liquidRange: 7, liquidViscosity: 1, liquidRenewable: true, level: 7, maxLevel: 8, textureName: 'default_river_water', soundGroup: 'water' },
+            { id: 103, name: 'desert_stone_slab', solid: true, transparent: false, color: '#A0926B', hardness: 1.5, textureName: 'default_desert_stone', groups: { cracky: 3 }, soundGroup: 'stone' },
+            { id: 104, name: 'jungle_wood_slab', solid: true, transparent: false, color: '#6B5030', hardness: 2.0, textureName: 'default_jungletree', groups: { choppy: 3 }, soundGroup: 'wood' },
+            { id: 105, name: 'pine_wood_slab', solid: true, transparent: false, color: '#5C3D1E', hardness: 2.0, textureName: 'default_pine_tree', groups: { choppy: 3 }, soundGroup: 'wood' },
+            { id: 106, name: 'coal_block', solid: true, transparent: false, color: '#2F2F2F', hardness: 5.0, groups: { cracky: 2 }, soundGroup: 'stone' },
+            { id: 107, name: 'lapis_block', solid: true, transparent: false, color: '#1A3A8A', hardness: 5.0, groups: { cracky: 2 }, soundGroup: 'stone' },
+            { id: 108, name: 'emerald_block', solid: true, transparent: false, color: '#1A8A3A', hardness: 5.0, groups: { cracky: 2 }, soundGroup: 'stone' },
+            { id: 109, name: 'redstone_block', solid: true, transparent: false, color: '#AA0000', hardness: 5.0, groups: { cracky: 2 }, soundGroup: 'stone' },
+            { id: 110, name: 'brick_stairs', solid: true, transparent: false, color: '#B22222', hardness: 2.0, textureName: 'default_brick', groups: { cracky: 2 }, soundGroup: 'stone' },
+            { id: 111, name: 'sandstone_stairs', solid: true, transparent: false, color: '#E8D5A3', hardness: 0.8, textureName: 'default_sandstone', groups: { cracky: 3 }, soundGroup: 'sand' },
+            { id: 112, name: 'wood_stairs', solid: true, transparent: false, color: '#BC8F5A', hardness: 2.0, textureName: 'default_planks', groups: { choppy: 2 }, soundGroup: 'wood' },
+            { id: 113, name: 'cobblestone_stairs', solid: true, transparent: false, color: '#6B6B6B', hardness: 2.0, textureName: 'default_cobble', groups: { cracky: 3 }, soundGroup: 'stone' },
+            { id: 114, name: 'desert_stone_stairs', solid: true, transparent: false, color: '#A0926B', hardness: 1.5, textureName: 'default_desert_stone', groups: { cracky: 3 }, soundGroup: 'stone' },
+            { id: 115, name: 'nether_brick_stairs', solid: true, transparent: false, color: '#2A1A1A', hardness: 2.0, groups: { cracky: 2 }, soundGroup: 'stone' },
+            { id: 116, name: 'pumpkin_block', solid: true, transparent: false, color: '#FF8C00', hardness: 1.0, textureName: 'default_pumpkin_top', groups: { choppy: 2 }, soundGroup: 'wood' },
+            { id: 117, name: 'jack_o_lantern', solid: true, transparent: false, color: '#FF8C00', hardness: 1.0, light: 15, textureName: 'default_pumpkin', groups: { choppy: 2 }, soundGroup: 'wood' },
+            { id: 118, name: 'cactus_block', solid: true, transparent: false, color: '#0A5C0A', hardness: 0.4, damage: 1, textureName: 'default_cactus', groups: { choppy: 2 }, soundGroup: 'wood' },
+            { id: 119, name: 'sugar_cane_block', solid: false, transparent: true, color: '#90EE90', hardness: 0.2, textureName: 'default_sugar_cane', groups: { dig_immediate: 3 }, soundGroup: 'grass' },
+            { id: 120, name: 'dead_bush', solid: false, transparent: true, color: '#8B7355', hardness: 0, groups: { dig_immediate: 3 }, soundGroup: 'grass' },
+            { id: 121, name: 'tall_grass', solid: false, transparent: true, color: '#4A8C3A', hardness: 0, groups: { dig_immediate: 3 }, soundGroup: 'grass' },
+            { id: 122, name: 'flower_red', solid: false, transparent: true, color: '#FF3333', hardness: 0, groups: { dig_immediate: 3, flower: 1 }, soundGroup: 'grass' },
+            { id: 123, name: 'flower_yellow', solid: false, transparent: true, color: '#FFFF33', hardness: 0, groups: { dig_immediate: 3, flower: 1 }, soundGroup: 'grass' },
+            { id: 124, name: 'flower_rose', solid: false, transparent: true, color: '#CC0000', hardness: 0, groups: { dig_immediate: 3, flower: 1 }, soundGroup: 'grass' },
+            { id: 125, name: 'flower_tulip', solid: false, transparent: true, color: '#FF6699', hardness: 0, groups: { dig_immediate: 3, flower: 1 }, soundGroup: 'grass' },
+            { id: 126, name: 'mushroom_red_block', solid: false, transparent: true, color: '#CC2222', hardness: 0, groups: { dig_immediate: 3 }, soundGroup: 'grass' },
+            { id: 127, name: 'mushroom_brown_block', solid: false, transparent: true, color: '#8B6B4A', hardness: 0, groups: { dig_immediate: 3 }, soundGroup: 'grass' },
+            { id: 128, name: 'gold_ore', solid: true, transparent: false, color: '#FFD700', hardness: 3.0, textureName: 'default_gold_ore', groups: { cracky: 3 }, soundGroup: 'stone' },
+            { id: 129, name: 'lapis_ore', solid: true, transparent: false, color: '#1A3A8A', hardness: 3.0, groups: { cracky: 3 }, soundGroup: 'stone' },
+            { id: 130, name: 'emerald_ore', solid: true, transparent: false, color: '#1A8A3A', hardness: 3.0, groups: { cracky: 3 }, soundGroup: 'stone' },
+            { id: 131, name: 'redstone_ore', solid: true, transparent: false, color: '#AA0000', hardness: 3.0, groups: { cracky: 3 }, soundGroup: 'stone' },
+            { id: 132, name: 'copper_ore', solid: true, transparent: false, color: '#B87333', hardness: 3.0, groups: { cracky: 3 }, soundGroup: 'stone' },
+            { id: 133, name: 'copper_block', solid: true, transparent: false, color: '#B87333', hardness: 5.0, groups: { cracky: 2 }, soundGroup: 'metal' },
+            { id: 134, name: 'raw_copper_block', solid: true, transparent: false, color: '#C4895A', hardness: 3.0, groups: { cracky: 2 }, soundGroup: 'stone' },
+            { id: 135, name: 'tuff', solid: true, transparent: false, color: '#6B6B6B', hardness: 1.5, groups: { cracky: 2 }, soundGroup: 'stone' },
+            { id: 136, name: 'dripstone', solid: true, transparent: false, color: '#8B7D6B', hardness: 1.5, groups: { cracky: 3 }, soundGroup: 'stone' },
+            { id: 137, name: 'calcite', solid: true, transparent: false, color: '#D4CDC4', hardness: 0.75, groups: { cracky: 3 }, soundGroup: 'stone' },
+            { id: 138, name: 'deepslate', solid: true, transparent: false, color: '#4A4A4A', hardness: 3.0, groups: { cracky: 3 }, soundGroup: 'stone' },
+            { id: 139, name: 'cobweb', solid: false, transparent: true, color: '#DDDDDD', hardness: 0.4, groups: { snappy: 2 }, soundGroup: 'cloth' },
+            { id: 140, name: 'fire', solid: false, transparent: true, color: '#FF6600', damage: 1, light: 15, groups: { dig_immediate: 3 }, soundGroup: 'default' },
+            { id: 141, name: 'soul_torch', solid: false, transparent: true, color: '#6699FF', light: 10, groups: { dig_immediate: 3 }, soundGroup: 'default' },
+            { id: 142, name: 'lantern', solid: true, transparent: true, color: '#FFCC66', hardness: 3.5, light: 15, groups: { cracky: 3 }, soundGroup: 'metal' },
+            { id: 143, name: 'campfire', solid: true, transparent: true, color: '#8B4513', hardness: 2.0, light: 15, damage: 1, interactive: true, groups: { cracky: 2 }, soundGroup: 'wood' },
+            { id: 144, name: 'soul_campfire', solid: true, transparent: true, color: '#4169E1', hardness: 2.0, light: 10, damage: 2, interactive: true, groups: { cracky: 2 }, soundGroup: 'wood' },
+            { id: 145, name: 'blast_furnace', solid: true, transparent: false, color: '#4A4A4A', interactive: true, hardness: 3.5, groups: { cracky: 2 }, soundGroup: 'stone' },
+            { id: 146, name: 'smoker', solid: true, transparent: false, color: '#696969', interactive: true, hardness: 3.5, groups: { cracky: 2 }, soundGroup: 'stone' },
+            { id: 147, name: 'barrel', solid: true, transparent: false, color: '#8B6914', interactive: true, hardness: 2.5, groups: { choppy: 2 }, soundGroup: 'wood' },
+            { id: 148, name: 'loom', solid: true, transparent: false, color: '#BC8F5A', interactive: true, hardness: 2.5, groups: { choppy: 2 }, soundGroup: 'wood' },
+            { id: 149, name: 'cartography_table', solid: true, transparent: false, color: '#BC8F5A', interactive: true, hardness: 2.5, groups: { choppy: 2 }, soundGroup: 'wood' },
+            { id: 150, name: 'fletching_table', solid: true, transparent: false, color: '#BC8F5A', interactive: true, hardness: 2.5, groups: { choppy: 2 }, soundGroup: 'wood' },
+            { id: 151, name: 'smithing_table', solid: true, transparent: false, color: '#696969', interactive: true, hardness: 2.5, groups: { cracky: 2 }, soundGroup: 'stone' },
+            { id: 152, name: 'grindstone', solid: true, transparent: false, color: '#808080', interactive: true, hardness: 2.0, groups: { cracky: 2 }, soundGroup: 'stone' },
+            { id: 153, name: 'stonecutter', solid: true, transparent: false, color: '#696969', interactive: true, hardness: 3.5, groups: { cracky: 2 }, soundGroup: 'stone' },
+            { id: 154, name: 'bell', solid: true, transparent: true, color: '#DAA520', hardness: 5.0, groups: { cracky: 2 }, soundGroup: 'metal' },
+            { id: 155, name: 'iron_bars', solid: true, transparent: true, color: '#C0C0C0', hardness: 5.0, groups: { cracky: 2 }, soundGroup: 'metal' },
+            { id: 156, name: 'chain', solid: false, transparent: true, color: '#808080', hardness: 5.0, groups: { cracky: 2 }, soundGroup: 'metal' },
+            { id: 157, name: 'note_block', solid: true, transparent: false, color: '#8B4513', interactive: true, hardness: 2.0, groups: { choppy: 2 }, soundGroup: 'wood' },
+            { id: 158, name: 'jukebox', solid: true, transparent: false, color: '#8B4513', interactive: true, hardness: 2.0, groups: { choppy: 2 }, soundGroup: 'wood' },
+            { id: 159, name: 'target_block', solid: true, transparent: false, color: '#FFEEEE', hardness: 0.5, groups: { cracky: 3 }, soundGroup: 'cloth' },
+            { id: 160, name: 'pointed_dripstone', solid: true, transparent: false, color: '#8B7D6B', hardness: 1.5, groups: { cracky: 3 }, soundGroup: 'stone' }
         ];
 
         for (const block of defaultBlocks) {

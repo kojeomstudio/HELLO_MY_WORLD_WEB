@@ -68,6 +68,33 @@ public class PhysicsSettings
     public float Drag { get; set; } = 0.1f;
     public float LiquidDrag { get; set; } = 0.8f;
     public float ClimbSpeed { get; set; } = 2.0f;
+
+    public void LoadFromFile(string dataPath)
+    {
+        var filePath = Path.Combine(dataPath, "physics_constants.json");
+        if (!File.Exists(filePath)) return;
+
+        var json = File.ReadAllText(filePath);
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+
+        if (root.TryGetProperty("gravity", out var gravity))
+            Gravity = (float)gravity.GetDouble();
+        if (root.TryGetProperty("jumpForce", out var jumpForce))
+            JumpForce = (float)jumpForce.GetDouble();
+        if (root.TryGetProperty("walkSpeed", out var walkSpeed))
+            WalkSpeed = (float)walkSpeed.GetDouble();
+        if (root.TryGetProperty("sprintSpeed", out var sprintSpeed))
+            SprintSpeed = (float)sprintSpeed.GetDouble();
+        if (root.TryGetProperty("flySpeed", out var flySpeed))
+            FlySpeed = (float)flySpeed.GetDouble();
+        if (root.TryGetProperty("terminalVelocity", out var terminalVelocity))
+            TerminalVelocity = (float)terminalVelocity.GetDouble();
+        if (root.TryGetProperty("liquidDrag", out var liquidDrag))
+            LiquidDrag = (float)liquidDrag.GetDouble();
+        if (root.TryGetProperty("climbSpeed", out var climbSpeed))
+            ClimbSpeed = (float)climbSpeed.GetDouble();
+    }
 }
 
 public class DayNightSettings

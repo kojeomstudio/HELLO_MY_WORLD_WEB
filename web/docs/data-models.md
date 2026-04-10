@@ -33,6 +33,8 @@
 | 26 | Cobblestone | Solid |
 | 27 | Stone Brick | Solid |
 | 28-63 | Wool variants, ores, plants, etc. | Various |
+| 64-100 | Crops, mossy_cobblestone, storage blocks, wool colors, etc. | Various |
+| 101-160 | DesertSand, RiverWater, ore variants (gold/lapis/emerald/redstone/copper), storage blocks, stairs/slabs, decorative blocks, flowers, mushrooms, utility blocks, light sources, fire, cobweb | Various |
 
 ## Player States
 
@@ -460,7 +462,7 @@ interface ServerConfig {
 }
 ```
 
-### blocks.json
+### blocks.json (161 definitions, IDs 0-160)
 ```typescript
 interface BlockDefinition {
     name: string;
@@ -493,7 +495,7 @@ interface BlockDefinition {
 }
 ```
 
-### items.json
+### items.json (210+ items, 125+ crafting recipes)
 ```typescript
 interface ItemDefinition {
     name: string;
@@ -526,7 +528,41 @@ interface SmeltingRecipeFile {
 }
 ```
 
-### privileges.json
+### physics_constants.json
+Physics constants loaded by `ServerConfig` at startup:
+```typescript
+interface PhysicsConstants {
+    gravity: number;
+    jumpForce: number;
+    walkSpeed: number;
+    sprintSpeed: number;
+    flySpeed: number;
+    climbSpeed: number;
+    terminalVelocity: number;
+    drag: number;
+    liquidDrag: number;
+    fallDamageThreshold: number;
+    fallDamageMultiplier: number;
+}
+```
+
+### biomes.json
+Biome definitions loaded by `NoiseWorldGenerator` for heat/humidity-based biome selection:
+```typescript
+interface BiomesFile {
+    biomes: {
+        name: string;
+        heatMin: number;
+        heatMax: number;
+        humidityMin: number;
+        humidityMax: number;
+        surfaceBlock: string;
+        treeTypes: string[];
+    }[];
+}
+```
+
+### privileges.json (19 privileges, fully loaded at startup)
 ```typescript
 interface PrivilegesFile {
     privileges: Record<string, {

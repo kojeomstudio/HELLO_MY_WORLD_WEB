@@ -1,3 +1,4 @@
+using System.Text.Json;
 using WebGameServer.Core.World;
 
 namespace WebGameServer.Core.World.Generators;
@@ -9,11 +10,23 @@ public class NoiseWorldGenerator : IWorldGenerator
     private int[] _permutationTable = new int[512];
     private bool _generateTrees = true;
 
+    private readonly List<BiomeDefinition> _biomes = new();
+    private BiomeNoiseConfig? _biomeNoiseConfig;
+
     private const int GroundBase = 32;
     private const int TerrainHeight = 20;
     private const int WaterLevel = 28;
     private const int CaveThreshold = 45;
     private const int TreeMinHeight = 5;
+
+    private record BiomeDefinition(
+        string Name, int YMin, int YMax, float HeatPoint, float HumidityPoint,
+        string TopBlock, string FillerBlock, int FillerDepth,
+        string StoneBlock, string WaterBlock);
+
+    private record BiomeNoiseConfig(
+        float HeatOffset, float HeatScale, float[] HeatSpread,
+        float HumidityOffset, float HumidityScale, float[] HumiditySpread);
 
     public void ConfigureTrees(bool generateTrees)
     {
@@ -36,6 +49,47 @@ public class NoiseWorldGenerator : IWorldGenerator
         for (int i = 0; i < 512; i++)
         {
             _permutationTable[i] = perm[i & 255];
+        }
+    }
+
+    public void LoadBiomes(string dataPath)
+    {
+        var biomesPath = Path.Combine(dataPath, "biomes.json");
+        if (!File.Exists(biomesPath)) return;
+
+        var json = File.ReadAllText(biomesPath);
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+
+        if (root.TryGetProperty("biomes", out var biomesEl))
+        {
+            foreach (var biome in biomesEl.EnumerateArray())
+            {
+                _biomes.Add(new BiomeDefinition(
+                    biome.GetProperty("name").GetString() ?? "",
+                    biome.GetProperty("yMin").GetInt32(),
+                    biome.GetProperty("yMax").GetInt32(),
+                    (float)biome.GetProperty("heatPoint").GetDouble(),
+                    (float)biome.GetProperty("humidityPoint").GetDouble(),
+                    biome.GetProperty("topBlock").GetString() ?? "grass",
+                    biome.GetProperty("fillerBlock").GetString() ?? "dirt",
+                    biome.GetProperty("fillerDepth").GetInt32(),
+                    biome.GetProperty("stoneBlock").GetString() ?? "stone",
+                    biome.GetProperty("waterBlock").GetString() ?? "water"
+                ));
+            }
+        }
+
+        if (root.TryGetProperty("noise", out var noiseEl))
+        {
+            _biomeNoiseConfig = new BiomeNoiseConfig(
+                (float)noiseEl.GetProperty("heatOffset").GetDouble(),
+                (float)noiseEl.GetProperty("heatScale").GetDouble(),
+                noiseEl.GetProperty("heatSpread").EnumerateArray().Select(e => (float)e.GetDouble()).ToArray(),
+                (float)noiseEl.GetProperty("humidityOffset").GetDouble(),
+                (float)noiseEl.GetProperty("humidityScale").GetDouble(),
+                noiseEl.GetProperty("humiditySpread").EnumerateArray().Select(e => (float)e.GetDouble()).ToArray()
+            );
         }
     }
 
@@ -101,8 +155,8 @@ public class NoiseWorldGenerator : IWorldGenerator
                     continue;
                 }
 
-                var biomeNoise = PerlinNoise2D(worldX * 0.005f + 1000, worldZ * 0.005f + 1000);
-                if (biomeNoise > 0.3f)
+                var biome = GetBiomeAt(worldX, surfaceHeight, worldZ, surfaceHeight);
+                if (biome.Name is "desert" or "grassland_ocean")
                 {
                     continue;
                 }
@@ -309,26 +363,23 @@ public class NoiseWorldGenerator : IWorldGenerator
         var detailNoise = PerlinNoise2D(x * 0.05f, z * 0.05f) * 0.3f;
         var height = GroundBase + (int)((noise2D + detailNoise) * TerrainHeight);
 
-        var biomeNoise = PerlinNoise2D(x * 0.005f + 1000, z * 0.005f + 1000);
-        bool isSandyBiome = biomeNoise > 0.3f;
-
         if (y > height)
         {
             if (y <= WaterLevel) return (ushort)BlockType.Water;
             return (ushort)BlockType.Air;
         }
 
+        var biome = GetBiomeAt(x, y, z, surfaceHeight);
+
         if (y == height)
         {
-            if (isSandyBiome) return (ushort)BlockType.Sand;
-            if (height <= WaterLevel) return (ushort)BlockType.Sand;
-            return (ushort)BlockType.Grass;
+            if (height <= WaterLevel && biome.TopBlock == "grass") return (ushort)BlockType.Sand;
+            return GetBlockTypeByName(biome.TopBlock);
         }
 
-        if (y > height - 4)
+        if (y > height - biome.FillerDepth)
         {
-            if (isSandyBiome) return (ushort)BlockType.Sand;
-            return (ushort)BlockType.Dirt;
+            return GetBlockTypeByName(biome.FillerBlock);
         }
 
         if (y > 1)
@@ -340,6 +391,11 @@ public class NoiseWorldGenerator : IWorldGenerator
             if (y < 32 && oreNoise > 0.8f) return (ushort)BlockType.OreGold;
             if (y < 48 && oreNoise > 0.75f) return (ushort)BlockType.OreIron;
             if (y < 64 && PerlinNoise3D(x * 0.15f, y * 0.15f, z * 0.15f) > 0.82f) return (ushort)BlockType.Coal;
+            if (y < 48 && PerlinNoise3D(x * 0.12f + 6000, y * 0.12f, z * 0.12f + 6000) > 0.85f) return (ushort)BlockType.GoldOre;
+            if (y < 32 && PerlinNoise3D(x * 0.11f + 7000, y * 0.11f, z * 0.11f + 7000) > 0.87f) return (ushort)BlockType.RedstoneOre;
+            if (y < 16 && PerlinNoise3D(x * 0.13f + 8000, y * 0.13f, z * 0.13f + 8000) > 0.88f) return (ushort)BlockType.EmeraldOre;
+            if (y < 96 && PerlinNoise3D(x * 0.14f + 9000, y * 0.14f, z * 0.14f + 9000) > 0.84f) return (ushort)BlockType.CopperOre;
+            if (y < 48 && PerlinNoise3D(x * 0.1f + 9500, y * 0.1f, z * 0.1f + 9500) > 0.86f) return (ushort)BlockType.LapisOre;
 
             var gravelNoise = PerlinNoise3D(x * 0.12f + 2000, y * 0.12f, z * 0.12f + 2000);
             if (gravelNoise > 0.9f && y < 40) return (ushort)BlockType.Gravel;
@@ -347,10 +403,71 @@ public class NoiseWorldGenerator : IWorldGenerator
             var clayNoise = PerlinNoise3D(x * 0.09f + 4000, y * 0.09f, z * 0.09f + 4000);
             if (clayNoise > 0.92f && y < WaterLevel + 5 && y > WaterLevel - 5) return (ushort)BlockType.Clay;
 
-            return (ushort)BlockType.Stone;
+            return GetBlockTypeByName(biome.StoneBlock);
         }
 
         return (ushort)BlockType.Bedrock;
+    }
+
+    private BiomeDefinition GetBiomeAt(int x, int y, int z, int surfaceHeight)
+    {
+        if (_biomes.Count == 0)
+        {
+            var biomeNoise = PerlinNoise2D(x * 0.005f + 1000, z * 0.005f + 1000);
+            if (biomeNoise > 0.3f) return new BiomeDefinition("desert", 4, 31000, 90, 10, "sand", "sand", 3, "stone", "water");
+            if (biomeNoise < -0.4f) return new BiomeDefinition("snow", 4, 31000, 10, 40, "snow", "dirt", 1, "stone", "water");
+            return new BiomeDefinition("grassland", 4, 31000, 50, 50, "grass", "dirt", 1, "stone", "water");
+        }
+
+        float heat = 50f;
+        float humidity = 50f;
+
+        if (_biomeNoiseConfig != null)
+        {
+            var hSpread = _biomeNoiseConfig.HeatSpread;
+            heat = _biomeNoiseConfig.HeatOffset + _biomeNoiseConfig.HeatScale * PerlinNoise2D(
+                x / Math.Max(hSpread[0], 1f),
+                z / Math.Max(hSpread[2], 1f));
+            var huSpread = _biomeNoiseConfig.HumiditySpread;
+            humidity = _biomeNoiseConfig.HumidityOffset + _biomeNoiseConfig.HumidityScale * PerlinNoise2D(
+                x / Math.Max(huSpread[0], 1f) + 100,
+                z / Math.Max(huSpread[2], 1f) + 100);
+        }
+
+        BiomeDefinition bestBiome = _biomes[0];
+        float bestDist = float.MaxValue;
+
+        foreach (var biome in _biomes)
+        {
+            if (y < biome.YMin || y > biome.YMax) continue;
+            var dx = heat - biome.HeatPoint;
+            var dz = humidity - biome.HumidityPoint;
+            var dist = dx * dx + dz * dz;
+            if (dist < bestDist)
+            {
+                bestDist = dist;
+                bestBiome = biome;
+            }
+        }
+
+        return bestBiome;
+    }
+
+    private static ushort GetBlockTypeByName(string name)
+    {
+        return name switch
+        {
+            "grass" => (ushort)BlockType.Grass,
+            "dirt" => (ushort)BlockType.Dirt,
+            "sand" => (ushort)BlockType.Sand,
+            "desert_sand" => (ushort)BlockType.DesertSand,
+            "snow" => (ushort)BlockType.Snow,
+            "stone" => (ushort)BlockType.Stone,
+            "desert_stone" => (ushort)BlockType.DesertStone,
+            "water" => (ushort)BlockType.Water,
+            "grassland_ocean" => (ushort)BlockType.Sand,
+            _ => (ushort)BlockType.Dirt
+        };
     }
 
     private bool IsCave(int x, int y, int z)

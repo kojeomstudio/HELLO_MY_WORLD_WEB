@@ -4,10 +4,10 @@ A web-based voxel game ported from the minetest_sub_project (Luanti engine) to a
 
 ## Features
 
-- **Voxel World**: Procedurally generated 3D world with noise-based terrain, caves, ores, trees, and biomes
-- **101 Block Types**: Including stone variants, ores, wood types, decorations, liquids, light sources, and Nether/End blocks
-- **120+ Items**: Tools (wood/stone/iron/diamond/steel/mese), weapons, armor, food, resources, and utility items
-- **Crafting System**: 122+ recipes including shaped crafting, tool creation, armor, building blocks, food, and tool repair
+- **Voxel World**: Procedurally generated 3D world with noise-based terrain, caves, ores, trees, and 4 biomes (grassland, desert, snow, ocean) with heat/humidity noise selection
+- **161 Block Types**: Including stone variants, 9 ore types (diamond, gold, iron, coal, redstone, emerald, lapis, copper), wood types, stairs/slabs for all wood/stone types, decorative blocks, flowers, mushrooms, utility blocks (blast_furnace, smoker, barrel), light sources (lantern, soul_torch, campfire), fire, cobweb, and Nether/End blocks
+- **210+ Items**: Tools (wood/stone/iron/diamond/steel/mese), special weapons (fire sword, ice sword, blood sword, heal sword, elemental sword, daggers), steel shears, alchemy ingredients, crafting materials, armor, food, testfood items, resources, and utility items
+- **Crafting System**: 125+ recipes including shaped crafting, tool creation, special weapon recipes, ore block storage, copper processing, decoration recipes, armor, building blocks, food, and tool repair
 - **Smelting System**: 25+ smelting recipes via furnace with fuel consumption
 - **Bucket System**: Place and pick up water/lava, drink milk for healing
 - **Player Mechanics**: Health, hunger, breath, fall damage, knockback, swimming (liquid physics), climbing, sprinting, flying, slippery blocks (ice), move resistance (soul sand)
@@ -18,7 +18,7 @@ A web-based voxel game ported from the minetest_sub_project (Luanti engine) to a
 - **Weather**: Rain particle system with day/night color transitions
 - **Multiplayer**: Real-time multiplayer via SignalR WebSocket with chat, player list
 - **Chat Commands**: 18+ commands (/help, /tp, /gamemode, /give, /status, /kill, /ban, /kick, /privs, /grant, /revoke, /settime, /spawn, etc.)
-- **Privilege System**: 19 privileges (interact, shout, fly, fast, teleport, give, ban, kick, server, etc.)
+- **Privilege System**: 19 privileges fully loaded from JSON (interact, shout, fly, fast, teleport, give, ban, kick, server, etc.)
 - **Inventory UI**: Hotbar, main inventory, crafting, furnace, chest, creative inventory, armor
 - **Minimap**: 3 modes (surface, radar, normal) with player direction indicator
 - **Physics**: AABB collision, gravity, liquid physics, falling nodes
@@ -32,6 +32,7 @@ A web-based voxel game ported from the minetest_sub_project (Luanti engine) to a
 - **Texture Atlas**: 89 block textures from minetest devtest, served via Vite and rendered with nearest-neighbor filtering
 - **Position Correction**: Server sends position corrections to clients when physics violations are detected
 - **Mob Rendering**: Type-specific colors, sizes, and animations for all 6 mob types
+- **Wield Item Rendering**: Procedural fire sword, ice sword, blood sword, heal sword, elemental sword, daggers with unique visual effects
 - **Procedural Audio**: Web Audio API generated sounds (no audio files needed)
 - **Settings**: Mouse sensitivity, render distance, FOV, volume controls, cloud/AO toggles
 - **Debug Info**: FPS counter, position display, chunk count
@@ -90,11 +91,11 @@ web/
 │       ├── GameHub.cs            # SignalR hub
 │       └── GameLoopService.cs    # Background game loop
 ├── data/                # JSON configuration
-│   ├── blocks.json       # 101 block definitions
-│   ├── items.json        # 120+ items, 112+ recipes, food values, tool capabilities
-│   ├── biomes.json       # Biome definitions and noise parameters
-│   ├── physics_constants.json  # Physics constants
-│   ├── privileges.json   # 19 privileges
+│   ├── blocks.json       # 161 block definitions (IDs 0-160)
+│   ├── items.json        # 210+ items, 125+ recipes, food values, tool capabilities
+│   ├── biomes.json       # 4 biome definitions loaded by NoiseWorldGenerator
+│   ├── physics_constants.json  # Physics constants loaded by ServerConfig
+│   ├── privileges.json   # 19 privileges, fully loaded at startup
 │   ├── server_config.json
 │   └── smelting.json     # 25+ smelting recipes
 └── docs/                # Architecture documentation
@@ -204,7 +205,7 @@ This project is a web port of the Luanti (formerly Minetest) voxel game engine, 
 - **Node Timers**: Timed block transformations
 - **Day/Night Cycle**: Matching minetest's 24000-tick cycle
 - **Ported Textures**: 89 block textures from minetest devtest (basenodes + wool colors) with nearest-neighbor filtering
-- **World Generation**: Noise-based terrain with caves, ores, and trees
+- **World Generation**: Noise-based terrain with caves, 9 ore types with realistic depth distribution, biome-based generation with heat/humidity noise, trees, and dungeons
 - **Tool Repair**: Matching minetest's tool repair system (combine two same-type tools)
 - **Server Physics Validation**: Anti-cheat with teleport detection, noclip prevention, and hover detection
 

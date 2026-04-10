@@ -1,6 +1,6 @@
 # HelloMyWorld - Architecture Documentation
 
-Web-based Minecraft/Minetest-like voxel game.
+Web-based Minecraft/Minetest-like voxel game with 161 block types, 210+ items, 125+ crafting recipes, and enhanced biome-based world generation.
 
 ## Tech Stack
 

@@ -25,6 +25,11 @@ if (File.Exists(configPath))
     serverConfig = JsonSerializer.Deserialize<ServerConfig>(configJson) ?? new ServerConfig();
 }
 
+var dataPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "data");
+if (!Directory.Exists(dataPath))
+    dataPath = Path.Combine(Directory.GetCurrentDirectory(), "data");
+serverConfig.Physics.LoadFromFile(dataPath);
+
 builder.Services.AddSingleton(serverConfig);
 
 builder.Services.AddSignalR();

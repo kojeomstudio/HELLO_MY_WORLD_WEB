@@ -26,6 +26,9 @@ public class PrivilegeSystem
         RegisterBuiltIn("password", "Can change own password", false);
         RegisterBuiltIn("fly", "Can fly", false);
         RegisterBuiltIn("fast", "Can move fast", false);
+        RegisterBuiltIn("noclip", "Can walk through walls", false);
+        RegisterBuiltIn("rollback", "Can use rollback", false);
+        RegisterBuiltIn("debug", "Can enable debug mode", false);
     }
 
     public void LoadFromFile(string filePath)

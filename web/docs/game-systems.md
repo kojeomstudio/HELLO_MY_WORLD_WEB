@@ -2,7 +2,7 @@
 
 ## Block Types
 
-101 block types defined in `BlockType.cs` enum:
+101→161 block types defined in `BlockType.cs` enum and `blocks.json` (IDs 0-160):
 
 | ID | Type | ID | Type | ID | Type |
 |----|------|----|------|----|------|
@@ -34,7 +34,7 @@
 | 25 | Planks | | | | |
 | 26 | Cobblestone | | | | |
 | 27 | StoneBrick | | | | |
-| 28-33 | Wool (White/Red/Blue/Green) + Bookshelf, Gravel | | | | |
+| 28-33 | Wool (White/Red/Blue/Green) + Bookshelf, Gravel | 82-100 | MossyStone..CoarseDirt | 101-160 | DesertSand, RiverWater, Ore variants (Gold/Lapis/Emerald/Redstone/Copper), Storage blocks, Stairs/Slabs, Decorative, Flowers, Mushrooms, Utility, Light sources, Fire, Cobweb | | | | |
 
 ### Block Groups
 Blocks have groups that determine tool effectiveness:
@@ -45,9 +45,62 @@ Blocks have groups that determine tool effectiveness:
 - `dig_immediate`: Instant break (0.15s dig time)
 - `oddly_breakable_by_hand`: Breakable by hand at 1x speed
 
+## Biome System
+
+4 biomes loaded from `biomes.json`, selected by heat/humidity noise in `NoiseWorldGenerator`:
+
+| Biome | Description | Surface Block | Tree Types |
+|-------|-------------|---------------|------------|
+| Grassland | Default temperate biome | Grass | Oak, Birch |
+| Desert | Hot, dry biome | DesertSand | None (cactus) |
+| Snow | Cold biome | DirtWithSnow | Pine |
+| Ocean | Deep water biome | Sand (below water) | None |
+
+Biome selection uses two independent Perlin noise maps (heat and humidity), matching minetest's biome selection approach.
+
+## World Generation
+
+### Terrain
+- Base height: Y=32, with Perlin noise variation (Height=20)
+- Water level: Y=28
+- Biome-based surface blocks and vegetation
+
+### Ore Distribution (9 types)
+| Ore | Max Y | Rarity | Cluster Size |
+|-----|-------|--------|-------------|
+| Diamond | 16 | Rare | 1-2 |
+| Emerald | 32 | Very Rare | 1 |
+| Gold | 32 | Uncommon | 1-3 |
+| Lapis | 32 | Uncommon | 1-5 |
+| Redstone | 16 | Uncommon | 1-5 |
+| Iron | 48 | Common | 1-4 |
+| Copper | 48 | Common | 1-6 |
+| Coal | 64 | Very Common | 1-6 |
+
+### New Block Categories (IDs 101-160)
+- **Ore variants**: gold_ore, lapis_ore, emerald_ore, redstone_ore, copper_ore
+- **Storage blocks**: gold_block (existing), lapis_block, redstone_block, copper_block
+- **Stairs/Slabs**: For all wood types (oak, birch, pine, jungle) and stone variants
+- **Decorative**: various colored blocks, wool extensions
+- **Flowers & Mushrooms**: rose, dandelion, tulips, red/brown mushroom
+- **Utility blocks**: blast_furnace, smoker, barrel, loom, stonecutter, fletching_table
+- **Light sources**: lantern, soul_torch, campfire, glowstone
+- **Special blocks**: fire, cobweb
+
+### Special Weapons & Tools
+| Weapon | Damage | Special Effect |
+|--------|--------|---------------|
+| Fire Sword | High | Fire damage on hit |
+| Ice Sword | High | Slowing effect |
+| Blood Sword | High | Lifesteal |
+| Heal Sword | Medium | Heals on hit |
+| Elemental Sword | Very High | Multi-element damage |
+| Daggers (various) | Medium | Fast attack speed |
+| Steel Shears | - | Shears sheep/leaves |
+
 ## Crafting Recipes
 
-85+ recipes from `web/data/items.json`. Key categories:
+125+ recipes from `web/data/items.json`. Key categories:
 
 ### Tools
 | Result | Ingredients |
