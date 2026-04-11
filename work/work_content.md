@@ -24,3 +24,9 @@
 
 #data
 - text, confing, 상수등의 하드코딩 성격을 가지는 경우 별도의 *.json 파일로 분리하십시오. web/data 아래 위치하게 하십시오. config 설정값이 중첩되지 않도록 하십시오.
+
+ #stability
+ - github action 기반으로 프로젝트 베이스의 코드 및 프로젝트 안정성을 확보하십시오. (논리적 정합성, github action 구성에 문제가 없어야합니다.)
+
+#security
+ - 사용자 프로파일, key chain, secret key등 보안 측면에서 위험 사항이 없도록 프로젝트 베이스 기준 전체 검토 진행 후 문제가 있으면 개선하십시오.
