@@ -163,7 +163,7 @@ builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.WithOrigins("http://localhost:5173", "http://localhost:3000", "*")
+        policy.WithOrigins("http://localhost:5173", "http://localhost:3000")
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
@@ -187,8 +187,7 @@ app.MapGet("/api/status", (GameServer server) => new
 {
     online = server.OnlinePlayerCount,
     maxPlayers = server.MaxPlayers,
-    isRunning = server.IsRunning,
-    worldSeed = server.DefaultWorld.Seed
+    isRunning = server.IsRunning
 });
 
 var gameServer = app.Services.GetRequiredService<GameServer>();

@@ -153,6 +153,8 @@ public class GameHub : Hub<IGameClient>
 
     public async Task UpdatePosition(float x, float y, float z, float vx, float vy, float vz, float yaw, float pitch)
     {
+        if (!CheckRateLimit(Context.ConnectionId, "position", 50)) return;
+
         var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
         if (player == null) return;
 
@@ -176,6 +178,8 @@ public class GameHub : Hub<IGameClient>
         var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
         if (player == null) return;
 
+        if (string.IsNullOrEmpty(message) || message.Length > 256) return;
+
         if (!string.IsNullOrEmpty(message) && message[0] == '/')
         {
             var result = await _chatCommands.TryExecute(player.Name, message);
@@ -195,6 +199,10 @@ public class GameHub : Hub<IGameClient>
 
         var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
         if (player == null) return;
+
+        var blockCenter = new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
+        var distance = Vector3.Distance(player.Position, blockCenter);
+        if (distance > 6.0f) return;
 
         var cropType = blockType switch
         {
@@ -529,8 +537,15 @@ public class GameHub : Hub<IGameClient>
 
     public async Task RequestChunk(int chunkX, int chunkY, int chunkZ)
     {
+        if (!CheckRateLimit(Context.ConnectionId, "chunk", 100)) return;
+
         var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
         if (player == null) return;
+
+        var dx = Math.Abs(chunkX * 16 + 8 - player.Position.X);
+        var dy = Math.Abs(chunkY * 16 + 8 - player.Position.Y);
+        var dz = Math.Abs(chunkZ * 16 + 8 - player.Position.Z);
+        if (dx > 256 || dy > 256 || dz > 256) return;
 
         var chunk = _gameServer.DefaultWorld.GetChunk(new ChunkCoord(chunkX, chunkY, chunkZ));
         var data = chunk.Serialize();
@@ -541,6 +556,7 @@ public class GameHub : Hub<IGameClient>
     {
         var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
         if (player == null) return;
+        if (slot < 0 || slot >= player.Inventory.HotbarSize) return;
         player.SelectedHotbarSlot = slot;
     }
 
@@ -986,6 +1002,7 @@ public class GameHub : Hub<IGameClient>
     {
         var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
         if (player == null) return;
+        if (armorSlot < 0 || armorSlot >= player.ArmorSlots.Length) return;
         var armor = player.ArmorSlots[armorSlot];
         if (armor == null) return;
 
@@ -1009,6 +1026,14 @@ public class GameHub : Hub<IGameClient>
         }
 
         _lastActionTimes[key] = now;
+
+        if (_lastActionTimes.Count > 10000)
+        {
+            var cutoff = now.AddMinutes(-5);
+            var expired = _lastActionTimes.Where(kvp => kvp.Value < cutoff).Select(kvp => kvp.Key).ToList();
+            foreach (var k in expired) _lastActionTimes.Remove(k);
+        }
+
         return true;
     }
 }

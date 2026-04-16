@@ -85,7 +85,12 @@ export class UIManager {
     addChatMessage(sender: string, message: string): void {
         const msgEl = document.createElement('div');
         msgEl.className = 'chat-message';
-        msgEl.innerHTML = `<span class="sender">${sender}:</span> ${message}`;
+        const senderSpan = document.createElement('span');
+        senderSpan.className = 'sender';
+        senderSpan.textContent = sender + ':';
+        const textNode = document.createTextNode(' ' + message);
+        msgEl.appendChild(senderSpan);
+        msgEl.appendChild(textNode);
         this.chatMessages.appendChild(msgEl);
         this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
 
@@ -111,11 +116,17 @@ export class UIManager {
             const slot = this.hotbar.children[i] as HTMLElement;
             if (items[i] && items[i].itemId) {
                 const item = items[i];
-                let html = `<span style="font-size:11px;color:white">${item.itemId.replace(/_/g, ' ')}</span>`;
+                const nameSpan = document.createElement('span');
+                nameSpan.style.cssText = 'font-size:11px;color:white';
+                nameSpan.textContent = item.itemId.replace(/_/g, ' ');
+                slot.innerHTML = '';
+                slot.appendChild(nameSpan);
                 if (item.count > 1) {
-                    html += `<span style="position:absolute;bottom:2px;right:4px;font-size:10px;color:white">${item.count}</span>`;
+                    const countSpan = document.createElement('span');
+                    countSpan.style.cssText = 'position:absolute;bottom:2px;right:4px;font-size:10px;color:white';
+                    countSpan.textContent = String(item.count);
+                    slot.appendChild(countSpan);
                 }
-                slot.innerHTML = html;
                 if (item.metadata) {
                     slot.style.borderBottom = '2px solid #00ff00';
                 }
@@ -141,7 +152,11 @@ export class UIManager {
         }
 
         panel.style.display = 'block';
-        panel.innerHTML = `<div style="font-weight:bold;margin-bottom:4px">Players (${players.length})</div>`;
+        panel.innerHTML = '';
+        const titleDiv = document.createElement('div');
+        titleDiv.style.cssText = 'font-weight:bold;margin-bottom:4px';
+        titleDiv.textContent = `Players (${players.length})`;
+        panel.appendChild(titleDiv);
         for (const name of players) {
             const row = document.createElement('div');
             row.textContent = name;
@@ -881,7 +896,11 @@ export class UIManager {
                 const item = items[i];
                 const def = UIManager.getDefenseValue(item.itemId);
                 totalDefense += def;
-                slot.innerHTML = `<span style="font-size:9px;color:#fff;text-align:center;">${this.formatItemName(item.itemId)}</span>`;
+                slot.innerHTML = '';
+                const armorSpan = document.createElement('span');
+                armorSpan.style.cssText = 'font-size:9px;color:#fff;text-align:center;';
+                armorSpan.textContent = this.formatItemName(item.itemId);
+                slot.appendChild(armorSpan);
                 slot.style.background = 'rgba(100,150,255,0.3)';
                 slot.style.borderColor = '#6699ff';
             } else {

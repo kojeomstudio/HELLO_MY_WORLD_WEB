@@ -1,10 +1,11 @@
 #!/bin/bash
+trap 'kill $SERVER_PID $CLIENT_PID 2>/dev/null; echo "Servers stopped."' EXIT INT TERM
+
 echo "========================================"
 echo " HelloMyWorld Web Game - Starting"
 echo "========================================"
 echo ""
 
-# Start server
 echo "Starting C# server..."
 cd "$(dirname "$0")/web/server"
 dotnet run --project WebGameServer.csproj &
@@ -13,7 +14,6 @@ cd - > /dev/null
 
 sleep 5
 
-# Start client
 echo "Starting Vite client dev server..."
 cd "$(dirname "$0")/web/client"
 npm run dev &
@@ -28,6 +28,4 @@ echo " Client: http://localhost:5173"
 echo "========================================"
 echo ""
 echo "Press Ctrl+C to stop all servers..."
-
-trap "kill $SERVER_PID $CLIENT_PID 2>/dev/null; echo 'Servers stopped.'" EXIT INT TERM
 wait

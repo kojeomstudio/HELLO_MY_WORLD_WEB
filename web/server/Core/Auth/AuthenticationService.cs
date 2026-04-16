@@ -19,6 +19,12 @@ public class AuthenticationService
         if (string.IsNullOrWhiteSpace(name) || name.Length < 1 || name.Length > 20)
             return AuthResult.NameInvalid;
 
+        foreach (var c in name)
+        {
+            if (!char.IsLetterOrDigit(c) && c != '_' && c != '-')
+                return AuthResult.NameInvalid;
+        }
+
         if (_bannedNames.Contains(name.ToLowerInvariant()))
             return AuthResult.Banned;
 

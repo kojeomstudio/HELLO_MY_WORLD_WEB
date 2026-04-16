@@ -17,7 +17,6 @@
         "fast": { "description": "Can move faster than normal speed", "default": false },
         "noclip": { "description": "Can walk through walls (noclip mode)", "default": false },
         "rollback": { "description": "Can use rollback functionality", "default": false },
-        "debug": { "description": "Can enable debug/wireframe mode", "default": false },
-        "password": { "description": "Can change player passwords", "default": false }
+        "debug": { "description": "Can enable debug/wireframe mode", "default": false }
     }
 }

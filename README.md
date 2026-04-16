@@ -207,7 +207,9 @@ This project is a web port of the Luanti (formerly Minetest) voxel game engine, 
 - **Ported Textures**: 89 block textures from minetest devtest (basenodes + wool colors) with nearest-neighbor filtering
 - **World Generation**: Noise-based terrain with caves, 9 ore types with realistic depth distribution, biome-based generation with heat/humidity noise, trees, and dungeons
 - **Tool Repair**: Matching minetest's tool repair system (combine two same-type tools)
-- **Server Physics Validation**: Anti-cheat with teleport detection, noclip prevention, and hover detection
+- **Server Physics Validation**: Anti-cheat with teleport detection, noclip prevention, hover detection, position update rate limiting, and block interaction range validation
+- **Security**: XSS-safe rendering, CORS-restricted origins, player name sanitization, chat message length limits, rate limiting on all actions, and chunk request range limits
+- **CI**: GitHub Actions pipeline for automated server build and client typecheck+build
 
 ## License
 
