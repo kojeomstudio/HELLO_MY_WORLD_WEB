@@ -429,6 +429,8 @@ public class GameServer
         {
             _ = _hubContext.Clients.Client(player.ConnectionId)
                 .OnHealthUpdate(player.Health, player.MaxHealth);
+            _ = _hubContext.Clients.Client(player.ConnectionId)
+                .OnFoodUpdate(player.FoodLevel, 20f);
         }
 
         if (player.IsDead)
@@ -465,6 +467,12 @@ public class GameServer
     {
         if (player.IsDead) return;
         player.ConsumeFood(nutrition, saturation);
+
+        if (_hubContext != null)
+        {
+            _ = _hubContext.Clients.Client(player.ConnectionId)
+                .OnFoodUpdate(player.FoodLevel, 20f);
+        }
     }
 
     public bool SetGameMode(string playerName, GameMode mode)

@@ -4,7 +4,7 @@ SignalR over WebSocket (`/game` endpoint). Strongly-typed via `IGameClient` inte
 
 ## Server-to-Client (IGameClient)
 
-27 methods invoked by server, received by client:
+28 methods invoked by server, received by client:
 
 | Method | Parameters | Description |
 |--------|-----------|-------------|
@@ -36,6 +36,7 @@ SignalR over WebSocket (`/game` endpoint). Strongly-typed via `IGameClient` inte
 | `OnFallingBlock` | fromX,Y,Z, toX,Y,Z, blockType | Falling block animation |
 | `OnArmorUpdate` | items (array) | Armor slot contents |
 | `OnExperienceUpdate` | level, totalExp | Experience update |
+| `OnFoodUpdate` | foodLevel: float, maxFood: float | Food/hunger level update |
 
 ## Client-to-Server (GameHub)
 

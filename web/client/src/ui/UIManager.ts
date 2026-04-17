@@ -17,6 +17,7 @@ export class UIManager {
     private deathScreen: HTMLElement | null = null;
     private craftingUI: HTMLElement | null = null;
     private breathBar: HTMLElement | null = null;
+    private hungerBar: HTMLElement | null = null;
     private furnaceUI: HTMLElement | null = null;
     private chestUI: HTMLElement | null = null;
     private creativeInventoryUI: HTMLElement | null = null;
@@ -825,6 +826,33 @@ export class UIManager {
         return this.settingsPanel;
     }
 
+    updateHunger(foodLevel: number, maxFood: number): void {
+        if (!this.hungerBar) {
+            this.hungerBar = document.createElement('div');
+            this.hungerBar.id = 'hunger-bar';
+            this.hungerBar.style.cssText = 'position:fixed;bottom:76px;left:50%;transform:translateX(-50%);display:none;gap:1px;z-index:100;';
+            document.body.appendChild(this.hungerBar);
+        }
+
+        if (foodLevel >= maxFood) {
+            this.hungerBar.style.display = 'none';
+            return;
+        }
+
+        this.hungerBar.style.display = 'flex';
+        this.hungerBar.innerHTML = '';
+
+        const icons = Math.ceil(maxFood / 2);
+        for (let i = 0; i < icons; i++) {
+            const icon = document.createElement('div');
+            const iconValue = foodLevel - i * 2;
+            icon.style.cssText = 'width:12px;height:12px;';
+            icon.style.background = iconValue > 0 ? '#b87333' : '#333';
+            icon.style.border = iconValue > 0 ? '1px solid #8B4513' : '1px solid #555';
+            this.hungerBar.appendChild(icon);
+        }
+    }
+
     updateBreath(breath: number, maxBreath: number): void {
         if (!this.breathBar) {
             this.breathBar = document.createElement('div');
@@ -859,7 +887,7 @@ export class UIManager {
             <div>FPS: ${fps}</div>
             <div>XYZ: ${pos.x.toFixed(1)} / ${pos.y.toFixed(1)} / ${pos.z.toFixed(1)}</div>
             <div>Chunks: ${chunkCount}</div>
-            <div>Memory: N/A</div>
+            <div>Memory: ${(() => { const memInfo = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory; return memInfo ? `${(memInfo.usedJSHeapSize / 1048576).toFixed(1)} MB` : 'N/A'; })()}</div>
         `;
     }
 

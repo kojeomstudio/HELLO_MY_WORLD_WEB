@@ -52,11 +52,30 @@ export class WieldItem {
         }
     }
 
-    private createBlockMesh(_itemName: string): THREE.Mesh {
+    private createBlockMesh(itemName: string): THREE.Mesh {
         const geometry = new THREE.BoxGeometry(0.25, 0.25, 0.25);
-        const material = new THREE.MeshLambertMaterial({
-            color: 0x888888
-        });
+        let color = 0x888888;
+        if (itemName.includes('stone')) color = 0x808080;
+        else if (itemName.includes('dirt')) color = 0x8B6914;
+        else if (itemName.includes('grass')) color = 0x4CAF50;
+        else if (itemName.includes('sand')) color = 0xDEC896;
+        else if (itemName.includes('wood') || itemName.includes('log')) color = 0x6B4226;
+        else if (itemName.includes('leaves')) color = 0x2E7D32;
+        else if (itemName.includes('glass')) color = 0xC8E8FF;
+        else if (itemName.includes('water')) color = 0x4488FF;
+        else if (itemName.includes('lava')) color = 0xFF4400;
+        else if (itemName.includes('coal')) color = 0x333333;
+        else if (itemName.includes('iron')) color = 0xD8D8D8;
+        else if (itemName.includes('gold')) color = 0xFFD700;
+        else if (itemName.includes('diamond')) color = 0x4AEDD9;
+        else if (itemName.includes('obsidian')) color = 0x1A0A2E;
+        else if (itemName.includes('snow')) color = 0xF0F0F0;
+        else if (itemName.includes('ice')) color = 0x87CEEB;
+        else if (itemName.includes('brick')) color = 0xB22222;
+        else if (itemName.includes('wool_white')) color = 0xEEEEEE;
+        else if (itemName.includes('wool_red')) color = 0xB02E26;
+        else if (itemName.includes('wool')) color = 0x888888;
+        const material = new THREE.MeshLambertMaterial({ color });
         return new THREE.Mesh(geometry, material);
     }
 

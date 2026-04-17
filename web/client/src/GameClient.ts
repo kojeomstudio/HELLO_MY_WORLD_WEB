@@ -54,6 +54,10 @@ export class GameClient {
             this.onParticleEvent(x, y, z, type);
         });
 
+        this.playerController.setAudioPlayer((soundName: string) => {
+            this.audioManager.play(soundName);
+        });
+
         this.applySettings(this.uiManager.getSettingsPanel().getSettings());
         this.uiManager.getSettingsPanel().setOnSettingsChanged((settings) => {
             this.applySettings(settings);
@@ -131,6 +135,7 @@ export class GameClient {
         });
 
         this.connection.on('OnInventoryUpdate', (items: any[]) => {
+            this.audioManager.play('pickup');
             this.uiManager.updateInventory(items);
             this.playerController.setInventory(items);
         });
@@ -167,6 +172,10 @@ export class GameClient {
 
         this.connection.on('OnBreathUpdate', (breath: number, maxBreath: number) => {
             this.uiManager.updateBreath(breath, maxBreath);
+        });
+
+        this.connection.on('OnFoodUpdate', (foodLevel: number, maxFood: number) => {
+            this.uiManager.updateHunger(foodLevel, maxFood);
         });
 
         this.connection.on('OnKnockback', (vx: number, vy: number, vz: number) => {

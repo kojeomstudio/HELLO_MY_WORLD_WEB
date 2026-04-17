@@ -11,6 +11,7 @@ A web-based voxel game ported from the minetest_sub_project (Luanti engine) to a
 - **Smelting System**: 25+ smelting recipes via furnace with fuel consumption
 - **Bucket System**: Place and pick up water/lava, drink milk for healing
 - **Player Mechanics**: Health, hunger, breath, fall damage, knockback, swimming (liquid physics), climbing, sprinting, flying, slippery blocks (ice), move resistance (soul sand)
+- **Hunger Bar**: Client-side hunger display synced from server food level
 - **Experience System**: XP gains from mining, crafting, smelting, and mob kills with level progression
 - **Mob System**: Hostile mobs (Zombie=3dmg, Skeleton=2dmg, Spider=2dmg) and passive mobs (Cow, Pig, Chicken) with AI state machine (Idle→Chase→Attack), 1s attack cooldown, passive mobs flee when hit, hostile mobs only spawn at night, passive mobs only on grass during day
 - **Entity System**: Dropped items, mob entities, with physics and lifespan
@@ -30,6 +31,7 @@ A web-based voxel game ported from the minetest_sub_project (Luanti engine) to a
 - **Persistence**: Player data, world chunks, block metadata, chest inventories, and node timers saved to disk
 - **Crop Planting**: Plant wheat, carrot, and potato seeds on farmland via block placement
 - **Server-Authoritative Physics**: Speed validation, teleport detection, noclip prevention, anti-hover gravity, position correction, NaN/Infinity checks, block type range validation, player AABB overlap on placement
+- **Entity Distance Culling**: Entity updates only broadcast to players within 128 blocks
 - **PvP**: Distance check (max 4 blocks), weapon damage with Minetest knockback formula
 - **Torch Placement Validation**: Requires adjacent solid block
 - **Tool Repair**: Combine two damaged tools of the same type to repair them
@@ -42,6 +44,8 @@ A web-based voxel game ported from the minetest_sub_project (Luanti engine) to a
 - **Mob Rendering**: Type-specific colors, sizes, and animations for all 6 mob types
 - **Wield Item Rendering**: Procedural fire sword, ice sword, blood sword, heal sword, elemental sword, daggers with unique visual effects
 - **Procedural Audio**: Web Audio API generated sounds (no audio files needed)
+- **Footstep Sounds**: Procedural footstep sounds triggered while walking on ground
+- **Pickup Sounds**: Audio feedback when items are added to inventory
 - **Settings**: Mouse sensitivity, render distance, FOV, volume controls, cloud/AO toggles
 - **Debug Info**: FPS counter, position display, chunk count
 
@@ -107,11 +111,10 @@ web/
 │   ├── physics_constants.json  # Physics constants, interaction ranges, eye height, player depth
 │   ├── privileges.json   # 19 privileges, fully loaded at startup
 │   ├── server_config.json
-│   └── smelting.json     # 25+ smelting recipes
-│   ├── physics_constants.json  # Physics constants loaded by ServerConfig
-│   ├── privileges.json   # 19 privileges, fully loaded at startup
-│   ├── server_config.json
-│   └── smelting.json     # 25+ smelting recipes
+│   ├── smelting.json     # 25+ smelting recipes
+│   ├── decorations.json  # Tree/decoration placement rules
+│   ├── ores.json         # Ore generation parameters and depth distribution
+│   └── server_config.json
 └── docs/                # Architecture documentation
 ```
 
@@ -224,7 +227,7 @@ This project is a web port of the Luanti (formerly Minetest) voxel game engine, 
 - **Tool Repair**: Matching minetest's tool repair system (combine two same-type tools)
 - **Server Physics Validation**: Anti-cheat with teleport detection, noclip prevention, hover detection, position update rate limiting, and block interaction range validation
 - **Security**: XSS-safe rendering, CORS-restricted origins (configurable from `server_config.json`), player name sanitization (regex + reserved names), HTML/XML tag stripping in chat, chat message length limits, rate limiting on all actions (join spam, punch, interact), chunk request range limits, IP ban enforcement, security headers (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection), NaN/Infinity position validation, block type range validation, player bounding box overlap check on placement
-- **CI**: GitHub Actions pipeline with submodule init, Ubuntu + Windows server builds, client typecheck+build, artifact uploads, concurrency control, secrets check
+- **CI**: GitHub Actions pipeline with submodule init, Ubuntu + Windows server builds, client typecheck+build, security scan (secrets detection, npm audit, debug endpoint check, .gitignore validation), data integrity verification (JSON validation, texture asset check), artifact uploads, concurrency control
 
 ## License
 

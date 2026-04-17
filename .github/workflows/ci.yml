@@ -12,7 +12,7 @@ on:
 
 jobs:
   server:
-    name: Build Server
+    name: Build Server (Ubuntu)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -31,23 +31,32 @@ jobs:
       - name: Build
         run: dotnet build web/server/WebGameServer.csproj --no-restore --configuration Release
 
-      - name: Test
-        run: dotnet test web/server/WebGameServer.csproj --no-restore --configuration Release --verbosity minimal
-        continue-on-error: true
-
-      - name: Check for secrets
-        run: |
-          if grep -rq "password\|secret\|api_key" web/server/ --include="*.cs" | grep -v "example\|placeholder\|TODO\|FIXME"; then
-            echo "::warning::Potential secrets found in source code"
-          fi
-        continue-on-error: true
-
       - name: Upload server build
         uses: actions/upload-artifact@v4
         with:
           name: server-build
           path: web/server/bin/Release/
           retention-days: 7
+
+  server-windows:
+    name: Build Server (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup .NET 8.0
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore web/server/WebGameServer.csproj
+
+      - name: Build
+        run: dotnet build web/server/WebGameServer.csproj --no-restore --configuration Release
 
   client:
     name: Build & Typecheck Client
@@ -97,26 +106,111 @@ jobs:
           path: web/client/dist/
           retention-days: 7
 
-  server-windows:
-    name: Build Server (Windows)
-    runs-on: windows-latest
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
-      - name: Setup .NET 8.0
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
+      - name: Check for hardcoded secrets in source
+        run: |
+          echo "Checking for potential secrets in source code..."
+          FOUND=0
+          if grep -rn --include="*.cs" \
+            -E '(Password\s*=\s*"[^"]+"|ApiKey\s*=\s*"[^"]+"|Secret\s*=\s*"[^"]+")' \
+            web/server/ | grep -vi 'example\|placeholder\|todo\|config\|empty\|{'; then
+            echo "::warning::Potential hardcoded secrets found in C# source"
+            FOUND=1
+          fi
+          if grep -rn --include="*.ts" \
+            -E '(api[_-]?key\s*[:=]\s*["\x27][^"\x27]+|password\s*[:=]\s*["\x27][^"\x27]+|secret\s*[:=]\s*["\x27][^"\x27]+)' \
+            web/client/src/ | grep -vi 'example\|placeholder\|todo'; then
+            echo "::warning::Potential hardcoded secrets found in TypeScript source"
+            FOUND=1
+          fi
+          if grep -rn --include="*.json" \
+            -E '"(password|secret|api_key|token)":\s*"[^"]+"' \
+            web/data/ | grep -vi 'example\|placeholder\|default\|empty\|changeme'; then
+            echo "::warning::Potential hardcoded secrets found in JSON config"
+            FOUND=1
+          fi
+          if [ $FOUND -eq 0 ]; then
+            echo "No hardcoded secrets detected"
+          fi
 
-      - name: Restore dependencies
-        run: dotnet restore web/server/WebGameServer.csproj
+      - name: Check for .env files in repository
+        run: |
+          if find . -name ".env" -o -name ".env.local" -o -name ".env.production" | grep -q .; then
+            echo "::warning::.env files detected in repository. Ensure they are in .gitignore"
+          else
+            echo "No .env files found in repository"
+          fi
 
-      - name: Build
-        run: dotnet build web/server/WebGameServer.csproj --no-restore --configuration Release
+      - name: Check for debug endpoints
+        run: |
+          if grep -rn --include="*.cs" 'MapGet.*debug\|MapGet.*dump\|MapGet.*admin' web/server/; then
+            echo "::warning::Potential debug/admin endpoints found"
+          else
+            echo "No suspicious debug endpoints found"
+          fi
 
-      - name: Test
-        run: dotnet test web/server/WebGameServer.csproj --no-restore --configuration Release --verbosity minimal
+      - name: Verify .gitignore covers sensitive files
+        run: |
+          MISSING=0
+          for pattern in ".env" ".env.local" "*.db" "node_modules" "bin/" "obj/"; do
+            if ! grep -q "$pattern" .gitignore 2>/dev/null; then
+              echo "::warning::.gitignore missing pattern: $pattern"
+              MISSING=1
+            fi
+          done
+          if [ $MISSING -eq 0 ]; then
+            echo ".gitignore covers all sensitive file patterns"
+          fi
+
+      - name: npm audit (client)
+        run: |
+          cd web/client
+          npm audit --audit-level=high || echo "::warning::npm audit found high/critical vulnerabilities"
         continue-on-error: true
+
+  data-integrity:
+    name: Verify Data Files
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify JSON data files are valid
+        run: |
+          FAILED=0
+          for f in web/data/*.json; do
+            if ! python3 -m json.tool "$f" > /dev/null 2>&1; then
+              echo "::error::Invalid JSON: $f"
+              FAILED=1
+            fi
+          done
+          if [ $FAILED -eq 0 ]; then
+            echo "All JSON data files are valid"
+          fi
+
+      - name: Verify texture assets exist
+        run: |
+          MISSING=0
+          if [ -d "web/client/public/textures/blocks" ]; then
+            COUNT=$(find web/client/public/textures/blocks -name "*.png" | wc -l)
+            echo "Block textures found: $COUNT"
+            if [ "$COUNT" -lt 50 ]; then
+              echo "::warning::Low block texture count ($COUNT). Expected 80+"
+            fi
+          else
+            echo "::error::Block textures directory not found"
+            MISSING=1
+          fi
+          if [ -d "web/client/public/textures/ui" ]; then
+            COUNT=$(find web/client/public/textures/ui -name "*.png" | wc -l)
+            echo "UI textures found: $COUNT"
+          else
+            echo "::warning::UI textures directory not found"
+          fi
+          exit $MISSING

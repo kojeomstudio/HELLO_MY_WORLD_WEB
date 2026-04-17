@@ -39,6 +39,7 @@ public interface IGameClient
     Task OnGameModeChanged(string mode);
     Task OnTeleported(float x, float y, float z);
     Task OnBreathUpdate(float breath, float maxBreath);
+    Task OnFoodUpdate(float foodLevel, float maxFood);
     Task OnCraftingRecipes(object[] recipes);
     Task OnSmeltingRecipes(object[] recipes);
     Task OnChestInventory(object[] items);
@@ -163,6 +164,7 @@ public class GameHub : Hub<IGameClient>
         await SendInventoryUpdate(player);
         await SendArmorUpdate(player);
         await SendTimeUpdate();
+        await Clients.Caller.OnFoodUpdate(player.FoodLevel, 20f);
         await SendBlockDefinitions();
         await SendInitialChunks(player);
     }

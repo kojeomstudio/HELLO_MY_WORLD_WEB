@@ -350,3 +350,27 @@ The server performs authoritative movement validation to prevent cheating:
 
 All server services registered as **Singleton** in `Program.cs`:
 `ServerConfig`, `BlockDefinitionManager`, `WorldGeneratorFactory`, `SmeltingSystem`, `PrivilegeSystem`, `ActiveBlockModifierSystem`, `KnockbackSystem`, `PlayerDatabase`, `BlockMetadataDatabase`, `GameServer`, `AuthenticationService`, `ChatCommandManager`, `CraftingSystem`, `EntityManager`, `GameLoopService` (hosted).
+
+## Recent Improvements
+
+### Hunger Bar System
+- Server broadcasts food level via `OnFoodUpdate` SignalR event
+- Client renders hunger bar with drumstick icons below the hotbar
+- Updates on damage (starvation), food consumption, and player join
+
+### Entity Distance Culling
+- `BroadcastEntityEvents` in `GameLoopService` only sends entity updates to players within 128 blocks
+- Significantly reduces network bandwidth for servers with many entities
+
+### Audio Enhancements
+- Footstep sounds triggered by `PlayerController` based on ground contact and horizontal movement
+- Pickup sounds play when inventory is updated from server
+
+### Improved Wield Item Rendering
+- Block items now display with their correct material color instead of a uniform grey
+- 20+ block type color mappings (stone, dirt, grass, sand, wood, leaves, glass, water, lava, etc.)
+
+### Enhanced CI/CD Pipeline
+- Security scanning job with secrets detection, npm audit, debug endpoint checks
+- Data integrity job with JSON validation and texture asset verification
+- .gitignore coverage validation

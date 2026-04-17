@@ -29,6 +29,9 @@ export class PlayerController {
     private _knockbackVelocity: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
     private _selectionBox: SelectionBox | null = null;
     private _particleEmitter: ((x: number, y: number, z: number, type: string) => void) | null = null;
+    private _audioPlayer: ((soundName: string) => void) | null = null;
+    private _footstepTimer: number = 0;
+    private _footstepInterval: number = 0.45;
     private _connection: HubConnection.HubConnection | null = null;
     private digStartTime: number = 0;
     private digTarget: { x: number; y: number; z: number } | null = null;
@@ -61,6 +64,10 @@ export class PlayerController {
 
     setParticleEmitter(emitter: (x: number, y: number, z: number, type: string) => void): void {
         this._particleEmitter = emitter;
+    }
+
+    setAudioPlayer(player: (soundName: string) => void): void {
+        this._audioPlayer = player;
     }
 
     setConnection(connection: HubConnection.HubConnection): void {
@@ -478,6 +485,17 @@ export class PlayerController {
 
         this._position.add(this._knockbackVelocity.clone().multiplyScalar(dt));
         this._knockbackVelocity.multiplyScalar(0.85);
+
+        const isMovingHorizontally = (this._velocity.x * this._velocity.x + this._velocity.z * this._velocity.z) > 0.5;
+        if (this._onGround && isMovingHorizontally) {
+            this._footstepTimer += dt;
+            if (this._footstepTimer >= this._footstepInterval) {
+                this._footstepTimer = 0;
+                this._audioPlayer?.('footstep');
+            }
+        } else {
+            this._footstepTimer = 0;
+        }
 
         if (this._position.y < -20) {
             this._position.set(0, 50, 0);

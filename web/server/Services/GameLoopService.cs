@@ -149,12 +149,29 @@ public class GameLoopService : BackgroundService
                 {
                     foreach (var entity in newEntities)
                     {
-                        await _hub.Clients.All.OnEntitySpawned(
-                            entity.Id,
-                            entity.Type.ToString().ToLowerInvariant(),
-                            entity.Position.X,
-                            entity.Position.Y,
-                            entity.Position.Z);
+                        var nearbyPlayers = _gameServer.OnlinePlayers
+                            .Where(p => Vector3.Distance(entity.Position, p.Position) < 128)
+                            .ToList();
+
+                        if (nearbyPlayers.Count > 0)
+                        {
+                            foreach (var player in nearbyPlayers)
+                            {
+                                try
+                                {
+                                    await _hub.Clients.Client(player.ConnectionId).OnEntitySpawned(
+                                        entity.Id,
+                                        entity.Type.ToString().ToLowerInvariant(),
+                                        entity.Position.X,
+                                        entity.Position.Y,
+                                        entity.Position.Z);
+                                }
+                                catch (Exception ex)
+                                {
+                                    _logger.LogWarning(ex, "Failed to send entity spawn to player {PlayerName}", player.Name);
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -172,11 +189,28 @@ public class GameLoopService : BackgroundService
 
             foreach (var entity in updatedEntities)
             {
-                await _hub.Clients.All.OnEntityUpdate(
-                    entity.Id,
-                    entity.Position.X,
-                    entity.Position.Y,
-                    entity.Position.Z);
+                var nearbyPlayers = _gameServer.OnlinePlayers
+                    .Where(p => Vector3.Distance(entity.Position, p.Position) < 128)
+                    .ToList();
+
+                if (nearbyPlayers.Count > 0)
+                {
+                    foreach (var player in nearbyPlayers)
+                    {
+                        try
+                        {
+                            await _hub.Clients.Client(player.ConnectionId).OnEntityUpdate(
+                                entity.Id,
+                                entity.Position.X,
+                                entity.Position.Y,
+                                entity.Position.Z);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to send entity update to player {PlayerName}", player.Name);
+                        }
+                    }
+                }
             }
         }
         catch (Exception ex)
