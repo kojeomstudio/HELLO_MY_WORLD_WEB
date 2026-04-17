@@ -96,7 +96,9 @@ See [server-api.md](server-api.md) for full method/event signatures.
 - `ItemEntity`: Dropped items with position, lifetime, magnet range
 - `MobEntity`: Hostile (Zombie, Skeleton, Spider) and passive (Cow, Pig, Chicken) mobs with AI pathfinding, attack, and mob-specific render properties (color, size)
 
-**MobSpawner** (`Entities/MobSpawner.cs`) — Spawns mobs every 10s (max 50), weighted random selection with spawn height validation, despawns distant mobs (>128 blocks).
+**MobSpawner** (`Entities/MobSpawner.cs`) — Spawns mobs every 10s (max 50), weighted random selection with spawn height validation, despawns distant mobs (>128 blocks). Hostile mobs only spawn at night (ticks 13000–23000); passive mobs only spawn on grass during day.
+
+**Mob Combat** — AI state machine (Idle → Chase → Attack) with 1s cooldown. Passive mobs flee when hit. PvP distance check (max 4 blocks). Mob definitions loaded from `web/data/mobs.json`.
 
 ### Crafting & Smelting
 
@@ -109,11 +111,12 @@ See [server-api.md](server-api.md) for full method/event signatures.
 - **AgricultureSystem** (`World/AgricultureSystem.cs`) — Crop growth (wheat, carrot, potato)
 - **NodeTimerSystem** (`World/NodeTimerSystem.cs`) — Scheduled block actions (farmland dehydration, grass spread, ice melting)
 - **ActiveBlockModifierSystem** (`World/ActiveBlockModifier.cs`) — Sand/gravel falling
-- **ChatCommandManager** (`Chat/ChatCommandManager.cs`) — Commands: /time, /gamemode, /tp, /give, /kill, /clear, /kick, /ban, /spawn, /privs
+- **ChatCommandManager** (`Chat/ChatCommandManager.cs`) — Commands: /time, /gamemode, /tp, /give, /kill, /clear, /kick, /ban, /spawn, /privs, /setborder
 - **PrivilegeSystem** (`Auth/PrivilegeSystem.cs`) — Permission management (interact, shout, fly, etc.)
-- **AuthenticationService** (`Auth/AuthenticationService.cs`) — Name validation, ban checks, server capacity
-- **PhysicsEngine** (`Physics/PhysicsEngine.cs`) — Server-authoritative movement validation with position correction
+- **AuthenticationService** (`Auth/AuthenticationService.cs`) — Name validation (regex + reserved names), ban checks, IP ban enforcement, server capacity
+- **PhysicsEngine** (`Physics/PhysicsEngine.cs`) — Server-authoritative movement validation with position correction, NaN/Infinity checks, block type range validation, player AABB overlap checks on placement
 - **KnockbackSystem** (`Physics/KnockbackSystem.cs`) — Damage knockback calculation
+- **Security**: HTML/XML tag stripping in chat, security headers (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection), configurable CORS origins from `server_config.json`, enhanced rate limiting (join spam, punch, interact)
 
 ## Client Architecture
 
@@ -150,7 +153,8 @@ Creates `UIManager`, then `GameClient`, connects to server.
 - Light interpolation from 4 neighbor light values
 - Vegetation wind animation (leaves, pine needles, sugar cane)
 - Texture atlas UV mapping (89 textures from Minetest DevTest, packed into atlas)
-- Animated textures for water and lava (frame cycling)
+- Animated textures for water and lava (wave vertex displacement + frame cycling)
+- Custom block geometry: stairs, slabs, fences, walls, glass panes, doors, ladders, torches, plant-like (cross), fire-like blocks
 
 ### Renderer (`rendering/Renderer.ts`) — Three.js scene management
 - Scene, camera, WebGL renderer
@@ -160,6 +164,9 @@ Creates `UIManager`, then `GameClient`, connects to server.
 - Lava proximity glow effect
 - Damage flash effect
 - Selection box rendering
+- Shadow mapping (PCFSoft, 1024 map, sun directional light)
+- Player-following point light for local illumination
+- Animated water (wave effect, 0.45 opacity, lowered surface) and lava (wave effect, emissive vertex colors)
 
 ### UIManager (`ui/UIManager.ts`) — HUD and UI panels
 - Health bar (heart textures), breath bar (bubble textures)
@@ -318,13 +325,15 @@ All configuration loaded from `web/data/server_config.json`:
 - Day/night: cycle length, phase start times
 - Network: protocol version, broadcast intervals
 - Liquid: flow intervals
+- CORS: configurable allowed origins (`corsOrigins` array)
+- World border: configurable border size (`worldBorderSize`, default 1000)
 
 ## Texture System
 
 - **Texture atlas**: All block textures packed into a single atlas texture (89 textures from Minetest DevTest)
 - **Runtime loading**: Atlas generated at startup from individual texture images
 - **UV mapping**: Each block face maps to its region in the atlas via normalized UV coordinates
-- **Animated textures**: Water and lava cycle through texture frames for flow animation
+- **Animated textures**: Water (wave vertex displacement, 0.45 opacity) and lava (wave displacement, emissive vertex colors)
 - **Block-face mapping**: 101 block types each have tile references for top, bottom, and side faces
 
 ## Server Physics Validation
@@ -335,7 +344,7 @@ The server performs authoritative movement validation to prevent cheating:
 2. Server's `PhysicsEngine` validates the move is physically possible (speed checks, collision checks)
 3. If the client position deviates beyond a threshold, the server sends a corrected position via `OnPositionCorrection`
 4. Client snaps to the corrected position seamlessly
-5. Validation checks: max speed, teleportation detection, flying mode consistency, collision boundaries
+5. Validation checks: max speed, teleportation detection, flying mode consistency, collision boundaries, NaN/Infinity checks, block type range validation, player AABB overlap on placement
 
 ## Dependency Injection
 

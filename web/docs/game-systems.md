@@ -350,3 +350,110 @@ The server validates all client movement to prevent cheating and desync:
 - Client interpolates to the corrected position to avoid visual snapping
 - Correction threshold: 0.5 blocks positional difference triggers correction
 - Rotation (yaw/pitch) is client-authoritative (not validated by server)
+
+## Block Geometry System
+
+Non-standard block shapes are rendered with custom geometry in `ChunkMesh.ts` instead of the default cube mesh.
+
+| Shape | Block Examples | Geometry |
+|-------|---------------|----------|
+| Stairs | Wood/stone stair variants | Half-height block with angled face, 3 exposed faces |
+| Slabs | Wood/stone slab variants | Half-height flat block, top/bottom placement via Param2 |
+| Fence | Fence | 0.25×0.25 post + 0.125×0.5 horizontal rails between adjacent fences |
+| Wall | Wall variants | 1.5-height pillar with connecting posts to neighbors |
+| Glass Pane | Glass pane | Thin flat plane with edge posts connecting to adjacent panes |
+| Door | Wood/iron doors | Full-height (2 blocks), top/bottom halves, open/closed via Param2 |
+| Ladder | Ladder | Thin flat plane attached to adjacent solid block face |
+| Torch | Torch, soul_torch | Small cross-shaped mesh with glow, requires adjacent solid block |
+| Plant-like | Flowers, mushrooms, crops | Two intersecting quads (X shape) centered on block |
+| Fire-like | Fire, campfire | Animated cross quads with emissive glow, no collision |
+
+Placement validation:
+- **Torches**: Require at least one adjacent solid block face for attachment
+- **Doors**: Placed on top of a solid block, occupy 2 block heights
+- **Slabs**: Stack to full block when placed on top of existing slab of same type
+
+## Water & Lava Rendering
+
+### Animated Water
+- Surface height lowered by 0.1 blocks from full block (visible air gap at top)
+- Opacity set to 0.45 (semi-transparent)
+- Wave animation: top face vertices displaced by sine wave (`sin(x*2 + time*2) * 0.05`) for rippling surface effect
+- Rendered as separate transparent mesh pass
+
+### Animated Lava
+- Wave animation on top face (same sine displacement as water)
+- Emissive glow via vertex colors: top face vertices colored `#FF4500`, side faces `#FF2200`
+- Light emission: light level 14 propagates to nearby blocks via `LightingEngine`
+- Damage: 4 damage/tick on contact
+
+## Shadow Mapping
+
+- Shadow type: `PCFSoftShadowMap` (percentage-closer filtering with soft edges)
+- Shadow map size: 1024×1024
+- Directional light (sun): follows sky brightness from day/night cycle
+- Shadow camera: orthographic, frustum covers visible terrain
+- Player-following point light: `PointLight` attached to camera for local illumination in dark areas (caves, night)
+
+## Mob Combat System
+
+### Mob Definitions (`web/data/mobs.json`)
+
+| Mob | Health | Attack Damage | Speed | Hostile | Drops |
+|-----|--------|---------------|-------|---------|-------|
+| Zombie | 20 | 3 | 2.5 | Yes | rotten_flesh, iron_ingot |
+| Skeleton | 20 | 2 | 2.0 | Yes | bone, flint |
+| Spider | 20 | 2 | 3.0 | Yes | string |
+| Cow | 20 | 0 | 1.5 | No | leather, raw_beef |
+| Pig | 20 | 0 | 1.5 | No | raw_pork |
+| Chicken | 20 | 0 | 1.5 | No | feather |
+
+### AI State Machine
+
+```
+Idle ──(player in range)──> Chase ──(in attack range)──> Attack
+  ^                              |                          |
+  |<──(player out of range)──────|<──(cooldown elapsed)────|
+```
+
+- **Idle**: Wander randomly, scan for nearby players every tick
+- **Chase**: Move toward detected player at mob speed, pathfinding via direct movement
+- **Attack**: Deal damage when within attack range (1.5 blocks), 1s cooldown between attacks
+- **Passive mobs**: Flee when hit instead of chasing (reverse direction, temporary speed boost)
+
+### Spawn Rules
+- **Hostile mobs** (Zombie, Skeleton, Spider): Only spawn at night (ticks 13000–23000)
+- **Passive mobs** (Cow, Pig, Chicken): Only spawn on grass blocks during daytime
+- Detection range: 16 blocks; attack range: 1.5 blocks
+- Max 50 mobs alive; despawn distance: 128 blocks from all players
+- Spawn interval: 10 seconds
+
+### PvP
+- Max PvP distance: 4 blocks (validated server-side)
+- Knockback applied via `KnockbackSystem` using Minetest formula
+
+## World Border System
+
+- Configurable border size in `server_config.json` → `world.worldBorderSize` (default: 1000)
+- Player position clamped to `[−borderSize/2, +borderSize/2]` on X and Z axes
+- Server enforces position correction if client exceeds border
+- `/setborder <size>` command for runtime configuration (requires server privilege)
+
+## Interactive Blocks
+
+### Sign
+- Right-click to open text input prompt
+- Sign text saved to `blockmeta.db` (SQLite via `BlockMetadataDatabase`)
+- Text persisted across server restarts
+- Displayed as overlay on sign block face
+
+### Bed
+- Right-click to set player spawn point to bed position
+- Spawn point persisted in `players.db`
+- On respawn, player teleports to last bed used
+- If bed is destroyed, reverts to default spawn
+
+### Note Block & Jukebox
+- Note block: plays procedural tone via Web Audio API on interaction
+- Jukebox: plays procedural music sequence
+- Audio generated client-side using `AudioManager` (no audio files needed)

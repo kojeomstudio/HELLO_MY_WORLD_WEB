@@ -5,6 +5,7 @@ export interface BlockDefinition {
     transparent: boolean;
     color: string;
     textureName?: string;
+    drawType?: string;
     liquid?: boolean;
     light?: number;
     hardness?: number;
@@ -240,6 +241,7 @@ export class BlockRegistry {
             if (raw.groups !== undefined) block.groups = raw.groups;
             if (raw.soundGroup !== undefined) block.soundGroup = raw.soundGroup;
             if (raw.textureName !== undefined) block.textureName = raw.textureName;
+        if (raw.drawType !== undefined) block.drawType = raw.drawType;
 
             this.blocks.set(id, block);
             this.byName.set(block.name, block);
@@ -264,4 +266,23 @@ export class BlockRegistry {
     }
     getGroups(id: number): Record<string, number> { return this.blocks.get(id)?.groups ?? {}; }
     getAll(): Map<number, BlockDefinition> { return this.blocks; }
+
+    getDrawType(id: number): string {
+        const block = this.blocks.get(id);
+        if (!block) return 'normal';
+        if (block.drawType) return block.drawType;
+        const name = block.name;
+        if (name === 'torch' || name === 'soul_torch') return 'torch';
+        if (name === 'ladder') return 'ladder';
+        if (name === 'fence') return 'fence';
+        if (name.startsWith('door_')) return 'door';
+        if (name === 'iron_bars') return 'glass_pane';
+        if (name.includes('slab') || name === 'snow_layer') return 'slab';
+        if (name.includes('stairs')) return 'stair';
+        if (name === 'fire') return 'firelike';
+        if (name.includes('crop') || name.includes('flower') || name.includes('mushroom') ||
+            name === 'dead_bush' || name === 'tall_grass' || name === 'junglegrass' ||
+            name === 'sugar_cane' || name === 'sugar_cane_block') return 'plantlike';
+        return 'normal';
+    }
 }

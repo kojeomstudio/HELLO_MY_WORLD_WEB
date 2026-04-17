@@ -12,6 +12,7 @@ public class ServerConfig
     public DayNightSettings DayNight { get; set; } = new();
     public NetworkSettings Network { get; set; } = new();
     public LiquidSettings Liquid { get; set; } = new();
+    public string[] CorsOrigins { get; set; } = ["http://localhost:5173", "http://localhost:3000"];
 }
 
 public class LiquidSettings
@@ -43,6 +44,7 @@ public class WorldSettings
     public float TreeDensity { get; set; } = 0.02f;
     public float CaveDensity { get; set; } = 0.5f;
     public float OreDensity { get; set; } = 0.3f;
+    public int WorldBorderSize { get; set; } = 1000;
 }
 
 public class PlayerSettings
@@ -68,6 +70,13 @@ public class PhysicsSettings
     public float Drag { get; set; } = 0.1f;
     public float LiquidDrag { get; set; } = 0.8f;
     public float ClimbSpeed { get; set; } = 2.0f;
+    public float DigRange { get; set; } = 6.0f;
+    public float PlaceRange { get; set; } = 6.0f;
+    public float PunchRange { get; set; } = 4.0f;
+    public float PickupRange { get; set; } = 2.0f;
+    public float EyeHeight { get; set; } = 0.6f;
+    public float PlayerDepth { get; set; } = 0.9f;
+    public float PlayerHeight { get; set; } = 1.8f;
 
     public void LoadFromFile(string dataPath)
     {
@@ -94,6 +103,20 @@ public class PhysicsSettings
             LiquidDrag = (float)liquidDrag.GetDouble();
         if (root.TryGetProperty("climbSpeed", out var climbSpeed))
             ClimbSpeed = (float)climbSpeed.GetDouble();
+        if (root.TryGetProperty("digRange", out var digRange))
+            DigRange = (float)digRange.GetDouble();
+        if (root.TryGetProperty("placeRange", out var placeRange))
+            PlaceRange = (float)placeRange.GetDouble();
+        if (root.TryGetProperty("punchRange", out var punchRange))
+            PunchRange = (float)punchRange.GetDouble();
+        if (root.TryGetProperty("pickupRange", out var pickupRange))
+            PickupRange = (float)pickupRange.GetDouble();
+        if (root.TryGetProperty("eyeHeight", out var eyeHeight))
+            EyeHeight = (float)eyeHeight.GetDouble();
+        if (root.TryGetProperty("playerDepth", out var playerDepth))
+            PlayerDepth = (float)playerDepth.GetDouble();
+        if (root.TryGetProperty("playerHeight", out var playerHeight))
+            PlayerHeight = (float)playerHeight.GetDouble();
     }
 }
 

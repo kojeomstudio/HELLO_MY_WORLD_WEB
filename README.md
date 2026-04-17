@@ -12,8 +12,10 @@ A web-based voxel game ported from the minetest_sub_project (Luanti engine) to a
 - **Bucket System**: Place and pick up water/lava, drink milk for healing
 - **Player Mechanics**: Health, hunger, breath, fall damage, knockback, swimming (liquid physics), climbing, sprinting, flying, slippery blocks (ice), move resistance (soul sand)
 - **Experience System**: XP gains from mining, crafting, smelting, and mob kills with level progression
-- **Mob System**: Hostile mobs (Zombie, Skeleton, Spider) and passive mobs (Cow, Pig, Chicken) with AI and death drops
+- **Mob System**: Hostile mobs (Zombie=3dmg, Skeleton=2dmg, Spider=2dmg) and passive mobs (Cow, Pig, Chicken) with AI state machine (Idle→Chase→Attack), 1s attack cooldown, passive mobs flee when hit, hostile mobs only spawn at night, passive mobs only on grass during day
 - **Entity System**: Dropped items, mob entities, with physics and lifespan
+- **World Border**: Configurable size (default 1000), position clamping, `/setborder` command
+- **Interactive Blocks**: Sign text input (persisted to DB), bed spawn point (persisted), note block/jukebox procedural audio
 - **Day/Night Cycle**: Full day/night cycle with sky brightness transitions
 - **Weather**: Rain particle system with day/night color transitions
 - **Multiplayer**: Real-time multiplayer via SignalR WebSocket with chat, player list
@@ -27,9 +29,15 @@ A web-based voxel game ported from the minetest_sub_project (Luanti engine) to a
 - **Node Timers**: Timed block transformations with persistence
 - **Persistence**: Player data, world chunks, block metadata, chest inventories, and node timers saved to disk
 - **Crop Planting**: Plant wheat, carrot, and potato seeds on farmland via block placement
-- **Server-Authoritative Physics**: Speed validation, teleport detection, noclip prevention, anti-hover gravity, and position correction
+- **Server-Authoritative Physics**: Speed validation, teleport detection, noclip prevention, anti-hover gravity, position correction, NaN/Infinity checks, block type range validation, player AABB overlap on placement
+- **PvP**: Distance check (max 4 blocks), weapon damage with Minetest knockback formula
+- **Torch Placement Validation**: Requires adjacent solid block
 - **Tool Repair**: Combine two damaged tools of the same type to repair them
 - **Texture Atlas**: 89 block textures from minetest devtest, served via Vite and rendered with nearest-neighbor filtering
+- **Block Geometry System**: Custom mesh generation for stairs, slabs, fences, walls, glass panes, doors, ladders, torches, plant-like (cross), and fire-like blocks
+- **Animated Water**: Wave surface effect, lowered water level (0.1 block gap), 0.45 opacity
+- **Animated Lava**: Wave surface effect, emissive vertex color glow (light level 14)
+- **Shadow Mapping**: PCFSoft shadow map (1024), sun directional light, player-following point light
 - **Position Correction**: Server sends position corrections to clients when physics violations are detected
 - **Mob Rendering**: Type-specific colors, sizes, and animations for all 6 mob types
 - **Wield Item Rendering**: Procedural fire sword, ice sword, blood sword, heal sword, elemental sword, daggers with unique visual effects
@@ -93,7 +101,13 @@ web/
 ├── data/                # JSON configuration
 │   ├── blocks.json       # 161 block definitions (IDs 0-160)
 │   ├── items.json        # 210+ items, 125+ recipes, food values, tool capabilities
+│   ├── mobs.json         # 6 mob definitions (health, damage, speed, drops, AI params)
+│   ├── tools.json        # 8 tool material definitions (durability, mining speed, weapon damage)
 │   ├── biomes.json       # 4 biome definitions loaded by NoiseWorldGenerator
+│   ├── physics_constants.json  # Physics constants, interaction ranges, eye height, player depth
+│   ├── privileges.json   # 19 privileges, fully loaded at startup
+│   ├── server_config.json
+│   └── smelting.json     # 25+ smelting recipes
 │   ├── physics_constants.json  # Physics constants loaded by ServerConfig
 │   ├── privileges.json   # 19 privileges, fully loaded at startup
 │   ├── server_config.json
@@ -187,6 +201,7 @@ The Vite dev server proxies `/game` to the server.
 | /unban player | Unban player |
 | /kick player | Kick player |
 | /spawn type x y z | Spawn entity |
+| /setborder size | Set world border size |
 | /killall | Clear all entities |
 | /stop | Shutdown server |
 
@@ -208,8 +223,8 @@ This project is a web port of the Luanti (formerly Minetest) voxel game engine, 
 - **World Generation**: Noise-based terrain with caves, 9 ore types with realistic depth distribution, biome-based generation with heat/humidity noise, trees, and dungeons
 - **Tool Repair**: Matching minetest's tool repair system (combine two same-type tools)
 - **Server Physics Validation**: Anti-cheat with teleport detection, noclip prevention, hover detection, position update rate limiting, and block interaction range validation
-- **Security**: XSS-safe rendering, CORS-restricted origins, player name sanitization, chat message length limits, rate limiting on all actions, and chunk request range limits
-- **CI**: GitHub Actions pipeline for automated server build and client typecheck+build
+- **Security**: XSS-safe rendering, CORS-restricted origins (configurable from `server_config.json`), player name sanitization (regex + reserved names), HTML/XML tag stripping in chat, chat message length limits, rate limiting on all actions (join spam, punch, interact), chunk request range limits, IP ban enforcement, security headers (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection), NaN/Infinity position validation, block type range validation, player bounding box overlap check on placement
+- **CI**: GitHub Actions pipeline with submodule init, Ubuntu + Windows server builds, client typecheck+build, artifact uploads, concurrency control, secrets check
 
 ## License
 

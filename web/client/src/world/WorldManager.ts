@@ -107,6 +107,7 @@ export class WorldManager {
     private connection: HubConnection.HubConnection | null = null;
     private textureAtlas: TextureAtlas | null = null;
     private fallingBlocks: FallingBlockAnimation[] = [];
+    private animatedChunks: Set<string> = new Set();
     private renderDistance: number = 4;
     private aoEnabled: boolean = true;
 
@@ -235,6 +236,10 @@ export class WorldManager {
         this.chunks.set(key, chunk);
         this.pendingChunks.delete(key);
 
+        if (chunk.isWater || chunk.isLava) {
+            this.animatedChunks.add(key);
+        }
+
         this.rebuildNeighborChunks(chunkX, chunkY, chunkZ);
     }
 
@@ -277,6 +282,12 @@ export class WorldManager {
         }
         if (chunk.transparentMesh) {
             this.renderer.addToScene(chunk.transparentMesh);
+        }
+
+        if (chunk.isWater || chunk.isLava) {
+            this.animatedChunks.add(key);
+        } else {
+            this.animatedChunks.delete(key);
         }
     }
     updateBlock(x: number, y: number, z: number, blockData: number): void {
@@ -571,6 +582,12 @@ export class WorldManager {
                 chunk.animateVegetation(time);
             }
         }
+        for (const key of this.animatedChunks) {
+            const chunk = this.chunks.get(key);
+            if (!chunk) continue;
+            if (chunk.isWater) chunk.animateWater(time);
+            if (chunk.isLava) chunk.animateLava(time);
+        }
     }
 
     unloadDistantChunks(playerPos: THREE.Vector3): void {
@@ -596,6 +613,7 @@ export class WorldManager {
                 if (chunk.transparentMesh) {
                     this.renderer.removeFromScene(chunk.transparentMesh);
                 }
+                this.animatedChunks.delete(key);
                 this.chunks.delete(key);
             }
         }

@@ -18,7 +18,7 @@ public class PlayerDatabase
         using var connection = new SqliteConnection(_connectionString);
         connection.Open();
         var cmd = connection.CreateCommand();
-        cmd.CommandText = @"
+            cmd.CommandText = @"
             CREATE TABLE IF NOT EXISTS players (
                 name TEXT PRIMARY KEY,
                 position_x REAL DEFAULT 0,
@@ -39,7 +39,11 @@ public class PlayerDatabase
                 selected_hotbar_slot INTEGER DEFAULT 0,
                 last_ground_y REAL DEFAULT 0,
                 last_login TEXT,
-                last_save TEXT
+                last_save TEXT,
+                spawn_x REAL DEFAULT 0,
+                spawn_y REAL DEFAULT 0,
+                spawn_z REAL DEFAULT 0,
+                has_spawn_point INTEGER DEFAULT 0
             )";
         cmd.ExecuteNonQuery();
     }
@@ -53,11 +57,13 @@ public class PlayerDatabase
             INSERT OR REPLACE INTO players 
             (name, position_x, position_y, position_z, yaw, pitch, health, max_health, breath,
              food_level, food_saturation, total_experience, experience_level, game_mode,
-             inventory_json, armor_json, selected_hotbar_slot, last_ground_y, last_save)
+             inventory_json, armor_json, selected_hotbar_slot, last_ground_y, last_save,
+             spawn_x, spawn_y, spawn_z, has_spawn_point)
             VALUES 
             ($name, $px, $py, $pz, $yaw, $pitch, $health, $maxHealth, $breath,
              $food, $saturation, $totalExp, $expLevel, $gameMode,
-             $inventory, $armor, $hotbar, $lastGroundY, $lastSave)";
+             $inventory, $armor, $hotbar, $lastGroundY, $lastSave,
+             $spawnX, $spawnY, $spawnZ, $hasSpawnPoint)";
         cmd.Parameters.AddWithValue("$name", player.Name);
         cmd.Parameters.AddWithValue("$px", player.Position.X);
         cmd.Parameters.AddWithValue("$py", player.Position.Y);
@@ -77,6 +83,10 @@ public class PlayerDatabase
         cmd.Parameters.AddWithValue("$hotbar", player.SelectedHotbarSlot);
         cmd.Parameters.AddWithValue("$lastGroundY", player.LastGroundY);
         cmd.Parameters.AddWithValue("$lastSave", DateTime.UtcNow.ToString("O"));
+        cmd.Parameters.AddWithValue("$spawnX", player.SpawnPoint.X);
+        cmd.Parameters.AddWithValue("$spawnY", player.SpawnPoint.Y);
+        cmd.Parameters.AddWithValue("$spawnZ", player.SpawnPoint.Z);
+        cmd.Parameters.AddWithValue("$hasSpawnPoint", player.HasSpawnPoint ? 1 : 0);
         cmd.ExecuteNonQuery();
     }
 
@@ -88,7 +98,8 @@ public class PlayerDatabase
         cmd.CommandText = @"
             SELECT position_x, position_y, position_z, yaw, pitch, health, max_health, breath,
                    food_level, food_saturation, total_experience, experience_level, game_mode,
-                   inventory_json, armor_json, selected_hotbar_slot, last_ground_y
+                   inventory_json, armor_json, selected_hotbar_slot, last_ground_y,
+                   spawn_x, spawn_y, spawn_z, has_spawn_point
             FROM players WHERE name = $name";
         cmd.Parameters.AddWithValue("$name", player.Name);
         using var reader = cmd.ExecuteReader();
@@ -107,6 +118,12 @@ public class PlayerDatabase
         player.Mode = (GameMode)reader.GetInt32(12);
         player.SelectedHotbarSlot = reader.GetInt32(15);
         player.LastGroundY = reader.GetFloat(16);
+
+        if (!reader.IsDBNull(17) && !reader.IsDBNull(18) && !reader.IsDBNull(19))
+        {
+            player.SpawnPoint = new Vector3(reader.GetFloat(17), reader.GetFloat(18), reader.GetFloat(19));
+        }
+        player.HasSpawnPoint = !reader.IsDBNull(20) && reader.GetInt32(20) == 1;
 
         if (!reader.IsDBNull(13))
         {

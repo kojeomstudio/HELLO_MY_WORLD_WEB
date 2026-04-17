@@ -226,6 +226,16 @@ export class GameClient {
         this.connection.on('OnExperienceUpdate', (_level: number, _totalExp: number) => {
             this.uiManager.updateExperience(_level, _totalExp);
         });
+
+        this.connection.on('OnSignEditorOpened', (x: number, y: number, z: number, text: string) => {
+            this.uiManager.showSignEditor(x, y, z, text, (newText) => {
+                this.connection?.invoke('SetSignText', x, y, z, newText);
+            });
+        });
+
+        this.connection.on('OnBlockSound', (blockType: string, _x: number, _y: number, _z: number) => {
+            this.audioManager.playBlockSound(blockType);
+        });
     }
 
     sendChat(message: string): void {
@@ -371,6 +381,7 @@ export class GameClient {
         }
 
         const playerPos = this.playerController.getPosition();
+        this.renderer.updatePlayerLight(playerPos.x, playerPos.y, playerPos.z);
         this.weatherSystem.update(dt, playerPos.x, playerPos.y, playerPos.z);
 
         const vel = this.playerController.getVelocity();

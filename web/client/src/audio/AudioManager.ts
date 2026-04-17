@@ -168,4 +168,58 @@ export class AudioManager {
     dispose(): void {
         this.audioContext?.close();
     }
+
+    playBlockSound(type: string): void {
+        if (!this.audioContext) return;
+        if (this.audioContext.state === 'suspended') {
+            this.audioContext.resume();
+        }
+
+        if (type === 'note_block') {
+            this.playNoteBlockTone();
+        } else if (type === 'jukebox') {
+            this.playJukeboxMelody();
+        }
+    }
+
+    private playNoteBlockTone(): void {
+        if (!this.audioContext) return;
+        const ctx = this.audioContext;
+        const duration = 0.8;
+
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(440, ctx.currentTime);
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(this.volume * 0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + duration);
+    }
+
+    private playJukeboxMelody(): void {
+        if (!this.audioContext) return;
+        const ctx = this.audioContext;
+        const notes = [523.25, 587.33, 659.25, 783.99, 659.25, 523.25];
+        const noteDuration = 0.2;
+
+        for (let i = 0; i < notes.length; i++) {
+            const osc = ctx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(notes[i], ctx.currentTime + i * noteDuration);
+
+            const gain = ctx.createGain();
+            gain.gain.setValueAtTime(this.volume * 0.2, ctx.currentTime + i * noteDuration);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + (i + 1) * noteDuration);
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(ctx.currentTime + i * noteDuration);
+            osc.stop(ctx.currentTime + (i + 1) * noteDuration);
+        }
+    }
 }

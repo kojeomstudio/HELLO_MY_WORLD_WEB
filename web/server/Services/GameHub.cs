@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.SignalR;
+using System.Text.RegularExpressions;
 using System.Text.Json;
 using WebGameServer.Core;
 using WebGameServer.Core.Auth;
@@ -46,11 +47,14 @@ public interface IGameClient
     Task OnArmorUpdate(object[] armorSlots);
     Task OnExperienceUpdate(int level, int totalExp);
     Task OnPositionCorrection(float x, float y, float z);
+    Task OnSignEditorOpened(int x, int y, int z, string text);
+    Task OnBlockSound(string blockType, int x, int y, int z);
 }
 
 public class GameHub : Hub<IGameClient>
 {
     private static readonly Dictionary<string, DateTime> _lastActionTimes = new();
+    private static readonly Dictionary<string, int> _joinAttempts = new();
 
     private readonly GameServer _gameServer;
     private readonly ILogger<GameHub> _logger;
@@ -106,15 +110,25 @@ public class GameHub : Hub<IGameClient>
 
     public async Task Join(string playerName)
     {
+        var joinKey = Context.ConnectionId;
+        _joinAttempts.TryGetValue(joinKey, out var attempts);
+        if (attempts >= 5)
+        {
+            await Clients.Caller.OnChatMessage("Server", "Too many join attempts. Wait a minute.");
+            return;
+        }
+        _joinAttempts[joinKey] = attempts + 1;
+
+        var ipAddress = Context.GetHttpContext()?.Connection?.RemoteIpAddress?.ToString();
         var authResult = _authService.AuthenticatePlayer(
             playerName, Context.ConnectionId,
-            _gameServer.OnlinePlayerCount, _gameServer.MaxPlayers);
+            _gameServer.OnlinePlayerCount, _gameServer.MaxPlayers, ipAddress);
 
         if (authResult != AuthResult.Success)
         {
             var msg = authResult switch
             {
-                AuthResult.NameInvalid => "Invalid name. Use 1-20 characters.",
+                AuthResult.NameInvalid => "Invalid name. Use 1-20 alphanumeric characters, underscores, or hyphens. Reserved names are not allowed.",
                 AuthResult.NameTaken => "Name already in use.",
                 AuthResult.Banned => "You are banned from this server.",
                 AuthResult.ServerFull => "Server is full.",
@@ -129,6 +143,8 @@ public class GameHub : Hub<IGameClient>
             await Clients.Caller.OnChatMessage("Server", "Failed to join. Name taken or server full.");
             return;
         }
+
+        _joinAttempts.Remove(joinKey);
 
         var player = _gameServer.GetPlayer(playerName);
         if (player == null) return;
@@ -155,8 +171,19 @@ public class GameHub : Hub<IGameClient>
     {
         if (!CheckRateLimit(Context.ConnectionId, "position", 50)) return;
 
-        var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        if (float.IsNaN(x) || float.IsInfinity(x) || float.IsNaN(y) || float.IsInfinity(y) ||
+            float.IsNaN(z) || float.IsInfinity(z) || float.IsNaN(vx) || float.IsInfinity(vx) ||
+            float.IsNaN(vy) || float.IsInfinity(vy) || float.IsNaN(vz) || float.IsInfinity(vz))
+            return;
+
+        const float maxBound = 100000f;
+        if (Math.Abs(x) > maxBound || Math.Abs(y) > maxBound || Math.Abs(z) > maxBound) return;
+
+        var player = GetAuthenticatedPlayer();
         if (player == null) return;
+
+        var border = _gameServer.WorldBorderSize;
+        if (Math.Abs(x) > border || Math.Abs(z) > border) return;
 
         _gameServer.UpdatePlayerPosition(Context.ConnectionId, new Vector3(x, y, z), new Vector3(vx, vy, vz), yaw, pitch);
 
@@ -175,10 +202,12 @@ public class GameHub : Hub<IGameClient>
     {
         if (!CheckRateLimit(Context.ConnectionId, "chat", 500)) return;
 
-        var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        var player = GetAuthenticatedPlayer();
         if (player == null) return;
 
         if (string.IsNullOrEmpty(message) || message.Length > 256) return;
+
+        message = SanitizeChatMessage(message);
 
         if (!string.IsNullOrEmpty(message) && message[0] == '/')
         {
@@ -197,12 +226,28 @@ public class GameHub : Hub<IGameClient>
     {
         if (!CheckRateLimit(Context.ConnectionId, "place", 250)) return;
 
-        var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        var player = GetAuthenticatedPlayer();
         if (player == null) return;
+
+        if (blockType > 160) return;
 
         var blockCenter = new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
         var distance = Vector3.Distance(player.Position, blockCenter);
-        if (distance > 6.0f) return;
+        if (distance > _gameServer.Config.Physics.PlaceRange) return;
+
+        var playerHalfWidth = _gameServer.Config.Physics.PlayerDepth;
+        var playerHeight = _gameServer.Config.Physics.PlayerHeight;
+        foreach (var otherPlayer in _gameServer.OnlinePlayers)
+        {
+            if (otherPlayer.ConnectionId == Context.ConnectionId || otherPlayer.IsDead) continue;
+            var otherCenter = otherPlayer.Position;
+            if (Math.Abs(blockCenter.X - otherCenter.X) < playerHalfWidth &&
+                Math.Abs(blockCenter.Y - otherCenter.Y) < playerHeight &&
+                Math.Abs(blockCenter.Z - otherCenter.Z) < playerHalfWidth)
+            {
+                return;
+            }
+        }
 
         var cropType = blockType switch
         {
@@ -230,6 +275,31 @@ public class GameHub : Hub<IGameClient>
             return;
         }
 
+        if (blockDef.Name == "torch")
+        {
+            var directions = new (int dx, int dy, int dz)[]
+            {
+                (1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)
+            };
+            var hasSolidNeighbor = false;
+            foreach (var (dx, dy, dz) in directions)
+            {
+                var neighborPos = new Vector3s((short)(x + dx), (short)(y + dy), (short)(z + dz));
+                var neighborBlock = _gameServer.DefaultWorld.GetBlock(neighborPos);
+                var neighborDef = _blockDefinitionManager.Get(neighborBlock.ToUInt16());
+                if (neighborDef != null && neighborDef.Solid)
+                {
+                    hasSolidNeighbor = true;
+                    break;
+                }
+            }
+            if (!hasSolidNeighbor)
+            {
+                await Clients.Caller.OnChatMessage("Server", "Torch must be placed next to a solid block");
+                return;
+            }
+        }
+
         var newBlock = new Block((BlockType)blockType);
         _gameServer.DefaultWorld.SetBlock(new Vector3s((short)x, (short)y, (short)z), newBlock);
         await Clients.All.OnBlockUpdate(x, y, z, newBlock.ToUInt16());
@@ -239,12 +309,12 @@ public class GameHub : Hub<IGameClient>
     {
         if (!CheckRateLimit(Context.ConnectionId, "dig", 250)) return;
 
-        var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        var player = GetAuthenticatedPlayer();
         if (player == null) return;
 
         var blockCenter = new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
         var distance = Vector3.Distance(player.Position, blockCenter);
-        if (distance > 6.0f) return;
+        if (distance > _gameServer.Config.Physics.DigRange) return;
 
         var blockPos = new Vector3s((short)x, (short)y, (short)z);
         var oldBlock = _gameServer.DefaultWorld.GetBlock(blockPos);
@@ -296,14 +366,7 @@ public class GameHub : Hub<IGameClient>
             if (isTool)
             {
                 var durabilityStr = heldItem.Metadata;
-                int maxDurability = toolName switch
-                {
-                    var n when n.StartsWith("wooden_") => 59,
-                    var n when n.StartsWith("stone_") => 131,
-                    var n when n.StartsWith("iron_") => 250,
-                    var n when n.StartsWith("diamond_") => 1561,
-                    _ => 60
-                };
+                int maxDurability = ToolConfig.GetDurability(toolName);
                 int currentDurability = maxDurability;
                 if (int.TryParse(durabilityStr, out var parsed))
                 {
@@ -330,7 +393,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task<float> DigBlockStart(int x, int y, int z)
     {
-        var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        var player = GetAuthenticatedPlayer();
         if (player == null) return -1f;
         var blockPos = new Vector3s((short)x, (short)y, (short)z);
         var block = _gameServer.DefaultWorld.GetBlock(blockPos);
@@ -363,7 +426,7 @@ public class GameHub : Hub<IGameClient>
     {
         if (!CheckRateLimit(Context.ConnectionId, "bucket", 500)) return false;
 
-        var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        var player = GetAuthenticatedPlayer();
         if (player == null) return false;
 
         var hotbarItem = player.GetSelectedHotbarItem();
@@ -435,14 +498,7 @@ public class GameHub : Hub<IGameClient>
 
     private static float GetToolMultiplier(string toolName, BlockDefinition blockDef)
     {
-        var materialMultiplier = toolName switch
-        {
-            var n when n.StartsWith("diamond_") => 8,
-            var n when n.StartsWith("iron_") => 6,
-            var n when n.StartsWith("stone_") => 4,
-            var n when n.StartsWith("wooden_") => 2,
-            _ => 1
-        };
+        var materialMultiplier = ToolConfig.GetMiningSpeed(toolName);
 
         string? toolGroup = null;
         if (toolName.Contains("pickaxe")) toolGroup = "cracky";
@@ -469,7 +525,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task UseItem(int slotIndex)
     {
-        var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        var player = GetAuthenticatedPlayer();
         if (player == null) return;
         if (player.IsDead) return;
 
@@ -520,15 +576,24 @@ public class GameHub : Hub<IGameClient>
 
     public async Task Respawn()
     {
-        var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        var player = GetAuthenticatedPlayer();
         if (player == null) return;
         if (!player.IsDead) return;
 
         player.Respawn();
 
-        var spawnY = _gameServer.DefaultWorld.GetGroundHeight(0, 0) + 2;
-        player.Position = new Vector3(0, spawnY, 0);
-        player.LastGroundY = spawnY;
+        Vector3 spawnPos;
+        if (player.HasSpawnPoint)
+        {
+            spawnPos = player.SpawnPoint;
+        }
+        else
+        {
+            var spawnY = _gameServer.DefaultWorld.GetGroundHeight(0, 0) + 2;
+            spawnPos = new Vector3(0, spawnY, 0);
+        }
+        player.Position = spawnPos;
+        player.LastGroundY = spawnPos.Y;
         player.FallDistance = 0;
 
         await Clients.Caller.OnHealthUpdate(player.Health, player.MaxHealth);
@@ -539,7 +604,7 @@ public class GameHub : Hub<IGameClient>
     {
         if (!CheckRateLimit(Context.ConnectionId, "chunk", 100)) return;
 
-        var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        var player = GetAuthenticatedPlayer();
         if (player == null) return;
 
         var dx = Math.Abs(chunkX * 16 + 8 - player.Position.X);
@@ -554,7 +619,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task SelectSlot(int slot)
     {
-        var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        var player = GetAuthenticatedPlayer();
         if (player == null) return;
         if (slot < 0 || slot >= player.Inventory.HotbarSize) return;
         player.SelectedHotbarSlot = slot;
@@ -562,13 +627,63 @@ public class GameHub : Hub<IGameClient>
 
     public async Task InteractBlock(int x, int y, int z)
     {
-        var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        var player = GetAuthenticatedPlayer();
         if (player == null) return;
+
+        var blockPos = new Vector3s((short)x, (short)y, (short)z);
+        var block = _gameServer.DefaultWorld.GetBlock(blockPos);
+        var blockData = block.ToUInt16();
+        if (blockData == 0) return;
+
+        var blockDef = _blockDefinitionManager.Get(blockData);
+        if (blockDef == null) return;
+
+        var blockName = blockDef.Name;
+
+        if (blockName == "sign")
+        {
+            var posKey = GameServer.PositionKey(x, y, z);
+            var existingText = _gameServer.BlockMetadataDatabase.LoadSignText(posKey) ?? string.Empty;
+            await Clients.Caller.OnSignEditorOpened(x, y, z, existingText);
+        }
+        else if (blockName == "bed")
+        {
+            player.SpawnPoint = new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
+            await Clients.Caller.OnChatMessage("Server", "Spawn point set");
+        }
+        else if (blockName == "note_block" || blockName == "jukebox")
+        {
+            await Clients.Caller.OnBlockSound(blockName, x, y, z);
+        }
+    }
+
+    public async Task SetSignText(int x, int y, int z, string text)
+    {
+        if (!CheckRateLimit(Context.ConnectionId, "sign", 300)) return;
+
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
+
+        if (string.IsNullOrEmpty(text) || text.Length > 100) return;
+
+        var blockPos = new Vector3s((short)x, (short)y, (short)z);
+        var block = _gameServer.DefaultWorld.GetBlock(blockPos);
+        var blockDef = _blockDefinitionManager.Get(block.ToUInt16());
+        if (blockDef == null || blockDef.Name != "sign") return;
+
+        var blockCenter = new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
+        var distance = Vector3.Distance(player.Position, blockCenter);
+        if (distance > 6.0f) return;
+
+        var posKey = GameServer.PositionKey(x, y, z);
+        _gameServer.BlockMetadataDatabase.SaveSignText(posKey, text);
     }
 
     public async Task InteractWithBlock(int x, int y, int z)
     {
-        var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        if (!CheckRateLimit(Context.ConnectionId, "interact", 300)) return;
+
+        var player = GetAuthenticatedPlayer();
         if (player == null) return;
         var blockPos = new Vector3s((short)x, (short)y, (short)z);
         var block = _gameServer.DefaultWorld.GetBlock(blockPos);
@@ -631,6 +746,22 @@ public class GameHub : Hub<IGameClient>
                 }).ToArray();
                 await Clients.Caller.OnCraftingRecipes(recipeDtos!);
             }
+            else if (blockName == "sign")
+            {
+                var posKey = GameServer.PositionKey(x, y, z);
+                var existingText = _gameServer.BlockMetadataDatabase.LoadSignText(posKey) ?? string.Empty;
+                await Clients.Caller.OnSignEditorOpened(x, y, z, existingText);
+            }
+            else if (blockName == "bed")
+            {
+                player.SpawnPoint = new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
+                player.HasSpawnPoint = true;
+                await Clients.Caller.OnChatMessage("Server", "Spawn point set");
+            }
+            else if (blockName == "note_block" || blockName == "jukebox")
+            {
+                await Clients.Caller.OnBlockSound(blockName, x, y, z);
+            }
         }
 
         var playerItem = player.GetSelectedHotbarItem();
@@ -659,22 +790,26 @@ public class GameHub : Hub<IGameClient>
 
     public async Task PunchPlayer(string targetName)
     {
-        var attacker = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        if (!CheckRateLimit(Context.ConnectionId, "punch", 500)) return;
+
+        var attacker = GetAuthenticatedPlayer();
         if (attacker == null) return;
         var target = _gameServer.GetPlayer(targetName);
         if (target == null || target.IsDead) return;
+
+        var distance = Vector3.Distance(attacker.Position, target.Position);
+        if (distance > _gameServer.Config.Physics.PunchRange)
+        {
+            await Clients.Caller.OnChatMessage("Server", "Too far away");
+            return;
+        }
+
         var toolItem = attacker.GetSelectedHotbarItem();
         var damage = 1.0f;
         if (toolItem != null)
         {
             var toolName = toolItem.ItemId.ToLowerInvariant();
-            damage = toolName switch
-            {
-                "wooden_sword" => 4, "stone_sword" => 5, "iron_sword" => 6, "diamond_sword" => 7,
-                "wooden_axe" => 3, "stone_axe" => 4, "iron_axe" => 5, "diamond_axe" => 6,
-                "wooden_pickaxe" => 2, "stone_pickaxe" => 3, "iron_pickaxe" => 4, "diamond_pickaxe" => 5,
-                _ => 1
-            };
+            damage = ToolConfig.GetWeaponDamage(toolName);
         }
         var knockback = _gameServer.DamagePlayerWithKnockback(target, damage, attacker.Position, "player");
         await Clients.Client(target.ConnectionId).OnKnockback(knockback.X, knockback.Y, knockback.Z);
@@ -682,7 +817,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task GetPrivileges()
     {
-        var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        var player = GetAuthenticatedPlayer();
         if (player == null) return;
         var privs = _gameServer.Privileges.GetPlayerPrivileges(player.Name);
         await Clients.Caller.OnPrivilegeList(privs);
@@ -690,7 +825,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task Craft(string recipeId)
     {
-        var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        var player = GetAuthenticatedPlayer();
         if (player == null) return;
 
         var availableItems = player.Inventory.GetAll()
@@ -742,7 +877,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task CraftRecipe(int recipeIndex)
     {
-        var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        var player = GetAuthenticatedPlayer();
         if (player == null) return;
 
         var recipes = _craftingSystem.GetAllRecipes();
@@ -802,7 +937,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task StartSmelting(string inputItemId, string resultItemId, int x, int y, int z)
     {
-        var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        var player = GetAuthenticatedPlayer();
         if (player == null) return;
 
         var posKey = GameServer.PositionKey(x, y, z);
@@ -832,7 +967,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task MoveItemToChest(int slotIndex, int chestSlot, int x, int y, int z)
     {
-        var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        var player = GetAuthenticatedPlayer();
         if (player == null) return;
 
         var posKey = GameServer.PositionKey(x, y, z);
@@ -854,7 +989,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task TakeItemFromChest(int chestSlot, int slotIndex, int x, int y, int z)
     {
-        var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        var player = GetAuthenticatedPlayer();
         if (player == null) return;
 
         var posKey = GameServer.PositionKey(x, y, z);
@@ -876,14 +1011,14 @@ public class GameHub : Hub<IGameClient>
 
     public async Task RequestInventory()
     {
-        var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        var player = GetAuthenticatedPlayer();
         if (player == null) return;
         await SendInventoryUpdate(player);
     }
 
     public async Task DropItem(int slotIndex, int count)
     {
-        var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        var player = GetAuthenticatedPlayer();
         if (player == null) return;
 
         var item = player.Inventory.RemoveItem(slotIndex, count);
@@ -971,7 +1106,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task EquipArmor(int slotIndex, int armorSlot)
     {
-        var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        var player = GetAuthenticatedPlayer();
         if (player == null) return;
         var item = player.Inventory[slotIndex];
         if (item == null) return;
@@ -1000,7 +1135,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task UnequipArmor(int armorSlot)
     {
-        var player = _gameServer.GetPlayerByConnection(Context.ConnectionId);
+        var player = GetAuthenticatedPlayer();
         if (player == null) return;
         if (armorSlot < 0 || armorSlot >= player.ArmorSlots.Length) return;
         var armor = player.ArmorSlots[armorSlot];
@@ -1012,6 +1147,18 @@ public class GameHub : Hub<IGameClient>
             await SendInventoryUpdate(player);
             await SendArmorUpdate(player);
         }
+    }
+
+    private PlayerEnt? GetAuthenticatedPlayer()
+    {
+        return _gameServer.GetPlayerByConnection(Context.ConnectionId);
+    }
+
+    private static string SanitizeChatMessage(string message)
+    {
+        message = Regex.Replace(message, "<[^>]*>", string.Empty);
+        message = message.Replace("\r\n", " ").Replace("\n", " ");
+        return message;
     }
 
     private static bool CheckRateLimit(string connectionId, string action, int cooldownMs)
@@ -1032,6 +1179,10 @@ public class GameHub : Hub<IGameClient>
             var cutoff = now.AddMinutes(-5);
             var expired = _lastActionTimes.Where(kvp => kvp.Value < cutoff).Select(kvp => kvp.Key).ToList();
             foreach (var k in expired) _lastActionTimes.Remove(k);
+
+            var joinExpired = _joinAttempts.Where(kvp => _lastActionTimes.TryGetValue(kvp.Key, out _) == false)
+                .Select(kvp => kvp.Key).ToList();
+            foreach (var k in joinExpired) _joinAttempts.Remove(k);
         }
 
         return true;

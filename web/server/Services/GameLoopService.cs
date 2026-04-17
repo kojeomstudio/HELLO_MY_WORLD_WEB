@@ -22,7 +22,6 @@ public class GameLoopService : BackgroundService
     private DateTime _lastTickTime;
     private int _tpsFrameCount;
     private float _currentTps;
-    private const float PickupRange = 2.0f;
     private const int AutoSaveIntervalSeconds = 300;
     private const int FallingBlockInterval = 10;
 
@@ -104,7 +103,7 @@ public class GameLoopService : BackgroundService
                 if (player.IsDead) continue;
 
                 var distance = Vector3.Distance(item.Position, player.Position);
-                if (distance > PickupRange) continue;
+                if (distance > _config.Physics.PickupRange) continue;
 
                 var stack = new ItemStack(item.ItemId, item.Count, item.Metadata);
                 if (!player.Inventory.AddItem(stack)) continue;

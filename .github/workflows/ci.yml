@@ -1,5 +1,9 @@
 name: CI
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [main, master]
@@ -10,8 +14,11 @@ jobs:
   server:
     name: Build Server
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Setup .NET 8.0
         uses: actions/setup-dotnet@v4
@@ -24,11 +31,32 @@ jobs:
       - name: Build
         run: dotnet build web/server/WebGameServer.csproj --no-restore --configuration Release
 
+      - name: Test
+        run: dotnet test web/server/WebGameServer.csproj --no-restore --configuration Release --verbosity minimal
+        continue-on-error: true
+
+      - name: Check for secrets
+        run: |
+          if grep -rq "password\|secret\|api_key" web/server/ --include="*.cs" | grep -v "example\|placeholder\|TODO\|FIXME"; then
+            echo "::warning::Potential secrets found in source code"
+          fi
+        continue-on-error: true
+
+      - name: Upload server build
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-build
+          path: web/server/bin/Release/
+          retention-days: 7
+
   client:
     name: Build & Typecheck Client
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -48,3 +76,47 @@ jobs:
       - name: Build
         run: npm run build
         working-directory: web/client
+
+      - name: Verify build output
+        run: |
+          if [ ! -d "web/client/dist" ]; then
+            echo "::error::Build output directory web/client/dist does not exist"
+            exit 1
+          fi
+          FILE_COUNT=$(find web/client/dist -type f | wc -l)
+          if [ "$FILE_COUNT" -eq 0 ]; then
+            echo "::error::Build output directory is empty"
+            exit 1
+          fi
+          echo "Build output verified: $FILE_COUNT files in web/client/dist"
+
+      - name: Upload client build
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-build
+          path: web/client/dist/
+          retention-days: 7
+
+  server-windows:
+    name: Build Server (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup .NET 8.0
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore web/server/WebGameServer.csproj
+
+      - name: Build
+        run: dotnet build web/server/WebGameServer.csproj --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test web/server/WebGameServer.csproj --no-restore --configuration Release --verbosity minimal
+        continue-on-error: true

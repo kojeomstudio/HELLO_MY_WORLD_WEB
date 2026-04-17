@@ -30,6 +30,12 @@ if (!Directory.Exists(dataPath))
     dataPath = Path.Combine(Directory.GetCurrentDirectory(), "data");
 serverConfig.Physics.LoadFromFile(dataPath);
 
+var mobsPath = Path.Combine(dataPath, "mobs.json");
+MobConfig.LoadFromFile(mobsPath);
+
+var toolsPath = Path.Combine(dataPath, "tools.json");
+ToolConfig.LoadFromFile(toolsPath);
+
 builder.Services.AddSingleton(serverConfig);
 
 builder.Services.AddSignalR();
@@ -143,7 +149,8 @@ builder.Services.AddSingleton<ChatCommandManager>(sp =>
         (time) => { gameServer.SetTimeOfDay(time); },
         () => { gameServer.Stop(); },
         (entityType, pos) => { gameServer.SpawnEntity(entityType, pos); },
-        () => { gameServer.ClearAllEntities(); });
+        () => { gameServer.ClearAllEntities(); },
+        (size) => { gameServer.SetWorldBorder(size); });
 });
 builder.Services.AddSingleton<CraftingSystem>(sp =>
 {
@@ -163,7 +170,7 @@ builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.WithOrigins("http://localhost:5173", "http://localhost:3000")
+        policy.WithOrigins(serverConfig.CorsOrigins)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
@@ -179,6 +186,13 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors();
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    context.Response.Headers["X-Frame-Options"] = "DENY";
+    context.Response.Headers["X-XSS-Protection"] = "1; mode=block";
+    await next();
+});
 app.UseAuthorization();
 app.MapControllers();
 app.MapHub<GameHub>("/game");

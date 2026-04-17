@@ -40,6 +40,8 @@ public class Player
     public float FoodSaturation { get; set; } = 5f;
     public int TotalExperience { get; set; }
     public int ExperienceLevel { get; set; }
+    public Vector3 SpawnPoint { get; set; } = Vector3.Zero;
+    public bool HasSpawnPoint { get; set; }
 
     public Player(string name)
     {

@@ -40,6 +40,7 @@ public class ChatCommandManager
     private readonly Action? _stopServer;
     private readonly Action<string, Vector3>? _spawnEntity;
     private readonly Action? _clearAllEntities;
+    private readonly Action<int>? _setWorldBorder;
 
     public ChatCommandManager(
         Func<long> getGameTime,
@@ -59,7 +60,8 @@ public class ChatCommandManager
         Action<long>? setTimeOfDay = null,
         Action? stopServer = null,
         Action<string, Vector3>? spawnEntity = null,
-        Action? clearAllEntities = null)
+        Action? clearAllEntities = null,
+        Action<int>? setWorldBorder = null)
     {
         _getGameTime = getGameTime;
         _getTps = getTps;
@@ -79,6 +81,7 @@ public class ChatCommandManager
         _stopServer = stopServer;
         _spawnEntity = spawnEntity;
         _clearAllEntities = clearAllEntities;
+        _setWorldBorder = setWorldBorder;
         RegisterBuiltInCommands();
     }
 
@@ -292,6 +295,16 @@ public class ChatCommandManager
                 if (_clearAllEntities == null) return Task.FromResult("Kill all command is not available.");
                 _clearAllEntities();
                 return Task.FromResult("All entities have been cleared");
+            }));
+
+        Register(new ChatCommand("setborder", "Set the world border size", Array.Empty<string>(),
+            (_, args) =>
+            {
+                if (_setWorldBorder == null) return Task.FromResult("Set border command is not available.");
+                if (args.Length == 0 || !int.TryParse(args[0], out var size) || size < 100)
+                    return Task.FromResult("Usage: /setborder <size> (minimum 100)");
+                _setWorldBorder(size);
+                return Task.FromResult($"World border set to {size} ({size * 2}x{size * 2})");
             }));
     }
 

@@ -647,6 +647,7 @@ export class UIManager {
         this.hideFurnaceUI();
         this.hideChestUI();
         this.hideCreativeInventory();
+        this.hideSignEditor();
     }
 
     setCreativeSelectHandler(handler: (blockId: number) => void): void {
@@ -957,6 +958,75 @@ export class UIManager {
             this.showArmorPanel();
         } else {
             this.hideArmorPanel();
+        }
+    }
+
+    showSignEditor(_x: number, _y: number, _z: number, existingText: string, onSave: (text: string) => void): void {
+        this.hideSignEditor();
+        document.exitPointerLock();
+
+        const overlay = document.createElement('div');
+        overlay.id = 'sign-editor-overlay';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:500;display:flex;align-items:center;justify-content:center;';
+
+        const container = document.createElement('div');
+        container.style.cssText = 'background:rgba(101,67,33,0.95);color:white;padding:20px;border-radius:8px;width:360px;display:flex;flex-direction:column;gap:12px;';
+
+        const header = document.createElement('div');
+        header.style.cssText = 'font-size:18px;font-weight:bold;text-align:center;';
+        header.textContent = 'Edit Sign';
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.maxLength = 100;
+        input.placeholder = 'Enter sign text...';
+        input.value = existingText;
+        input.style.cssText = 'width:100%;padding:10px;background:rgba(0,0,0,0.4);border:2px solid #8B6914;border-radius:4px;color:white;font-size:14px;outline:none;box-sizing:border-box;';
+
+        const buttons = document.createElement('div');
+        buttons.style.cssText = 'display:flex;gap:10px;justify-content:flex-end;';
+
+        const saveBtn = document.createElement('button');
+        saveBtn.style.cssText = 'padding:8px 20px;cursor:pointer;background:#556b2f;color:white;border:1px solid #6b8e23;border-radius:4px;font-size:14px;';
+        saveBtn.textContent = 'Save';
+        saveBtn.addEventListener('click', () => {
+            const text = input.value.trim();
+            if (text) {
+                onSave(text);
+            }
+            this.hideSignEditor();
+        });
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.style.cssText = 'padding:8px 20px;cursor:pointer;background:#8b0000;color:white;border:1px solid #a52a2a;border-radius:4px;font-size:14px;';
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.addEventListener('click', () => {
+            this.hideSignEditor();
+        });
+
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                saveBtn.click();
+            } else if (e.key === 'Escape') {
+                this.hideSignEditor();
+            }
+        });
+
+        buttons.appendChild(cancelBtn);
+        buttons.appendChild(saveBtn);
+        container.appendChild(header);
+        container.appendChild(input);
+        container.appendChild(buttons);
+        overlay.appendChild(container);
+        document.body.appendChild(overlay);
+        input.focus();
+        input.select();
+    }
+
+    hideSignEditor(): void {
+        const overlay = document.getElementById('sign-editor-overlay');
+        if (overlay && overlay.parentNode) {
+            overlay.parentNode.removeChild(overlay);
         }
     }
 }

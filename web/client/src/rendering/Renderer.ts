@@ -17,6 +17,7 @@ export class Renderer {
     private damageFlashIntensity: number = 0;
     private currentBrightness: number = 1;
     private isRaining: boolean = false;
+    private playerLight: THREE.PointLight;
     private normalFogNear: number = 80;
     private normalFogFar: number = 160;
     private rainFogNear: number = 30;
@@ -38,14 +39,28 @@ export class Renderer {
         this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        this.renderer.shadowMap.enabled = false;
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
         this.skyLight = new THREE.DirectionalLight(0xffffff, 1.0);
         this.skyLight.position.set(100, 200, 100);
+        this.skyLight.castShadow = true;
+        this.skyLight.shadow.mapSize.width = 1024;
+        this.skyLight.shadow.mapSize.height = 1024;
+        this.skyLight.shadow.camera.left = -50;
+        this.skyLight.shadow.camera.right = 50;
+        this.skyLight.shadow.camera.top = 50;
+        this.skyLight.shadow.camera.bottom = -50;
+        this.skyLight.shadow.camera.near = 0.5;
+        this.skyLight.shadow.camera.far = 500;
         this.scene.add(this.skyLight);
 
         this.ambientLight = new THREE.AmbientLight(0x404040, 0.6);
         this.scene.add(this.ambientLight);
+
+        this.playerLight = new THREE.PointLight(0xffffff, 0.3, 20);
+        this.playerLight.position.set(0, 0, 0);
+        this.scene.add(this.playerLight);
 
         this.addSkyDome();
         this.setupResizeHandler();
@@ -177,6 +192,10 @@ export class Renderer {
 
     updateEffects(dt: number): void {
         this.updateDamageFlash(dt);
+    }
+
+    updatePlayerLight(x: number, y: number, z: number): void {
+        this.playerLight.position.set(x, y, z);
     }
 
     render(): void {

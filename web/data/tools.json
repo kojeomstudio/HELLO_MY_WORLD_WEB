@@ -1,0 +1,41 @@
+{
+    "materials": {
+        "wooden": { "durability": 59, "miningSpeed": 2.0 },
+        "stone": { "durability": 131, "miningSpeed": 4.0 },
+        "iron": { "durability": 250, "miningSpeed": 6.0 },
+        "diamond": { "durability": 1561, "miningSpeed": 8.0 },
+        "gold": { "durability": 32, "miningSpeed": 12.0 },
+        "mese": { "durability": 1337, "miningSpeed": 10.0 },
+        "steel": { "durability": 400, "miningSpeed": 6.0 },
+        "titanium": { "durability": 2000, "miningSpeed": 9.0 }
+    },
+    "weaponDamage": {
+        "wooden_sword": 4,
+        "stone_sword": 5,
+        "iron_sword": 6,
+        "diamond_sword": 7,
+        "mese_sword": 100,
+        "steel_sword": 6,
+        "titanium_sword": 8,
+        "fire_sword": 7,
+        "ice_sword": 6,
+        "blood_sword": 9,
+        "heal_sword": -5,
+        "elemental_sword": 10,
+        "wood_dagger": 2,
+        "steel_dagger": 4,
+        "diamond_dagger": 5,
+        "wooden_axe": 3,
+        "stone_axe": 4,
+        "iron_axe": 5,
+        "diamond_axe": 6,
+        "steel_axe": 5,
+        "wooden_pickaxe": 2,
+        "stone_pickaxe": 3,
+        "iron_pickaxe": 4,
+        "diamond_pickaxe": 5,
+        "mese_pickaxe": 100,
+        "titanium_pickaxe": 5,
+        "steel_pickaxe": 4
+    }
+}

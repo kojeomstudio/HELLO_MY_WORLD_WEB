@@ -37,6 +37,10 @@ public class BlockMetadataDatabase
                 block_name TEXT,
                 expiration REAL,
                 PRIMARY KEY (x, y, z)
+            );
+            CREATE TABLE IF NOT EXISTS sign_text (
+                pos_key TEXT PRIMARY KEY,
+                text TEXT NOT NULL
             )";
         cmd.ExecuteNonQuery();
     }
@@ -161,5 +165,29 @@ public class BlockMetadataDatabase
                 reader.GetString(3), reader.GetDouble(4)));
         }
         return results;
+    }
+
+    public void SaveSignText(string posKey, string text)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = @"
+            INSERT OR REPLACE INTO sign_text (pos_key, text)
+            VALUES ($posKey, $text)";
+        cmd.Parameters.AddWithValue("$posKey", posKey);
+        cmd.Parameters.AddWithValue("$text", text);
+        cmd.ExecuteNonQuery();
+    }
+
+    public string? LoadSignText(string posKey)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT text FROM sign_text WHERE pos_key = $posKey";
+        cmd.Parameters.AddWithValue("$posKey", posKey);
+        var result = cmd.ExecuteScalar();
+        return result?.ToString();
     }
 }

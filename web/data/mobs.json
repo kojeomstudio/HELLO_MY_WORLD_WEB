@@ -1,0 +1,76 @@
+{
+    "mobs": [
+        {
+            "type": "Zombie",
+            "health": 20,
+            "attackDamage": 3,
+            "speed": 2.5,
+            "attackRange": 1.5,
+            "attackCooldown": 1.0,
+            "detectionRange": 16,
+            "hostile": true,
+            "despawnRange": 128,
+            "drops": [["rotten_flesh", 1], ["iron_ingot", 1]]
+        },
+        {
+            "type": "Skeleton",
+            "health": 20,
+            "attackDamage": 2,
+            "speed": 2.0,
+            "attackRange": 1.5,
+            "attackCooldown": 1.0,
+            "detectionRange": 16,
+            "hostile": true,
+            "despawnRange": 128,
+            "drops": [["bone", 2], ["flint", 1]]
+        },
+        {
+            "type": "Spider",
+            "health": 20,
+            "attackDamage": 2,
+            "speed": 3.0,
+            "attackRange": 1.5,
+            "attackCooldown": 1.0,
+            "detectionRange": 16,
+            "hostile": true,
+            "despawnRange": 128,
+            "drops": [["string", 1]]
+        },
+        {
+            "type": "Cow",
+            "health": 20,
+            "attackDamage": 0,
+            "speed": 1.5,
+            "attackRange": 1.5,
+            "attackCooldown": 1.0,
+            "detectionRange": 16,
+            "hostile": false,
+            "despawnRange": 128,
+            "drops": [["leather", 1], ["raw_beef", 2]]
+        },
+        {
+            "type": "Pig",
+            "health": 20,
+            "attackDamage": 0,
+            "speed": 1.5,
+            "attackRange": 1.5,
+            "attackCooldown": 1.0,
+            "detectionRange": 16,
+            "hostile": false,
+            "despawnRange": 128,
+            "drops": [["raw_pork", 2]]
+        },
+        {
+            "type": "Chicken",
+            "health": 20,
+            "attackDamage": 0,
+            "speed": 1.5,
+            "attackRange": 1.5,
+            "attackCooldown": 1.0,
+            "detectionRange": 16,
+            "hostile": false,
+            "despawnRange": 128,
+            "drops": [["feather", 1]]
+        }
+    ]
+}

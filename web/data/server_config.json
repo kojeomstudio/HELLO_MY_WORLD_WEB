@@ -18,7 +18,8 @@
         "generateOres": true,
         "treeDensity": 0.02,
         "caveDensity": 0.5,
-        "oreDensity": 0.3
+        "oreDensity": 0.3,
+        "worldBorderSize": 1000
     },
     "player": {
         "defaultHealth": 20,
@@ -57,5 +58,6 @@
     "liquid": {
         "waterFlowInterval": 3,
         "lavaFlowInterval": 5
-    }
+    },
+    "corsOrigins": ["http://localhost:5173", "http://localhost:3000"]
 }

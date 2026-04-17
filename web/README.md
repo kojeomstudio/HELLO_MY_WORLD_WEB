@@ -73,7 +73,12 @@ Output is in `web/client/dist/`. Serve with any static file server.
 - Three.js WebGL renderer with perspective camera
 - Dynamic sky dome with sun and fog
 - Ambient occlusion per-vertex lighting
+- Shadow mapping (PCFSoft, 1024 map, sun directional light)
+- Player-following point light for local illumination
+- Animated water (wave effect, 0.45 opacity, lowered surface)
+- Animated lava (wave effect, emissive vertex colors, light level 14)
 - Transparent block rendering (water, glass, leaves)
+- Custom block geometry: stairs, slabs, fences, walls, glass panes, doors, ladders, torches, plants, fire
 - Minimap with 3 modes: surface, radar, normal (click to toggle)
 - Block selection highlight wireframe
 - Wield item display with tool/block models
@@ -93,10 +98,13 @@ Output is in `web/client/dist/`. Serve with any static file server.
 ### Multiplayer
 - Real-time multiplayer via SignalR/WebSocket
 - Player list and position sync
-- Chat system with slash commands (`/gamemode`, `/tp`, `/give`, `/help`, `/time`, `/tps`)
-- PvP combat with weapon damage and Minetest knockback formula
-- Rate limiting on chat, dig, and place actions
+- Chat system with slash commands (`/gamemode`, `/tp`, `/give`, `/help`, `/time`, `/tps`, `/setborder`)
+- PvP combat with weapon damage and Minetest knockback formula (max 4 block range)
+- Rate limiting on chat, dig, place, punch, interact, and join spam
 - Server-authoritative physics validation
+- Configurable CORS origins from `server_config.json`
+- Security headers (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection)
+- Player name regex validation, reserved name check, IP ban enforcement
 
 ### Crafting & Smelting
 - Crafting UI with full recipe listing (80+ recipes)
@@ -108,8 +116,11 @@ Output is in `web/client/dist/`. Serve with any static file server.
 ### Entities
 - Item drop entities with gravity and 5-minute lifespan
 - Item pickup system (2-block range, auto-collect)
-- Mob entities with AI (chase, attack, wander states)
+- Mob entities with AI state machine (Idle → Chase → Attack)
+- Hostile mobs (Zombie, Skeleton, Spider) spawn at night with attack damage
+- Passive mobs (Cow, Pig, Chicken) spawn on grass during day, flee when hit
 - Entity spawn/despawn/position broadcast
+- Mob definitions loaded from `mobs.json`
 
 ### Systems
 - 15 Minetest-compatible privileges (loaded from JSON)
@@ -119,6 +130,9 @@ Output is in `web/client/dist/`. Serve with any static file server.
 - HUD (health hearts, breath bar, hotbar, debug overlay, minimap)
 - Death screen with respawn
 - Wield item display with tool/block visual models
+- World border (configurable size, position clamping)
+- Interactive blocks: sign text (persisted), bed spawn point (persisted), note block/jukebox audio
+- Torch placement validation (requires adjacent solid block)
 
 ## Controls
 
@@ -217,9 +231,12 @@ web/
   data/                      # Game Data (JSON)
     blocks.json                # 64 block definitions with groups & sounds
     items.json                 # 100+ items, 80+ recipes, 16 food values
-    server_config.json         # Server configuration
+    mobs.json                  # 6 mob definitions (health, damage, speed, drops, AI)
+    tools.json                 # 8 tool material definitions (durability, mining speed, weapon damage)
+    server_config.json         # Server configuration (includes CORS origins, world border)
     smelting.json              # 15 smelting recipes
     privileges.json            # 15 privilege definitions
+    physics_constants.json     # Physics constants, interaction ranges, player dimensions
     worlds/default/            # Auto-saved world data (*.chunk files)
   docs/                      # Documentation
     architecture.md            # Full architecture overview
@@ -235,11 +252,14 @@ All configuration is done via JSON files in `web/data/`:
 
 | File | Purpose |
 |------|---------|
-| `server_config.json` | Max players, tick rate, world seed, spawn, physics |
+| `server_config.json` | Max players, tick rate, world seed, spawn, physics, CORS origins, world border |
 | `blocks.json` | 64 block type definitions (properties, groups, sounds) |
 | `items.json` | 100+ items, 80+ crafting recipes, tool tiers |
+| `mobs.json` | 6 mob definitions (health, damage, speed, drops, AI params) |
+| `tools.json` | 8 tool material definitions (durability, mining speed, weapon damage) |
 | `smelting.json` | 15 smelting recipes (input, output, cook time, XP) |
 | `privileges.json` | 15 privilege definitions (name, description, default) |
+| `physics_constants.json` | Physics constants, interaction ranges, player dimensions |
 
 ## Documentation
 

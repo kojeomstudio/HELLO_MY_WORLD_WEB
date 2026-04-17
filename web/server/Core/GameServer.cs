@@ -47,6 +47,7 @@ public class GameServer
 
     public WorldMap DefaultWorld { get; }
     public BlockDefinitionManager BlockDefinitions => _blockDefinitionManager;
+    public BlockMetadataDatabase BlockMetadataDatabase => _blockMetadataDatabase;
     public SmeltingSystem Smelting => _smeltingSystem;
     public PrivilegeSystem Privileges => _privilegeSystem;
     public int MaxPlayers { get; private set; }
@@ -57,6 +58,7 @@ public class GameServer
     public float TimeSpeed { get; set; } = 1.0f;
     public DayNightCycle DayNight { get; }
     public ServerConfig Config => _config;
+    public int WorldBorderSize { get; private set; }
 
     public int OnlinePlayerCount => _players.Count;
     public IEnumerable<PlayerEnt> OnlinePlayers => _players.Values;
@@ -86,9 +88,11 @@ public class GameServer
         _playerDatabase = playerDatabase;
         _blockMetadataDatabase = blockMetadataDatabase;
         _mobSpawner = new MobSpawner(entityManager);
+        _mobSpawner.SetGameTimeProvider(() => GameTime);
 
         MaxPlayers = config.Server.MaxPlayers;
         TickRate = config.Server.TickRate;
+        WorldBorderSize = config.World.WorldBorderSize;
         TimeSpeed = 1.0f;
 
         DayNight = new DayNightCycle();
@@ -269,7 +273,7 @@ public class GameServer
         if (entity == null || entity is not ItemEntity itemEntity || !itemEntity.IsAlive) return false;
 
         var distance = Vector3.Distance(itemEntity.Position, player.Position);
-        if (distance > 2.0f) return false;
+        if (distance > _config.Physics.PickupRange) return false;
 
         var stack = new ItemStack(itemEntity.ItemId, itemEntity.Count, itemEntity.Metadata);
         if (!player.Inventory.AddItem(stack)) return false;
@@ -291,6 +295,7 @@ public class GameServer
             UpdatePlayer(player);
             ValidatePlayerPhysics(player, 1f / TickRate);
             ValidatePlayerPosition(player, 1f / TickRate);
+            ValidateWorldBorder(player);
         }
 
         _entityManager.UpdateAll(1f / TickRate);
@@ -600,6 +605,42 @@ public class GameServer
             .OnPositionCorrection(player.Position.X, player.Position.Y, player.Position.Z);
     }
 
+    private void ValidateWorldBorder(PlayerEnt player)
+    {
+        if (player.Mode == GameMode.Creative || player.Mode == GameMode.Spectator) return;
+
+        var border = WorldBorderSize;
+        var pos = player.Position;
+        bool violated = false;
+
+        if (pos.X > border) { pos = new Vector3(border, pos.Y, pos.Z); violated = true; }
+        else if (pos.X < -border) { pos = new Vector3(-border, pos.Y, pos.Z); violated = true; }
+
+        if (pos.Z > border) { pos = new Vector3(pos.X, pos.Y, border); violated = true; }
+        else if (pos.Z < -border) { pos = new Vector3(pos.X, pos.Y, -border); violated = true; }
+
+        if (violated)
+        {
+            player.Position = pos;
+            player.Velocity = Vector3.Zero;
+            SendPositionCorrection(player);
+            SendMessageToPlayer(player, "You have reached the world border");
+        }
+    }
+
+    public void SetWorldBorder(int size)
+    {
+        WorldBorderSize = size;
+        _config.World.WorldBorderSize = size;
+    }
+
+    private void SendMessageToPlayer(PlayerEnt player, string message)
+    {
+        if (_hubContext == null) return;
+        _ = _hubContext.Clients.Client(player.ConnectionId)
+            .OnChatMessage("Server", message);
+    }
+
     public bool GiveItem(string playerName, string itemId, int count)
     {
         var player = GetPlayer(playerName);
@@ -887,16 +928,11 @@ public class GameServer
         return level;
     }
 
-    private static (string itemId, int count)[] GetMobDrops(string mobType) => mobType switch
+    private static (string itemId, int count)[] GetMobDrops(string mobType)
     {
-        "Zombie" => new[] { ("rotten_flesh", 1), ("iron_ingot", 1) },
-        "Skeleton" => new[] { ("bone", 2), ("flint", 1) },
-        "Spider" => new[] { ("string", 1) },
-        "Cow" => new[] { ("leather", 1), ("raw_beef", 2) },
-        "Pig" => new[] { ("raw_pork", 2) },
-        "Chicken" => new[] { ("feather", 1) },
-        _ => Array.Empty<(string, int)>()
-    };
+        var def = MobConfig.Get(mobType);
+        return def?.Drops ?? Array.Empty<(string, int)>();
+    }
 
     public static string PositionKey(int x, int y, int z) => $"{x},{y},{z}";
 
