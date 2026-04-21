@@ -302,55 +302,114 @@ public class NoiseWorldGenerator : IWorldGenerator
     {
         var rng = new Random(_seed + baseX * 73856093 ^ baseZ * 19349663 ^ baseY * 83492791);
 
-        for (int attempt = 0; attempt < 2; attempt++)
+        var numDungeons = rng.Next(1, 3);
+        for (int d = 0; d < numDungeons; d++)
         {
-            var cx = rng.Next(2, Chunk.Size - 2);
-            var cy = rng.Next(1, Chunk.Size - 4);
-            var cz = rng.Next(2, Chunk.Size - 2);
+            var startCX = rng.Next(4, Chunk.Size - 4);
+            var startCY = rng.Next(2, Chunk.Size / 2 - 2);
+            var startCZ = rng.Next(4, Chunk.Size - 4);
 
-            if (blocks[cx, cy, cz] != (ushort)BlockType.Stone) continue;
+            if (blocks[startCX, startCY, startCZ] == (ushort)BlockType.Air) continue;
 
-            var worldCX = baseX + cx;
-            var worldCY = baseY + cy;
-            if (worldCY > 30) continue;
+            var worldCY = baseY + startCY;
+            if (worldCY > 28 || worldCY < 2) continue;
 
+            var worldCX = baseX + startCX;
             var dungeonNoise = PerlinNoise2D(worldCX * 0.02f + 3000, baseZ * 0.02f + 3000);
-            if (dungeonNoise < 0.6f) continue;
+            if (dungeonNoise < 0.55f) continue;
 
-            var roomW = rng.Next(3, 6);
-            var roomH = rng.Next(3, 5);
-            var roomD = rng.Next(3, 6);
+            var numRooms = rng.Next(2, 5);
+            var curX = startCX;
+            var curY = startCY;
+            var curZ = startCZ;
+            var placedChest = false;
 
-            for (int dx = 0; dx < roomW; dx++)
+            for (int room = 0; room < numRooms; room++)
             {
-                for (int dy = 0; dy < roomH; dy++)
-                {
-                    for (int dz = 0; dz < roomD; dz++)
-                    {
-                        var lx = cx + dx;
-                        var ly = cy + dy;
-                        var lz = cz + dz;
-                        if (lx >= Chunk.Size || ly >= Chunk.Size || lz >= Chunk.Size) continue;
+                var isLarge = rng.NextDouble() < 0.25;
+                var roomW = isLarge ? rng.Next(5, 8) : rng.Next(3, 5);
+                var roomH = rng.Next(3, 5);
+                var roomD = isLarge ? rng.Next(5, 8) : rng.Next(3, 5);
 
-                        if (dx == 0 || dx == roomW - 1 || dy == 0 || dy == roomH - 1 || dz == 0 || dz == roomD - 1)
-                        {
-                            blocks[lx, ly, lz] = rng.NextDouble() > 0.5
-                                ? (ushort)BlockType.MossyCobblestone
-                                : (ushort)BlockType.Cobblestone;
-                        }
-                        else
-                        {
-                            blocks[lx, ly, lz] = (ushort)BlockType.Air;
-                        }
+                var placed = CarveRoom(blocks, curX, curY, curZ, roomW, roomH, roomD, rng);
+                if (placed && !placedChest && room > 0 && rng.NextDouble() < 0.4)
+                {
+                    var chestX = curX + roomW / 2;
+                    var chestZ = curZ + roomD / 2;
+                    if (chestX > 0 && chestX < Chunk.Size - 1 && chestZ > 0 && chestZ < Chunk.Size - 1
+                        && curY + 1 < Chunk.Size && blocks[chestX, curY + 1, chestZ] == (ushort)BlockType.Air)
+                    {
+                        blocks[chestX, curY + 1, chestZ] = (ushort)BlockType.Chest;
+                        placedChest = true;
+                    }
+                }
+
+                if (room < numRooms - 1)
+                {
+                    var dir = rng.Next(4);
+                    var corridorLen = rng.Next(3, 8);
+                    for (int c = 0; c < corridorLen; c++)
+                    {
+                        curX += dir == 2 ? 1 : dir == 3 ? -1 : 0;
+                        curZ += dir == 0 ? 1 : dir == 1 ? -1 : 0;
+
+                        if (curX < 1 || curX >= Chunk.Size - 1 || curZ < 1 || curZ >= Chunk.Size - 1
+                            || curY < 1 || curY + 2 >= Chunk.Size) break;
+
+                        CarveCorridor(blocks, curX, curY, curZ, rng);
                     }
                 }
             }
+        }
+    }
 
-            if (roomW > 3 && roomD > 3 && cy + 1 < Chunk.Size)
+    private static bool CarveRoom(ushort[,,] blocks, int cx, int cy, int cz, int w, int h, int d, Random rng)
+    {
+        if (cx + w >= Chunk.Size || cy + h >= Chunk.Size || cz + d >= Chunk.Size) return false;
+        if (cx < 1 || cy < 1 || cz < 1) return false;
+
+        for (int dx = 0; dx < w; dx++)
+        {
+            for (int dy = 0; dy < h; dy++)
             {
-                blocks[cx, cy + 1, cz] = (ushort)BlockType.Cobblestone;
-                blocks[cx, cy + 2, cz] = (ushort)BlockType.Air;
+                for (int dz = 0; dz < d; dz++)
+                {
+                    var lx = cx + dx;
+                    var ly = cy + dy;
+                    var lz = cz + dz;
+
+                    if (dx == 0 || dx == w - 1 || dy == 0 || dy == h - 1 || dz == 0 || dz == d - 1)
+                    {
+                        var altNoise = rng.NextDouble();
+                        blocks[lx, ly, lz] = altNoise > 0.7
+                            ? (ushort)BlockType.MossyCobblestone
+                            : altNoise > 0.5
+                                ? (ushort)BlockType.StoneBrick
+                                : (ushort)BlockType.Cobblestone;
+                    }
+                    else
+                    {
+                        blocks[lx, ly, lz] = (ushort)BlockType.Air;
+                    }
+                }
             }
+        }
+        return true;
+    }
+
+    private static void CarveCorridor(ushort[,,] blocks, int x, int y, int z, Random rng)
+    {
+        for (int dy = 0; dy < 3; dy++)
+        {
+            if (y + dy >= Chunk.Size) break;
+            blocks[x, y + dy, z] = (ushort)BlockType.Air;
+        }
+
+        if (rng.NextDouble() < 0.15 && y + 2 < Chunk.Size)
+        {
+            blocks[x, y + 2, z] = rng.NextDouble() > 0.5
+                ? (ushort)BlockType.Torch
+                : (ushort)BlockType.Lantern;
         }
     }
 

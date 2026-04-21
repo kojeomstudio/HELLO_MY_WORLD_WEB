@@ -174,6 +174,25 @@ jobs:
           npm audit --audit-level=high || echo "::warning::npm audit found high/critical vulnerabilities"
         continue-on-error: true
 
+      - name: Check for sensitive file patterns
+        run: |
+          FOUND=0
+          for f in credentials.json serviceAccountKey.json .env.production.local; do
+            if find . -name "$f" -not -path "./.git/*" | grep -q .; then
+              echo "::error::Sensitive file found: $f"
+              FOUND=1
+            fi
+          done
+          if grep -rn --include="*.cs" --include="*.ts" --include="*.json" \
+            -E '(AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z\-_]{35}|ghp_[0-9a-zA-Z]{36})' \
+            web/ 2>/dev/null; then
+            echo "::error::Potential cloud/API keys detected"
+            FOUND=1
+          fi
+          if [ $FOUND -eq 0 ]; then
+            echo "No sensitive files or key patterns detected"
+          fi
+
   data-integrity:
     name: Verify Data Files
     runs-on: ubuntu-latest

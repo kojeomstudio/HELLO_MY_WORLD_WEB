@@ -4,24 +4,27 @@ A web-based voxel game ported from the minetest_sub_project (Luanti engine) to a
 
 ## Features
 
-- **Voxel World**: Procedurally generated 3D world with noise-based terrain, caves, ores, trees, and 4 biomes (grassland, desert, snow, ocean) with heat/humidity noise selection
+- **Voxel World**: Procedurally generated 3D world with noise-based terrain, caves, ores, trees, and multiple biomes (grassland, desert, snow, jungle, taiga, tundra, mountain, ocean) with heat/humidity noise selection
 - **161 Block Types**: Including stone variants, 9 ore types (diamond, gold, iron, coal, redstone, emerald, lapis, copper), wood types, stairs/slabs for all wood/stone types, decorative blocks, flowers, mushrooms, utility blocks (blast_furnace, smoker, barrel), light sources (lantern, soul_torch, campfire), fire, cobweb, and Nether/End blocks
 - **210+ Items**: Tools (wood/stone/iron/diamond/steel/mese), special weapons (fire sword, ice sword, blood sword, heal sword, elemental sword, daggers), steel shears, alchemy ingredients, crafting materials, armor, food, testfood items, resources, and utility items
 - **Crafting System**: 125+ recipes including shaped crafting, tool creation, special weapon recipes, ore block storage, copper processing, decoration recipes, armor, building blocks, food, and tool repair
 - **Smelting System**: 25+ smelting recipes via furnace with fuel consumption
 - **Bucket System**: Place and pick up water/lava, drink milk for healing
+- **Tool Wear/Durability**: Tools degrade with use (minetest-matching 65536 wear scale), repair by combining two same-type tools, wear visualization support
 - **Player Mechanics**: Health, hunger, breath, fall damage, knockback, swimming (liquid physics), climbing, sprinting, flying, slippery blocks (ice), move resistance (soul sand)
 - **Hunger Bar**: Client-side hunger display synced from server food level
 - **Experience System**: XP gains from mining, crafting, smelting, and mob kills with level progression
-- **Mob System**: Hostile mobs (Zombie=3dmg, Skeleton=2dmg, Spider=2dmg) and passive mobs (Cow, Pig, Chicken) with AI state machine (Idle→Chase→Attack), 1s attack cooldown, passive mobs flee when hit, hostile mobs only spawn at night, passive mobs only on grass during day
-- **Entity System**: Dropped items, mob entities, with physics and lifespan
+- **Mob System**: Hostile mobs (Zombie, Skeleton, Spider) and passive mobs (Cow, Pig, Chicken) with full AI state machine (Idle→Wander→Chase→Attack→Flee), passive mobs flee when hit, hostile mobs chase on detection, A* pathfinding support, 1s attack cooldown
+- **Entity System**: Dropped items with merge behavior (same items within 1.0 radius auto-stack), mob entities with AI, physics and lifespan
+- **A* Pathfinding**: 3D grid-based A* pathfinding for mobs with Manhattan distance heuristic, configurable jump/drop limits, and 700-waypoint limit
+- **Dungeon Generation**: Multi-room procedural dungeons with corridors connecting rooms, mossy/stone brick walls, torch/lantern lighting, and loot chests placed in inner rooms
 - **World Border**: Configurable size (default 1000), position clamping, `/setborder` command
 - **Interactive Blocks**: Sign text input (persisted to DB), bed spawn point (persisted), note block/jukebox procedural audio
 - **Day/Night Cycle**: Full day/night cycle with sky brightness transitions
 - **Weather**: Rain particle system with day/night color transitions
 - **Multiplayer**: Real-time multiplayer via SignalR WebSocket with chat, player list
-- **Chat Commands**: 18+ commands (/help, /tp, /gamemode, /give, /status, /kill, /ban, /kick, /privs, /grant, /revoke, /settime, /spawn, etc.)
-- **Privilege System**: 19 privileges fully loaded from JSON (interact, shout, fly, fast, teleport, give, ban, kick, server, etc.)
+- **Chat Commands**: 20+ commands with privilege enforcement (/help, /tp, /gamemode, /give, /status, /kill, /ban, /kick, /privs, /grant, /revoke, /settime, /spawn, etc.)
+- **Privilege System**: 19 privileges fully loaded from JSON with per-command privilege checks (interact, shout, fly, fast, teleport, give, ban, kick, server, etc.)
 - **Inventory UI**: Hotbar, main inventory, crafting, furnace, chest, creative inventory, armor
 - **Minimap**: 3 modes (surface, radar, normal) with player direction indicator
 - **Physics**: AABB collision, gravity, liquid physics, falling nodes
@@ -34,8 +37,7 @@ A web-based voxel game ported from the minetest_sub_project (Luanti engine) to a
 - **Entity Distance Culling**: Entity updates only broadcast to players within 128 blocks
 - **PvP**: Distance check (max 4 blocks), weapon damage with Minetest knockback formula
 - **Torch Placement Validation**: Requires adjacent solid block
-- **Tool Repair**: Combine two damaged tools of the same type to repair them
-- **Texture Atlas**: 89 block textures from minetest devtest, served via Vite and rendered with nearest-neighbor filtering
+- **Texture Atlas**: 89+ block textures from minetest devtest, served via Vite and rendered with nearest-neighbor filtering
 - **Block Geometry System**: Custom mesh generation for stairs, slabs, fences, walls, glass panes, doors, ladders, torches, plant-like (cross), and fire-like blocks
 - **Animated Water**: Wave surface effect, lowered water level (0.1 block gap), 0.45 opacity
 - **Animated Lava**: Wave surface effect, emissive vertex color glow (light level 14)
@@ -80,7 +82,7 @@ web/
 │   │       └── AudioManager.ts  # Procedural audio
 │   └── public/
 │       └── textures/
-│           ├── blocks/              # 89 block textures from minetest devtest
+│           ├── blocks/              # 89+ block textures from minetest devtest
 │           └── ui/                  # 97 base UI textures
 │   └── package.json
 ├── server/              # C# ASP.NET Core 8.0 backend
@@ -90,13 +92,16 @@ web/
 │   │   ├── ServerConfig.cs       # Configuration
 │   │   ├── Vector3.cs / Vector3s.cs
 │   │   ├── DayNightCycle.cs
+│   │   ├── ToolConfig.cs         # Tool material definitions
 │   │   ├── Auth/                 # Authentication, privileges
-│   │   ├── Chat/                 # Chat commands
+│   │   ├── Chat/                 # Chat commands with privilege checks
 │   │   ├── Crafting/             # Crafting system
-│   │   ├── Entities/             # Entities, mobs, spawner
+│   │   ├── Entities/             # Entities, mobs (with AI states), spawner
 │   │   ├── Game/                 # Block definitions
+│   │   ├── Pathfinding/          # A* pathfinding for mobs
 │   │   ├── Physics/              # Physics, knockback
 │   │   ├── Player/               # Player, inventory, DB
+│   │   ├── ToolWear/             # Tool wear/durability system
 │   │   ├── Smelting/             # Smelting system
 │   │   └── World/                # World, chunks, generators, lighting, ABMs
 │   └── Services/
@@ -107,7 +112,7 @@ web/
 │   ├── items.json        # 210+ items, 125+ recipes, food values, tool capabilities
 │   ├── mobs.json         # 6 mob definitions (health, damage, speed, drops, AI params)
 │   ├── tools.json        # 8 tool material definitions (durability, mining speed, weapon damage)
-│   ├── biomes.json       # 4 biome definitions loaded by NoiseWorldGenerator
+│   ├── biomes.json       # 8 biome definitions loaded by NoiseWorldGenerator
 │   ├── physics_constants.json  # Physics constants, interaction ranges, eye height, player depth
 │   ├── privileges.json   # 19 privileges, fully loaded at startup
 │   ├── server_config.json
@@ -214,20 +219,24 @@ This project is a web port of the Luanti (formerly Minetest) voxel game engine, 
 
 - **Blocks**: All basenodes (stone, dirt, grass, sand, wood variants, ores, liquids, decorations)
 - **Tools**: Full tool tier system (wood/stone/iron/steel/diamond/mese) matching minetest groupcap system
+- **Tool Wear**: 65536-scale wear system matching minetest, tool repair via combining
 - **Crafting**: Shaped and shapeless recipes with group-based matching
 - **Physics**: AABB collision, gravity, liquid physics, knockback formula (m - m*e^(k*damage))
-- **Privileges**: Complete privilege system matching minetest's builtin definitions
-- **Chat Commands**: Full command set matching minetest's builtin chat commands
-- **Entities**: Item entities with TTL and merge behavior, mob entities with AI
+- **Privileges**: Complete privilege system matching minetest's builtin definitions, per-command enforcement
+- **Chat Commands**: Full command set matching minetest's builtin chat commands with privilege checks
+- **Entities**: Item entities with merge behavior and TTL, mob entities with full AI state machine
+- **Mob AI**: 5-state machine (Idle/Wander/Chase/Attack/Flee) with hostile/passive distinction matching minetest behavior
+- **Pathfinding**: A* pathfinding matching minetest's pathfinder.cpp with Manhattan heuristic
+- **Dungeons**: Multi-room procedural dungeons with corridors matching minetest's dungeongen algorithm
 - **ABMs**: Falling nodes, grass spreading, farmland decay, ice melting
 - **Node Timers**: Timed block transformations
 - **Day/Night Cycle**: Matching minetest's 24000-tick cycle
-- **Ported Textures**: 89 block textures from minetest devtest (basenodes + wool colors) with nearest-neighbor filtering
-- **World Generation**: Noise-based terrain with caves, 9 ore types with realistic depth distribution, biome-based generation with heat/humidity noise, trees, and dungeons
+- **Ported Textures**: 89+ block textures from minetest devtest (basenodes + wool colors) with nearest-neighbor filtering
+- **World Generation**: Noise-based terrain with caves, 9 ore types with realistic depth distribution, biome-based generation with heat/humidity noise, multiple tree types, multi-room dungeons with corridors and loot chests
 - **Tool Repair**: Matching minetest's tool repair system (combine two same-type tools)
 - **Server Physics Validation**: Anti-cheat with teleport detection, noclip prevention, hover detection, position update rate limiting, and block interaction range validation
-- **Security**: XSS-safe rendering, CORS-restricted origins (configurable from `server_config.json`), player name sanitization (regex + reserved names), HTML/XML tag stripping in chat, chat message length limits, rate limiting on all actions (join spam, punch, interact), chunk request range limits, IP ban enforcement, security headers (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection), NaN/Infinity position validation, block type range validation, player bounding box overlap check on placement
-- **CI**: GitHub Actions pipeline with submodule init, Ubuntu + Windows server builds, client typecheck+build, security scan (secrets detection, npm audit, debug endpoint check, .gitignore validation), data integrity verification (JSON validation, texture asset check), artifact uploads, concurrency control
+- **Security**: XSS-safe rendering, CORS-restricted origins (configurable from `server_config.json`), player name sanitization (regex + reserved names), HTML/XML tag stripping in chat, chat message length limits, rate limiting on all actions (join spam, punch, interact), chunk request range limits, IP ban enforcement, security headers (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection), NaN/Infinity position validation, block type range validation, player bounding box overlap check on placement, cloud key/API key pattern detection in CI
+- **CI**: GitHub Actions pipeline with submodule init, Ubuntu + Windows server builds, client typecheck+build, security scan (secrets detection, npm audit, debug endpoint check, .gitignore validation, sensitive file pattern check, cloud key detection), data integrity verification (JSON validation, texture asset check), artifact uploads, concurrency control
 
 ## License
 

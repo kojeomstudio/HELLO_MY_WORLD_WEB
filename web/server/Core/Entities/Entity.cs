@@ -47,6 +47,8 @@ public class ItemEntity : Entity
     public string? Metadata { get; set; }
     public DateTime SpawnTime { get; set; } = DateTime.UtcNow;
     public TimeSpan Lifespan { get; set; } = TimeSpan.FromMinutes(5);
+    public const float MergeRadius = 1.0f;
+    public const int MaxStackSize = 64;
 
     public ItemEntity(string itemId, int count, Vector3 position)
         : base(EntityType.Item)
@@ -58,6 +60,41 @@ public class ItemEntity : Entity
             (Random.Shared.NextSingle() - 0.5f) * 2,
             Random.Shared.NextSingle() * 2,
             (Random.Shared.NextSingle() - 0.5f) * 2);
+    }
+
+    public bool CanMergeWith(ItemEntity other)
+    {
+        if (other == this) return false;
+        if (ItemId != other.ItemId) return false;
+        if (Metadata != other.Metadata) return false;
+        if (Count + other.Count > MaxStackSize) return false;
+        return (DateTime.UtcNow - SpawnTime).TotalSeconds > 0.5;
+    }
+
+    public void MergeWith(ItemEntity other)
+    {
+        Count += other.Count;
+        other.Health = 0;
+    }
+
+    public static void ProcessMerges(IEnumerable<Entity> entities)
+    {
+        var items = entities
+            .Where(e => e is ItemEntity { IsAlive: true })
+            .Cast<ItemEntity>()
+            .ToList();
+
+        for (int i = 0; i < items.Count; i++)
+        {
+            if (!items[i].IsAlive) continue;
+            for (int j = i + 1; j < items.Count; j++)
+            {
+                if (!items[j].IsAlive) continue;
+                if (Vector3.Distance(items[i].Position, items[j].Position) > MergeRadius) continue;
+                if (!items[i].CanMergeWith(items[j])) continue;
+                items[i].MergeWith(items[j]);
+            }
+        }
     }
 
     public override void Update(float dt)
@@ -102,7 +139,9 @@ public enum MobState
 {
     Idle,
     Wander,
-    Chase
+    Chase,
+    Flee,
+    Attack
 }
 
 public class MobEntity : Entity
@@ -110,12 +149,14 @@ public class MobEntity : Entity
     public static Func<Vector3, float, PlayerEnt?>? FindNearestPlayer { get; set; }
     public static Action<PlayerEnt, float>? DamagePlayer { get; set; }
     public static Action<MobEntity>? MobDeathDrops { get; set; }
+    public static Func<Vector3, Vector3, List<Vector3>?>? FindPath { get; set; }
 
     public string MobType { get; set; } = "";
     public float Speed { get; set; } = 2.0f;
     public float AttackDamage { get; set; } = 1.0f;
     public float AttackRange { get; set; } = 1.5f;
     public float DetectionRange { get; set; } = 16.0f;
+    public bool IsHostile { get; set; } = true;
     public Guid? TargetPlayerId { get; set; }
     public MobState State { get; set; } = MobState.Wander;
     public bool IsHurt { get; private set; }
@@ -126,6 +167,7 @@ public class MobEntity : Entity
     private const int HurtFlashDurationMs = 300;
     private float _wanderAngle;
     private float _wanderTimer;
+    private List<Vector3>? _currentPath;
 
     public MobEntity(string mobType, Vector3 position)
         : base(EntityType.Mob)
@@ -143,6 +185,7 @@ public class MobEntity : Entity
             AttackRange = def.AttackRange;
             DetectionRange = def.DetectionRange;
             AttackCooldownMs = (int)(def.AttackCooldown * 1000);
+            IsHostile = def.Hostile;
         }
     }
 
@@ -152,7 +195,11 @@ public class MobEntity : Entity
         _lastHurtTime = DateTime.UtcNow;
         IsHurt = true;
 
-        if (State is MobState.Idle or MobState.Wander)
+        if (!IsHostile)
+        {
+            State = MobState.Flee;
+        }
+        else if (State is MobState.Idle or MobState.Wander)
         {
             State = MobState.Chase;
         }
@@ -179,7 +226,7 @@ public class MobEntity : Entity
         switch (State)
         {
             case MobState.Idle:
-                if (target != null)
+                if (IsHostile && target != null)
                 {
                     State = MobState.Chase;
                     break;
@@ -195,7 +242,7 @@ public class MobEntity : Entity
                 break;
 
             case MobState.Wander:
-                if (target != null)
+                if (IsHostile && target != null)
                 {
                     State = MobState.Chase;
                     break;
@@ -217,6 +264,7 @@ public class MobEntity : Entity
                 {
                     State = MobState.Wander;
                     _wanderTimer = 2.0f + Random.Shared.NextSingle() * 3.0f;
+                    _currentPath = null;
                     break;
                 }
 
@@ -229,20 +277,75 @@ public class MobEntity : Entity
 
                 if (distance > AttackRange)
                 {
-                    Velocity = new Vector3(
-                        direction.X * Speed,
-                        Velocity.Y,
-                        direction.Z * Speed);
+                    _currentPath = FindPath?.Invoke(Position, target.Position);
+
+                    if (_currentPath != null && _currentPath.Count > 1)
+                    {
+                        var pathDir = _currentPath[1] - Position;
+                        pathDir = pathDir.Normalized;
+                        Velocity = new Vector3(
+                            pathDir.X * Speed,
+                            Velocity.Y,
+                            pathDir.Z * Speed);
+                    }
+                    else
+                    {
+                        Velocity = new Vector3(
+                            direction.X * Speed,
+                            Velocity.Y,
+                            direction.Z * Speed);
+                    }
                 }
                 else
                 {
+                    State = MobState.Attack;
                     Velocity = new Vector3(0, Velocity.Y, 0);
+                }
+                break;
 
-                    if (DateTime.UtcNow - _lastAttackTime > TimeSpan.FromMilliseconds(AttackCooldownMs))
-                    {
-                        DamagePlayer?.Invoke(target, AttackDamage);
-                        _lastAttackTime = DateTime.UtcNow;
-                    }
+            case MobState.Attack:
+                if (target == null)
+                {
+                    State = MobState.Wander;
+                    _wanderTimer = 2.0f + Random.Shared.NextSingle() * 3.0f;
+                    break;
+                }
+
+                var attackDist = Vector3.Distance(Position, target.Position);
+                if (attackDist > AttackRange * 1.5f)
+                {
+                    State = MobState.Chase;
+                    break;
+                }
+
+                Velocity = new Vector3(0, Velocity.Y, 0);
+                Yaw = MathF.Atan2(target.Position.X - Position.X, target.Position.Z - Position.Z);
+
+                if (DateTime.UtcNow - _lastAttackTime > TimeSpan.FromMilliseconds(AttackCooldownMs))
+                {
+                    DamagePlayer?.Invoke(target, AttackDamage);
+                    _lastAttackTime = DateTime.UtcNow;
+                }
+                break;
+
+            case MobState.Flee:
+                if (target == null || (DateTime.UtcNow - _lastHurtTime).TotalSeconds > 5)
+                {
+                    State = MobState.Wander;
+                    _wanderTimer = 2.0f;
+                    break;
+                }
+
+                var fleeDir = Position - target.Position;
+                var fleeLen = fleeDir.Length;
+                if (fleeLen > 0)
+                {
+                    fleeDir = fleeDir.Normalized;
+                    Yaw = MathF.Atan2(fleeDir.X, fleeDir.Z);
+                    Velocity = new Vector3(
+                        fleeDir.X * Speed * 1.2f,
+                        Velocity.Y,
+                        fleeDir.Z * Speed * 1.2f);
                 }
                 break;
         }

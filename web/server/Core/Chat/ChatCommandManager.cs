@@ -8,14 +8,16 @@ public class ChatCommand
     public string Name { get; }
     public string Description { get; }
     public string[] Aliases { get; }
+    public string RequiredPrivilege { get; }
     public Func<string, string[], Task<string>> Handler { get; }
 
-    public ChatCommand(string name, string description, string[] aliases, Func<string, string[], Task<string>> handler)
+    public ChatCommand(string name, string description, string[] aliases, Func<string, string[], Task<string>> handler, string requiredPrivilege = "")
     {
         Name = name;
         Description = description;
         Aliases = aliases;
         Handler = handler;
+        RequiredPrivilege = requiredPrivilege;
     }
 }
 
@@ -41,6 +43,7 @@ public class ChatCommandManager
     private readonly Action<string, Vector3>? _spawnEntity;
     private readonly Action? _clearAllEntities;
     private readonly Action<int>? _setWorldBorder;
+    private readonly Func<string, bool>? _hasPrivilege;
 
     public ChatCommandManager(
         Func<long> getGameTime,
@@ -61,7 +64,8 @@ public class ChatCommandManager
         Action? stopServer = null,
         Action<string, Vector3>? spawnEntity = null,
         Action? clearAllEntities = null,
-        Action<int>? setWorldBorder = null)
+        Action<int>? setWorldBorder = null,
+        Func<string, bool>? hasPrivilege = null)
     {
         _getGameTime = getGameTime;
         _getTps = getTps;
@@ -82,6 +86,7 @@ public class ChatCommandManager
         _spawnEntity = spawnEntity;
         _clearAllEntities = clearAllEntities;
         _setWorldBorder = setWorldBorder;
+        _hasPrivilege = hasPrivilege;
         RegisterBuiltInCommands();
     }
 
@@ -140,7 +145,7 @@ public class ChatCommandManager
 
                 _setGameMode(playerName, mode);
                 return Task.FromResult($"Game mode set to {mode} for {playerName}");
-            }));
+            }, "server"));
 
         Register(new ChatCommand("tp", "Teleport to coordinates", new[] { "teleport" },
             (playerName, args) =>
@@ -157,7 +162,7 @@ public class ChatCommandManager
 
                 _teleport(playerName, new Vector3(x, y, z));
                 return Task.FromResult($"Teleported {playerName} to ({x}, {y}, {z})");
-            }));
+            }, "teleport"));
 
         Register(new ChatCommand("give", "Give item to player", Array.Empty<string>(),
             (playerName, args) =>
@@ -175,7 +180,7 @@ public class ChatCommandManager
 
                 _giveItem(playerName, targetPlayer, itemId, count);
                 return Task.FromResult($"Gave {count}x {itemId} to {targetPlayer}");
-            }));
+            }, "give"));
 
         Register(new ChatCommand("kill", "Kill a player", Array.Empty<string>(),
             (playerName, args) =>
@@ -184,7 +189,7 @@ public class ChatCommandManager
                 var target = args.Length > 0 ? args[0] : playerName;
                 _killPlayer(target);
                 return Task.FromResult($"Killed {target}");
-            }));
+            }, "server"));
 
         Register(new ChatCommand("clear", "Clear your inventory", new[] { "clearinventory", "clearinv" },
             (playerName, _) =>
@@ -192,7 +197,7 @@ public class ChatCommandManager
                 if (_clearInventory == null) return Task.FromResult("Clear command is not available.");
                 _clearInventory(playerName);
                 return Task.FromResult($"Cleared inventory for {playerName}");
-            }));
+            }, "give"));
 
         Register(new ChatCommand("list", "List online players", new[] { "online", "players" },
             (_, _) =>
@@ -210,7 +215,7 @@ public class ChatCommandManager
                 if (args.Length == 0) return Task.FromResult("Usage: /kick <player>");
                 _kickPlayer(args[0]);
                 return Task.FromResult($"Kicked {args[0]}");
-            }));
+            }, "kick"));
 
         Register(new ChatCommand("ban", "Ban a player from the server", Array.Empty<string>(),
             (_, args) =>
@@ -219,7 +224,7 @@ public class ChatCommandManager
                 if (args.Length == 0) return Task.FromResult("Usage: /ban <player>");
                 _banPlayer(args[0]);
                 return Task.FromResult($"Banned {args[0]}");
-            }));
+            }, "ban"));
 
         Register(new ChatCommand("unban", "Unban a player", Array.Empty<string>(),
             (_, args) =>
@@ -228,7 +233,7 @@ public class ChatCommandManager
                 if (args.Length == 0) return Task.FromResult("Usage: /unban <player>");
                 _unbanPlayer(args[0]);
                 return Task.FromResult($"Unbanned {args[0]}");
-            }));
+            }, "ban"));
 
         Register(new ChatCommand("privileges", "List a player's privileges", new[] { "privs" },
             (playerName, args) =>
@@ -247,7 +252,7 @@ public class ChatCommandManager
                 if (args.Length < 2) return Task.FromResult("Usage: /grant <player> <privilege>");
                 _grantPrivilege(args[0], args[1]);
                 return Task.FromResult($"Granted '{args[1]}' to {args[0]}");
-            }));
+            }, "privs"));
 
         Register(new ChatCommand("revoke", "Revoke a privilege from a player", Array.Empty<string>(),
             (_, args) =>
@@ -256,7 +261,7 @@ public class ChatCommandManager
                 if (args.Length < 2) return Task.FromResult("Usage: /revoke <player> <privilege>");
                 _revokePrivilege(args[0], args[1]);
                 return Task.FromResult($"Revoked '{args[1]}' from {args[0]}");
-            }));
+            }, "privs"));
 
         Register(new ChatCommand("settime", "Set time of day", new[] { "timeofday" },
             (_, args) =>
@@ -266,7 +271,7 @@ public class ChatCommandManager
                     return Task.FromResult("Usage: /settime <time>");
                 _setTimeOfDay(time);
                 return Task.FromResult($"Time set to {time}");
-            }));
+            }, "settime"));
 
         Register(new ChatCommand("stop", "Stop the server", new[] { "shutdown" },
             (_, _) =>
@@ -274,7 +279,7 @@ public class ChatCommandManager
                 if (_stopServer == null) return Task.FromResult("Stop command is not available.");
                 _stopServer();
                 return Task.FromResult("Server is shutting down...");
-            }));
+            }, "server"));
 
         Register(new ChatCommand("spawn", "Spawn an entity", new[] { "summon", "spawnentity" },
             (_, args) =>
@@ -287,7 +292,7 @@ public class ChatCommandManager
                     return Task.FromResult("Invalid coordinates. Usage: /spawn <entityType> <x> <y> <z>");
                 _spawnEntity(args[0], new Vector3(x, y, z));
                 return Task.FromResult($"Spawned {args[0]} at ({x}, {y}, {z})");
-            }));
+            }, "give"));
 
         Register(new ChatCommand("killall", "Clear all entities", new[] { "clearentities", "pulverize" },
             (_, _) =>
@@ -295,7 +300,7 @@ public class ChatCommandManager
                 if (_clearAllEntities == null) return Task.FromResult("Kill all command is not available.");
                 _clearAllEntities();
                 return Task.FromResult("All entities have been cleared");
-            }));
+            }, "server"));
 
         Register(new ChatCommand("setborder", "Set the world border size", Array.Empty<string>(),
             (_, args) =>
@@ -305,7 +310,7 @@ public class ChatCommandManager
                     return Task.FromResult("Usage: /setborder <size> (minimum 100)");
                 _setWorldBorder(size);
                 return Task.FromResult($"World border set to {size} ({size * 2}x{size * 2})");
-            }));
+            }, "server"));
     }
 
     public void Register(ChatCommand command)
@@ -326,6 +331,15 @@ public class ChatCommandManager
 
         var commandName = parts[0].ToLowerInvariant();
         if (!_commands.TryGetValue(commandName, out var command)) return "Unknown command. Type /help for available commands.";
+
+        if (!string.IsNullOrEmpty(command.RequiredPrivilege))
+        {
+            var playerPrivs = _getPlayerPrivileges?.Invoke(playerName);
+            if (playerPrivs == null || !Array.Exists(playerPrivs, p => p == command.RequiredPrivilege))
+            {
+                return $"You don't have the '{command.RequiredPrivilege}' privilege to use /{command.Name}";
+            }
+        }
 
         var args = parts.Skip(1).ToArray();
         return await command.Handler(playerName, args);
