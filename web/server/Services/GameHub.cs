@@ -383,7 +383,7 @@ public class GameHub : Hub<IGameClient>
                 }
                 else
                 {
-                    player.Inventory[player.SelectedHotbarSlot] = toolItem with { Metadata = currentDurability.ToString() };
+                    player.Inventory[player.SelectedHotbarSlot] = heldItem with { Metadata = currentDurability.ToString() };
                 }
 
                 await SendInventoryUpdate(player);

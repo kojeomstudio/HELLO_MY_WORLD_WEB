@@ -1,0 +1,152 @@
+{
+  "decorations": [
+    {
+      "name": "tall_grass",
+      "type": "plantlike",
+      "blockType": "TallGrass",
+      "biomes": ["grassland", "forest", "jungle"],
+      "yMin": 1,
+      "yMax": 31000,
+      "noiseThreshold": 0.3,
+      "noiseScale": 0.05,
+      "placeOn": "grass",
+      "spawnChance": 0.35
+    },
+    {
+      "name": "flower_red",
+      "type": "plantlike",
+      "blockType": "FlowerRed",
+      "biomes": ["grassland", "forest"],
+      "yMin": 1,
+      "yMax": 31000,
+      "noiseThreshold": 0.6,
+      "noiseScale": 0.08,
+      "placeOn": "grass",
+      "spawnChance": 0.08
+    },
+    {
+      "name": "flower_yellow",
+      "type": "plantlike",
+      "blockType": "FlowerYellow",
+      "biomes": ["grassland", "forest"],
+      "yMin": 1,
+      "yMax": 31000,
+      "noiseThreshold": 0.65,
+      "noiseScale": 0.08,
+      "placeOn": "grass",
+      "spawnChance": 0.07
+    },
+    {
+      "name": "flower_rose",
+      "type": "plantlike",
+      "blockType": "FlowerRose",
+      "biomes": ["grassland", "forest"],
+      "yMin": 1,
+      "yMax": 31000,
+      "noiseThreshold": 0.7,
+      "noiseScale": 0.08,
+      "placeOn": "grass",
+      "spawnChance": 0.05
+    },
+    {
+      "name": "flower_tulip",
+      "type": "plantlike",
+      "blockType": "FlowerTulip",
+      "biomes": ["grassland"],
+      "yMin": 1,
+      "yMax": 31000,
+      "noiseThreshold": 0.75,
+      "noiseScale": 0.08,
+      "placeOn": "grass",
+      "spawnChance": 0.04
+    },
+    {
+      "name": "mushroom_red",
+      "type": "plantlike",
+      "blockType": "MushroomRedBlock",
+      "biomes": ["forest", "jungle"],
+      "yMin": 1,
+      "yMax": 31000,
+      "noiseThreshold": 0.8,
+      "noiseScale": 0.1,
+      "placeOn": "dirt",
+      "spawnChance": 0.02
+    },
+    {
+      "name": "mushroom_brown",
+      "type": "plantlike",
+      "blockType": "MushroomBrownBlock",
+      "biomes": ["forest", "jungle"],
+      "yMin": 1,
+      "yMax": 31000,
+      "noiseThreshold": 0.82,
+      "noiseScale": 0.1,
+      "placeOn": "dirt",
+      "spawnChance": 0.03
+    },
+    {
+      "name": "dead_bush",
+      "type": "plantlike",
+      "blockType": "DeadBush",
+      "biomes": ["desert", "savanna"],
+      "yMin": 1,
+      "yMax": 31000,
+      "noiseThreshold": 0.4,
+      "noiseScale": 0.06,
+      "placeOn": "sand",
+      "spawnChance": 0.1
+    },
+    {
+      "name": "cactus",
+      "type": "schematic",
+      "blockType": "Cactus",
+      "biomes": ["desert"],
+      "yMin": 1,
+      "yMax": 31000,
+      "noiseThreshold": 0.7,
+      "noiseScale": 0.04,
+      "placeOn": "desert_sand",
+      "spawnChance": 0.015,
+      "heightMin": 1,
+      "heightMax": 3
+    },
+    {
+      "name": "sugar_cane",
+      "type": "schematic",
+      "blockType": "SugarCane",
+      "biomes": ["grassland", "savanna"],
+      "yMin": 1,
+      "yMax": 31000,
+      "noiseThreshold": 0.5,
+      "noiseScale": 0.05,
+      "placeOn": "sand",
+      "spawnChance": 0.02,
+      "heightMin": 2,
+      "heightMax": 4
+    },
+    {
+      "name": "apple",
+      "type": "plantlike",
+      "blockType": "Apple",
+      "biomes": ["forest", "grassland"],
+      "yMin": 1,
+      "yMax": 31000,
+      "noiseThreshold": 0.9,
+      "noiseScale": 0.1,
+      "placeOn": "leaves",
+      "spawnChance": 0.01
+    },
+    {
+      "name": "pumpkin",
+      "type": "schematic",
+      "blockType": "PumpkinBlock",
+      "biomes": ["grassland", "forest"],
+      "yMin": 1,
+      "yMax": 31000,
+      "noiseThreshold": 0.85,
+      "noiseScale": 0.04,
+      "placeOn": "grass",
+      "spawnChance": 0.005
+    }
+  ]
+}

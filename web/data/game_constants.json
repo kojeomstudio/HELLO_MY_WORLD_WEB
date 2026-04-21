@@ -1,0 +1,106 @@
+{
+  "version": "5.16.0",
+  "protocol": 51,
+  "map": {
+    "blockSize": 16,
+    "maxGenerationLimit": 31007,
+    "chunkSize": 5,
+    "waterLevel": 1
+  },
+  "node": {
+    "nodeSize": 1.0,
+    "contentUnknown": 125,
+    "contentAir": 126,
+    "contentIgnore": 127,
+    "liquidLevelMax": 7,
+    "lightMax": 14,
+    "lightSun": 15
+  },
+  "player": {
+    "nameMaxLength": 20,
+    "maxHpDefault": 20,
+    "maxBreathDefault": 10,
+    "defaultStepHeight": 0.6,
+    "inventorySize": 32,
+    "hotbarSize": 8,
+    "hotbarMaxSize": 32,
+    "hotbarImageSize": 48,
+    "defaultSpawnTime": 6125
+  },
+  "physics": {
+    "gravity": 9.81,
+    "accelerationDefault": 3.0,
+    "accelerationAir": 2.0,
+    "accelerationFast": 10.0,
+    "speedWalk": 4.0,
+    "speedCrouch": 1.35,
+    "speedFast": 20.0,
+    "speedClimb": 3.0,
+    "speedJump": 6.5,
+    "liquidFluidity": 1.0,
+    "liquidFluiditySmooth": 0.5,
+    "liquidSink": 10.0
+  },
+  "tool": {
+    "fullPunchInterval": 1.4,
+    "punchAttackUses": 0,
+    "wearRange": 65535
+  },
+  "network": {
+    "defaultServerPort": 30000,
+    "connectionTimeout": 30,
+    "mediaFileMaxSize": 16700000,
+    "maxMessageSize": 500,
+    "chatRateLimit": 8,
+    "chatRateLimitWindowSec": 10,
+    "chatKickThreshold": 50
+  },
+  "time": {
+    "timeRange": 24000,
+    "timeSpeed": 72,
+    "worldStartTime": 6125,
+    "dtimeLimit": 2.5
+  },
+  "sky": {
+    "starCount": 1000,
+    "cloudDensity": 0.4,
+    "cloudThickness": 16.0,
+    "cloudHeight": 120,
+    "cloudSpeed": [0.0, 0.0]
+  },
+  "rendering": {
+    "maxWorkingVolume": 150000000,
+    "textureFilterMinSize": 192
+  },
+  "font": {
+    "ttfDefaultFontSize": 16
+  },
+  "interaction": {
+    "startDigging": 0,
+    "stopDigging": 1,
+    "diggingCompleted": 2,
+    "place": 3,
+    "use": 4,
+    "activate": 5
+  },
+  "csmRestrictionFlags": {
+    "loadClientMods": 1,
+    "chatMessages": 2,
+    "readItemDefs": 4,
+    "readNodeDefs": 8,
+    "lookupNodes": 16,
+    "readPlayerInfo": 32
+  },
+  "activeObjectTypes": {
+    "invalid": 0,
+    "test": 1,
+    "luaEntity": 7,
+    "player": 100,
+    "generic": 101
+  },
+  "cameraModes": {
+    "firstPerson": 0,
+    "thirdPerson": 1,
+    "thirdPersonFront": 2
+  }
+}

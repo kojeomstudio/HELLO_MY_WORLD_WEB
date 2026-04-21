@@ -11,7 +11,7 @@ Built with **TypeScript + Three.js** (client) and **C# ASP.NET Core 8.0 + Signal
 | Server | C# .NET 8.0, ASP.NET Core, SignalR |
 | Communication | WebSocket (SignalR) |
 | Data | JSON configuration files |
-| Textures | 63 PNG textures from Minetest devtest |
+| Textures | 89 PNG textures from Minetest devtest |
 | Audio | Web Audio API (procedural, no audio files) |
 
 ## Prerequisites
@@ -60,9 +60,9 @@ Output is in `web/client/dist/`. Serve with any static file server.
 - Procedural terrain generation with Perlin noise (biomes, caves, caverns, dungeons, ores)
 - Tree generation (oak, pine, birch variants with biome-aware placement)
 - Gravel veins and clay deposits
-- 64 block types with groups, sounds, and extended properties
+- 161 block types with groups, sounds, and extended properties
 - Block placement/digging with tool wear and durability system
-- Texture atlas-based block rendering (32 textures, pixelated style)
+- Texture atlas-based block rendering (89 textures from Minetest DevTest, pixelated style)
 - Ambient occlusion in chunk meshing for realistic lighting
 - Falling node physics (sand, gravel) via ABM system
 - Liquid physics (water/lava flow and spreading)

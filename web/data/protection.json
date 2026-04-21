@@ -1,0 +1,13 @@
+{
+  "defaultPrivs": ["interact", "shout"],
+  "enableProtection": true,
+  "defaultProtectionRange": 50,
+  "maxProtectionRange": 500,
+  "interactionRangeCheck": true,
+  "protectedAreas": [],
+  "areaProtectionMessage": "This area is protected.",
+  "privilegeBypass": "protection_bypass",
+  "allowAreaClaims": true,
+  "maxAreasPerPlayer": 10,
+  "claimTool": "protect_tool"
+}

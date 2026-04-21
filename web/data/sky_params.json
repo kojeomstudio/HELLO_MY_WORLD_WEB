@@ -1,0 +1,70 @@
+{
+  "sky": {
+    "backgroundColor": [0, 0, 0],
+    "type": "regular",
+    "clouds": true,
+    "skyColor": {
+      "day": [105, 165, 220],
+      "dayHorizon": [215, 230, 255],
+      "dawn": [180, 120, 80],
+      "dawnHorizon": [255, 180, 120],
+      "night": [10, 10, 30],
+      "nightHorizon": [25, 25, 50],
+      "indoors": [100, 100, 100]
+    },
+    "fog": {
+      "fogStart": -1.0,
+      "fogEnd": -1.0,
+      "fogDistance": -1.0
+    }
+  },
+  "sun": {
+    "visible": true,
+    "texture": "sun.png",
+    "tonemap": "sun_tonemap.png",
+    "sunrise": "sunrisebg.png",
+    "scale": 1.0
+  },
+  "moon": {
+    "visible": true,
+    "texture": "moon.png",
+    "tonemap": "moon_tonemap.png",
+    "scale": 1.0
+  },
+  "stars": {
+    "visible": true,
+    "count": 1000,
+    "color": [255, 255, 200],
+    "scale": 1.0,
+    "dayOpacity": 0.0,
+    "seed": 0
+  },
+  "clouds": {
+    "density": 0.4,
+    "color": [255, 255, 255],
+    "ambient": [255, 255, 255],
+    "thickness": 16.0,
+    "height": 120.0,
+    "speed": [0.0, 0.0]
+  },
+  "lighting": {
+    "shadowIntensity": 0.0,
+    "saturation": 1.0,
+    "exposure": {
+      "luminanceMin": 0.0,
+      "luminanceMax": 0.0,
+      "exposureCorrection": 0.0,
+      "speedDarkBright": 1000.0,
+      "speedBrightDark": 1000.0
+    },
+    "volumetricLight": {
+      "strength": 0.0,
+      "density": 16.0
+    },
+    "bloom": {
+      "luminanceBias": 0.0,
+      "strengthFactor": 0.0,
+      "radius": 1.0
+    }
+  }
+}

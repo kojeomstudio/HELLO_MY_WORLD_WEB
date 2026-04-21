@@ -178,7 +178,7 @@ Creates `UIManager`, then `GameClient`, connects to server.
 
 ### Other Client Modules
 - **InputManager** (`input/InputManager.ts`) — Keyboard/mouse state tracking
-- **AudioManager** (`audio/AudioManager.ts`) — Sound effects (stub)
+- **AudioManager** (`audio/AudioManager.ts`) — Procedural audio via Web Audio API (8 sound types: block break, block place, footstep, hurt, pickup, death, note block, jukebox)
 - **Minimap** (`ui/Minimap.ts`) — 2D overhead minimap
 - **WeatherSystem** (`world/WeatherSystem.ts`) — Rain particle system
 - **ParticleSystem** (`world/ParticleSystem.ts`) — Block break/place/damage particles
@@ -202,7 +202,7 @@ Each block has:
 - `Light`: Packed lighting (4-bit sun + 4-bit artificial)
 
 ### Block Types
-101 block types defined in `BlockType.cs` (Air through CoarseDirt). See [game-systems.md](game-systems.md) for full list.
+101→161 block types defined in `BlockType.cs` enum and `blocks.json` (IDs 0-160). See [game-systems.md](game-systems.md) for full list.
 
 ### Chunk Meshing
 - Only renders exposed faces (face culling against solid neighbors)
@@ -374,3 +374,49 @@ All server services registered as **Singleton** in `Program.cs`:
 - Security scanning job with secrets detection, npm audit, debug endpoint checks
 - Data integrity job with JSON validation and texture asset verification
 - .gitignore coverage validation
+
+## Security Model
+
+### Authentication & Authorization
+- Player name validation: regex `^[a-zA-Z0-9_-]{1,20}$` + reserved name list (server, admin, system, console, root, moderator)
+- IP-based and name-based ban system (`AuthenticationService`)
+- 19 privilege system with per-player grant/revoke loaded from `privileges.json`
+- Server capacity enforcement (max players check)
+
+### Input Validation
+- HTML/XML tag stripping in chat messages (XSS prevention)
+- Chat message length limits
+- NaN/Infinity position validation
+- Block type range validation (0-160)
+- Player AABB overlap check on block placement
+- Block interaction range check (8 blocks)
+- World border enforcement with position clamping
+
+### Rate Limiting
+- Position updates: 50ms minimum interval
+- Chat messages: 500ms minimum interval
+- Block dig/place: 250ms minimum interval
+- Player punch: 250ms minimum interval
+- Block interaction: 250ms minimum interval
+- Join spam prevention
+
+### Network Security
+- CORS origins restricted to configured list in `server_config.json`
+- Security headers: X-Content-Type-Options: nosniff, X-Frame-Options: DENY, X-XSS-Protection: 1; mode=block
+- SignalR WebSocket transport (no raw HTTP API exposure)
+- Server-authoritative physics validation (anti-cheat)
+
+### Data Security
+- No hardcoded secrets or credentials in source code
+- `.gitignore` excludes `.env`, `*.key`, `*.pem`, `*.db`, `credentials.json`
+- Database files (SQLite) excluded from version control
+- World data excluded from version control
+- CI pipeline includes automated secrets detection and npm audit
+
+### Anti-Cheat
+- Server-authoritative physics validation
+- Teleport detection (position delta exceeds max speed)
+- Noclip prevention (solid block collision checks)
+- Hover detection (gravity enforcement when not flying)
+- Position correction sent to clients on violation
+- Fly mode requires privilege check

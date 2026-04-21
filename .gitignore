@@ -1,0 +1,72 @@
+# Environment & secrets
+.env
+.env.local
+.env.production
+.env.*.local
+*.key
+*.pem
+*.p12
+*.pfx
+credentials.json
+secrets.json
+
+# Build outputs
+bin/
+obj/
+dist/
+out/
+build/
+
+# Dependencies
+node_modules/
+vendor/
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+*.cache
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# World data (generated at runtime)
+web/data/worlds/
+
+# NuGet
+*.nupkg
+packages/
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Compiled files
+*.dll
+*.pdb
+*.exe
+
+# Package lock (keep package-lock.json for reproducibility)
+# Uncomment if you want to exclude:
+# package-lock.json
