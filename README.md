@@ -23,12 +23,12 @@ A web-based voxel game ported from the minetest_sub_project (Luanti engine) to a
 - **Day/Night Cycle**: Full day/night cycle with sky brightness transitions
 - **Weather**: Rain particle system with day/night color transitions
 - **Multiplayer**: Real-time multiplayer via SignalR WebSocket with chat, player list
-- **Chat Commands**: 20+ commands with privilege enforcement (/help, /tp, /gamemode, /give, /status, /kill, /ban, /kick, /privs, /grant, /revoke, /settime, /spawn, etc.)
+- **Chat Commands**: 28+ commands with privilege enforcement (/help, /tp, /gamemode, /give, /giveme, /status, /kill, /ban, /kick, /privs, /grant, /revoke, /settime, /spawn, /me, /mods, /days, /msg, /admin, /haspriv, /setborder, /killall, /stop, etc.)
 - **Privilege System**: 19 privileges fully loaded from JSON with per-command privilege checks (interact, shout, fly, fast, teleport, give, ban, kick, server, etc.)
 - **Inventory UI**: Hotbar, main inventory, crafting, furnace, chest, creative inventory, armor
 - **Minimap**: 3 modes (surface, radar, normal) with player direction indicator
 - **Physics**: AABB collision, gravity, liquid physics, falling nodes
-- **Active Block Modifiers**: Sand/gravel falling, farmland decay, grass spreading, ice melting
+- **Active Block Modifiers**: Sand/gravel falling, farmland decay, grass spreading, dirt-to-grass conversion, ice melting near heat, fire spread/burnout, cactus growth, sugar cane growth (near water), mushroom spreading
 - **Agriculture**: Farmable crops (wheat, carrot, potato), farmland hydration from nearby water
 - **Node Timers**: Timed block transformations with persistence
 - **Persistence**: Player data, world chunks, block metadata, chest inventories, and node timers saved to disk
@@ -212,6 +212,12 @@ The Vite dev server proxies `/game` to the server.
 | /setborder size | Set world border size |
 | /killall | Clear all entities |
 | /stop | Shutdown server |
+| /me action | Show chat action |
+| /mods | List installed mods |
+| /days | Show day count |
+| /msg player message | Send private message |
+| /giveme item [count] | Give item to self |
+| /admin | Show server admin |
 
 ## Ported from minetest_sub_project
 
@@ -228,11 +234,12 @@ This project is a web port of the Luanti (formerly Minetest) voxel game engine, 
 - **Mob AI**: 5-state machine (Idle/Wander/Chase/Attack/Flee) with hostile/passive distinction matching minetest behavior
 - **Pathfinding**: A* pathfinding matching minetest's pathfinder.cpp with Manhattan heuristic
 - **Dungeons**: Multi-room procedural dungeons with corridors matching minetest's dungeongen algorithm
-- **ABMs**: Falling nodes, grass spreading, farmland decay, ice melting
+- **ABMs**: Falling nodes, grass spreading, farmland decay, ice melting, fire spread, cactus/sugar cane growth, mushroom spreading
+- **Liquid Physics**: Water/lava flow with level system, lava-water interaction (obsidian/cobblestone), liquid renewal
 - **Node Timers**: Timed block transformations
 - **Day/Night Cycle**: Matching minetest's 24000-tick cycle
 - **Ported Textures**: 89+ block textures from minetest devtest (basenodes + wool colors) with nearest-neighbor filtering
-- **World Generation**: Noise-based terrain with caves, 9 ore types with realistic depth distribution, biome-based generation with heat/humidity noise, multiple tree types, multi-room dungeons with corridors and loot chests
+- **World Generation**: Noise-based terrain with caves, 9 ore types with realistic depth distribution, biome-based generation with heat/humidity noise, multiple tree types (oak, pine, birch, jungle), cactus in desert, dead bush, flowers, mushrooms, tall grass, pumpkins, multi-room dungeons with corridors and loot chests
 - **Tool Repair**: Matching minetest's tool repair system (combine two same-type tools)
 - **Server Physics Validation**: Anti-cheat with teleport detection, noclip prevention, hover detection, position update rate limiting, and block interaction range validation
 - **Security**: XSS-safe rendering, CORS-restricted origins (configurable from `server_config.json`), player name sanitization (regex + reserved names), HTML/XML tag stripping in chat, chat message length limits, rate limiting on all actions (join spam, punch, interact), chunk request range limits, IP ban enforcement, security headers (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection), NaN/Infinity position validation, block type range validation, player bounding box overlap check on placement, cloud key/API key pattern detection in CI

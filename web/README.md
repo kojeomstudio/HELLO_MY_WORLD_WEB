@@ -58,14 +58,16 @@ Output is in `web/client/dist/`. Serve with any static file server.
 
 ### World
 - Procedural terrain generation with Perlin noise (biomes, caves, caverns, dungeons, ores)
-- Tree generation (oak, pine, birch variants with biome-aware placement)
+- Tree generation (oak, pine, birch, jungle with biome-aware placement, snow biome pine trees)
+- Desert decorations (cactus, dead bush)
+- Surface decorations (flowers, mushrooms, tall grass, pumpkins)
 - Gravel veins and clay deposits
 - 161 block types with groups, sounds, and extended properties
 - Block placement/digging with tool wear and durability system
 - Texture atlas-based block rendering (89 textures from Minetest DevTest, pixelated style)
 - Ambient occlusion in chunk meshing for realistic lighting
 - Falling node physics (sand, gravel) via ABM system
-- Liquid physics (water/lava flow and spreading)
+- Liquid physics (water/lava flow and spreading with lava-water interaction)
 - Day/night cycle with sky rendering
 - World persistence (auto-save every 5 minutes to disk)
 
@@ -98,7 +100,7 @@ Output is in `web/client/dist/`. Serve with any static file server.
 ### Multiplayer
 - Real-time multiplayer via SignalR/WebSocket
 - Player list and position sync
-- Chat system with slash commands (`/gamemode`, `/tp`, `/give`, `/help`, `/time`, `/tps`, `/setborder`)
+- Chat system with slash commands (`/gamemode`, `/tp`, `/give`, `/giveme`, `/me`, `/msg`, `/mods`, `/days`, `/help`, `/time`, `/tps`, `/setborder`, `/admin`)
 - PvP combat with weapon damage and Minetest knockback formula (max 4 block range)
 - Rate limiting on chat, dig, place, punch, interact, and join spam
 - Server-authoritative physics validation
@@ -123,8 +125,8 @@ Output is in `web/client/dist/`. Serve with any static file server.
 - Mob definitions loaded from `mobs.json`
 
 ### Systems
-- 15 Minetest-compatible privileges (loaded from JSON)
-- Active Block Modifier (ABM) system for periodic block changes
+- 18 Minetest-compatible privileges (loaded from JSON, enforced on interact/shout/chat commands)
+- Active Block Modifier (ABM) system: sand/gravel falling, dirt-to-grass, fire spread, cactus/sugarcane growth, mushroom spreading, ice melting
 - Node timer system for time-based block events
 - Procedural audio (Web Audio API, 6 sound types)
 - HUD (health hearts, breath bar, hotbar, debug overlay, minimap)

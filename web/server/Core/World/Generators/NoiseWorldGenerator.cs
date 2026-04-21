@@ -145,18 +145,47 @@ public class NoiseWorldGenerator : IWorldGenerator
                     continue;
                 }
 
-                if (blocks[x, localSurfaceY, z] != (ushort)BlockType.Grass)
-                {
-                    continue;
-                }
-
                 if (surfaceHeight <= WaterLevel)
                 {
                     continue;
                 }
 
                 var biome = GetBiomeAt(worldX, surfaceHeight, worldZ, surfaceHeight);
-                if (biome.Name is "desert" or "grassland_ocean")
+                var surfaceBlock = blocks[x, localSurfaceY, z];
+
+                if (biome.Name == "desert")
+                {
+                    if (surfaceBlock == (ushort)BlockType.DesertSand)
+                    {
+                        var cactusNoise = PerlinNoise2D(worldX * 0.8f + 7000, worldZ * 0.8f + 7000);
+                        if (cactusNoise > 0.7f)
+                        {
+                            GenerateCactus(blocks, x, localSurfaceY, z);
+                        }
+                        var deadBushNoise = PerlinNoise2D(worldX * 1.2f + 7500, worldZ * 1.2f + 7500);
+                        if (deadBushNoise > 0.6f && localSurfaceY + 1 < Chunk.Size)
+                        {
+                            blocks[x, localSurfaceY + 1, z] = (ushort)BlockType.DeadBush;
+                        }
+                    }
+                    continue;
+                }
+
+                if (biome.Name == "snow")
+                {
+                    if (surfaceBlock == (ushort)BlockType.Snow)
+                    {
+                        var pineNoise = PerlinNoise2D(worldX * 0.5f + 5000, worldZ * 0.5f + 5000);
+                        if (pineNoise > 0.45f)
+                        {
+                            var rng = new Random(_seed + worldX * 73856093 ^ worldZ * 19349663);
+                            GeneratePineTree(blocks, x, localSurfaceY, z, rng.Next(5, 8));
+                        }
+                    }
+                    continue;
+                }
+
+                if (biome.Name == "grassland_ocean")
                 {
                     continue;
                 }
@@ -167,7 +196,59 @@ public class NoiseWorldGenerator : IWorldGenerator
                     continue;
                 }
 
-                GenerateTree(blocks, x, localSurfaceY, z, baseX, baseY, baseZ, worldX, worldZ);
+                if (surfaceBlock != (ushort)BlockType.Grass)
+                {
+                    continue;
+                }
+
+                var rng2 = new Random(_seed + worldX * 73856093 ^ worldZ * 19349663);
+                var tempNoise = PerlinNoise2D(worldX * 0.005f + 1000, worldZ * 0.005f + 1000);
+                if (tempNoise > 0.25f)
+                {
+                    GenerateJungleTree(blocks, x, localSurfaceY, z, rng2.Next(6, 10));
+                }
+                else
+                {
+                    GenerateTree(blocks, x, localSurfaceY, z, baseX, baseY, baseZ, worldX, worldZ);
+                }
+
+                var flowerNoise = PerlinNoise2D(worldX * 2.0f + 8000, worldZ * 2.0f + 8000);
+                if (flowerNoise > 0.6f && localSurfaceY + 1 < Chunk.Size
+                    && blocks[x, localSurfaceY + 1, z] == (ushort)BlockType.Air)
+                {
+                    blocks[x, localSurfaceY + 1, z] = flowerNoise > 0.8
+                        ? (ushort)BlockType.FlowerRed
+                        : (ushort)BlockType.FlowerYellow;
+                }
+
+                var mushroomNoise = PerlinNoise2D(worldX * 1.5f + 8500, worldZ * 1.5f + 8500);
+                if (mushroomNoise > 0.8f && localSurfaceY + 1 < Chunk.Size
+                    && blocks[x, localSurfaceY + 1, z] == (ushort)BlockType.Air)
+                {
+                    blocks[x, localSurfaceY + 1, z] = rng2.Next(2) == 0
+                        ? (ushort)BlockType.MushroomRedBlock
+                        : (ushort)BlockType.MushroomBrownBlock;
+                }
+
+                var grassNoise = PerlinNoise2D(worldX * 3.0f + 9000, worldZ * 3.0f + 9000);
+                if (grassNoise > 0.3f && localSurfaceY + 1 < Chunk.Size
+                    && blocks[x, localSurfaceY + 1, z] == (ushort)BlockType.Air)
+                {
+                    blocks[x, localSurfaceY + 1, z] = (ushort)BlockType.TallGrass;
+                }
+
+                var pumpkinNoise = PerlinNoise2D(worldX * 0.3f + 9500, worldZ * 0.3f + 9500);
+                if (pumpkinNoise > 0.85f)
+                {
+                    var px = x + rng2.Next(-2, 3);
+                    var pz = z + rng2.Next(-2, 3);
+                    if (px >= 0 && px < Chunk.Size && pz >= 0 && pz < Chunk.Size
+                        && localSurfaceY + 1 < Chunk.Size
+                        && blocks[px, localSurfaceY + 1, pz] == (ushort)BlockType.Air)
+                    {
+                        blocks[px, localSurfaceY + 1, pz] = (ushort)BlockType.PumpkinBlock;
+                    }
+                }
             }
         }
     }
@@ -176,7 +257,7 @@ public class NoiseWorldGenerator : IWorldGenerator
     {
         var rng = new Random(_seed + worldX * 73856093 ^ worldZ * 19349663);
         var trunkHeight = rng.Next(4, 7);
-        var treeType = rng.Next(3);
+        var treeType = rng.Next(4);
 
         if (treeType == 0)
         {
@@ -186,9 +267,26 @@ public class NoiseWorldGenerator : IWorldGenerator
         {
             GeneratePineTree(blocks, x, surfaceY, z, trunkHeight);
         }
-        else
+        else if (treeType == 2)
         {
             GenerateBirchTree(blocks, x, surfaceY, z, trunkHeight);
+        }
+        else
+        {
+            GenerateJungleTree(blocks, x, surfaceY, z, trunkHeight + 2);
+        }
+    }
+
+    private static void GenerateCactus(ushort[,,] blocks, int x, int surfaceY, int z)
+    {
+        var height = Random.Shared.Next(1, 4);
+        for (int dy = 1; dy <= height; dy++)
+        {
+            var ly = surfaceY + dy;
+            if (ly >= 0 && ly < Chunk.Size)
+            {
+                blocks[x, ly, z] = (ushort)BlockType.Cactus;
+            }
         }
     }
 
@@ -293,6 +391,69 @@ public class NoiseWorldGenerator : IWorldGenerator
                     {
                         blocks[lx, ly, lz] = (ushort)BlockType.Leaves;
                     }
+                }
+            }
+        }
+    }
+
+    private static void GenerateJungleTree(ushort[,,] blocks, int x, int surfaceY, int z, int trunkHeight)
+    {
+        for (int ty = 1; ty <= trunkHeight; ty++)
+        {
+            var ly = surfaceY + ty;
+            if (ly >= 0 && ly < Chunk.Size)
+            {
+                blocks[x, ly, z] = (ushort)BlockType.JungleWood;
+
+                if (ty > 2 && ty < trunkHeight - 1)
+                {
+                    if (Random.Shared.Next(3) == 0)
+                    {
+                        var sideDx = Random.Shared.Next(2) == 0 ? -1 : 1;
+                        var sx = x + sideDx;
+                        if (sx >= 0 && sx < Chunk.Size)
+                        {
+                            blocks[sx, ly, z] = (ushort)BlockType.JungleWood;
+                        }
+                    }
+                }
+            }
+        }
+
+        var canopyBase = surfaceY + trunkHeight - 2;
+        for (int dy = 0; dy <= 4; dy++)
+        {
+            var ly = canopyBase + dy;
+            if (ly < 0 || ly >= Chunk.Size) continue;
+
+            var radius = dy <= 1 ? 3 : dy <= 3 ? 2 : 1;
+            for (int dx = -radius; dx <= radius; dx++)
+            {
+                for (int dz = -radius; dz <= radius; dz++)
+                {
+                    if (dx * dx + dz * dz > radius * radius + 2) continue;
+                    var lx = x + dx;
+                    var lz = z + dz;
+                    if (lx < 0 || lx >= Chunk.Size || lz < 0 || lz >= Chunk.Size) continue;
+                    if (blocks[lx, ly, lz] == (ushort)BlockType.Air)
+                    {
+                        blocks[lx, ly, lz] = (ushort)BlockType.JungleLeaves;
+                    }
+                }
+            }
+        }
+
+        for (int vineTry = 0; vineTry < 4; vineTry++)
+        {
+            var vx = x + Random.Shared.Next(-2, 3);
+            var vz = z + Random.Shared.Next(-2, 3);
+            if (vx < 0 || vx >= Chunk.Size || vz < 0 || vz >= Chunk.Size) continue;
+
+            for (int vy = surfaceY + 1; vy < canopyBase; vy++)
+            {
+                if (blocks[vx, vy, vz] == (ushort)BlockType.Air)
+                {
+                    blocks[vx, vy, vz] = (ushort)BlockType.JungleLeaves;
                 }
             }
         }

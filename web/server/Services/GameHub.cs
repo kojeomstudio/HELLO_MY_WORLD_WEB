@@ -221,6 +221,8 @@ public class GameHub : Hub<IGameClient>
             return;
         }
 
+        if (!_gameServer.Privileges.HasPrivilege(player.Name, "shout")) return;
+
         await Clients.All.OnChatMessage(player.Name, message);
     }
 
@@ -230,6 +232,8 @@ public class GameHub : Hub<IGameClient>
 
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
+
+        if (!_gameServer.Privileges.HasPrivilege(player.Name, "interact")) return;
 
         if (blockType > 160) return;
 
@@ -313,6 +317,8 @@ public class GameHub : Hub<IGameClient>
 
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
+
+        if (!_gameServer.Privileges.HasPrivilege(player.Name, "interact")) return;
 
         var blockCenter = new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
         var distance = Vector3.Distance(player.Position, blockCenter);
@@ -1160,6 +1166,8 @@ public class GameHub : Hub<IGameClient>
     {
         message = Regex.Replace(message, "<[^>]*>", string.Empty);
         message = message.Replace("\r\n", " ").Replace("\n", " ");
+        message = message.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
+        if (message.Length > 256) message = message[..256];
         return message;
     }
 

@@ -311,6 +311,56 @@ public class ChatCommandManager
                 _setWorldBorder(size);
                 return Task.FromResult($"World border set to {size} ({size * 2}x{size * 2})");
             }, "server"));
+
+        Register(new ChatCommand("me", "Show chat action", Array.Empty<string>(),
+            (playerName, args) =>
+            {
+                if (args.Length == 0) return Task.FromResult($"* {playerName}");
+                return Task.FromResult($"* {playerName} {string.Join(' ', args)}");
+            }));
+
+        Register(new ChatCommand("admin", "Show server admin name", Array.Empty<string>(),
+            (_, _) => Task.FromResult("Server admin: server_owner")));
+
+        Register(new ChatCommand("mods", "List installed mods", Array.Empty<string>(),
+            (_, _) => Task.FromResult("Installed mods: basenodes, basetools, bucket, chest, stairs, testnodes")));
+
+        Register(new ChatCommand("days", "Show day count", Array.Empty<string>(),
+            (_, _) =>
+            {
+                var gameTime = _getGameTime();
+                var days = gameTime / 24000;
+                return Task.FromResult($"Day {days + 1}");
+            }));
+
+        Register(new ChatCommand("haspriv", "List players with a privilege", Array.Empty<string>(),
+            (playerName, args) =>
+            {
+                if (_getPlayerPrivileges == null) return Task.FromResult("Privilege command is not available.");
+                if (args.Length == 0) return Task.FromResult("Usage: /haspriv <privilege>");
+                return Task.FromResult($"Players with '{args[0]}': use /list and check individually");
+            }, "basic_privs"));
+
+        Register(new ChatCommand("msg", "Send private message to player", new[] { "tell", "whisper" },
+            (playerName, args) =>
+            {
+                if (args.Length < 2) return Task.FromResult("Usage: /msg <player> <message>");
+                var target = args[0];
+                var message = string.Join(' ', args[1..]);
+                return Task.FromResult($"[PM] To {target}: {message}");
+            }));
+
+        Register(new ChatCommand("giveme", "Give item to yourself", Array.Empty<string>(),
+            (playerName, args) =>
+            {
+                if (_giveItem == null) return Task.FromResult("Give command is not available.");
+                if (args.Length == 0) return Task.FromResult("Usage: /giveme <item> [count]");
+                var count = 1;
+                if (args.Length >= 2 && !int.TryParse(args[1], out count))
+                    return Task.FromResult("Invalid count. Usage: /giveme <item> [count]");
+                _giveItem(playerName, playerName, args[0], count);
+                return Task.FromResult($"Gave {count}x {args[0]} to yourself");
+            }, "give"));
     }
 
     public void Register(ChatCommand command)

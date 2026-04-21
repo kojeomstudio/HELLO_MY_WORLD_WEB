@@ -109,6 +109,185 @@ builder.Services.AddSingleton<ActiveBlockModifierSystem>(sp =>
         }
     });
 
+    system.Register(new ActiveBlockModifier
+    {
+        Name = "dirt_to_grass",
+        Interval = 20,
+        Chance = 0.1f,
+        RequiredNeighbor = "air",
+        Action = (blockDef, pos, world) =>
+        {
+            var above = new Vector3s(pos.X, (short)(pos.Y + 1), pos.Z);
+            var aboveBlock = world.GetBlock(above);
+            if (aboveBlock.Type != BlockType.Air) return false;
+            world.SetBlock(pos, new Block(BlockType.Grass));
+            return true;
+        }
+    });
+
+    system.Register(new ActiveBlockModifier
+    {
+        Name = "ice_melt",
+        Interval = 30,
+        Chance = 0.05f,
+        Action = (blockDef, pos, world) =>
+        {
+            for (int dx = -2; dx <= 2; dx++)
+            {
+                for (int dz = -2; dz <= 2; dz++)
+                {
+                    var checkPos = new Vector3s((short)(pos.X + dx), pos.Y, (short)(pos.Z + dz));
+                    var check = world.GetBlock(checkPos);
+                    if (check.Type is BlockType.Lava or BlockType.LavaFlowing or BlockType.Fire)
+                    {
+                        world.SetBlock(pos, new Block(BlockType.Water));
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+    });
+
+    system.Register(new ActiveBlockModifier
+    {
+        Name = "fire_spread",
+        Interval = 3,
+        Chance = 0.3f,
+        Action = (blockDef, pos, world) =>
+        {
+            if (blockDef.Name != "fire") return false;
+
+            for (int dy = -1; dy <= 1; dy++)
+            {
+                for (int dx = -1; dx <= 1; dx++)
+                {
+                    for (int dz = -1; dz <= 1; dz++)
+                    {
+                        if (dx == 0 && dy == 0 && dz == 0) continue;
+                        var nPos = new Vector3s((short)(pos.X + dx), (short)(pos.Y + dy), (short)(pos.Z + dz));
+                        var neighbor = world.GetBlock(nPos);
+                        if (neighbor.Type is BlockType.Wood or BlockType.Leaves
+                            or BlockType.JungleWood or BlockType.JungleLeaves
+                            or BlockType.Planks or BlockType.JungleLeaves)
+                        {
+                            if (Random.Shared.NextSingle() < 0.15f)
+                            {
+                                world.SetBlock(nPos, new Block(BlockType.Fire));
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (Random.Shared.NextSingle() < 0.2f)
+            {
+                world.SetBlock(pos, Block.Air);
+            }
+            return true;
+        }
+    });
+
+    system.Register(new ActiveBlockModifier
+    {
+        Name = "cactus_growth",
+        Interval = 40,
+        Chance = 0.2f,
+        Action = (blockDef, pos, world) =>
+        {
+            if (blockDef.Name != "cactus") return false;
+            var above = new Vector3s(pos.X, (short)(pos.Y + 1), pos.Z);
+            if (world.GetBlock(above).Type != BlockType.Air) return false;
+
+            int height = 1;
+            for (int dy = 1; dy <= 3; dy++)
+            {
+                var checkPos = new Vector3s(pos.X, (short)(pos.Y - dy), pos.Z);
+                if (world.GetBlock(checkPos).Type == BlockType.Cactus)
+                    height++;
+                else
+                    break;
+            }
+
+            if (height < 3)
+            {
+                world.SetBlock(above, new Block(BlockType.Cactus));
+                return true;
+            }
+            return false;
+        }
+    });
+
+    system.Register(new ActiveBlockModifier
+    {
+        Name = "sugarcane_growth",
+        Interval = 40,
+        Chance = 0.2f,
+        Action = (blockDef, pos, world) =>
+        {
+            if (blockDef.Name != "sugar_cane") return false;
+            var above = new Vector3s(pos.X, (short)(pos.Y + 1), pos.Z);
+            if (world.GetBlock(above).Type != BlockType.Air) return false;
+
+            bool hasWater = false;
+            for (int dx = -4; dx <= 4 && !hasWater; dx++)
+            {
+                for (int dz = -4; dz <= 4 && !hasWater; dz++)
+                {
+                    var checkPos = new Vector3s((short)(pos.X + dx), pos.Y, (short)(pos.Z + dz));
+                    if (world.GetBlock(checkPos).Type is BlockType.Water or BlockType.WaterFlowing)
+                        hasWater = true;
+                }
+            }
+
+            if (!hasWater) return false;
+
+            int height = 1;
+            for (int dy = 1; dy <= 3; dy++)
+            {
+                var checkPos = new Vector3s(pos.X, (short)(pos.Y - dy), pos.Z);
+                if (world.GetBlock(checkPos).Type == BlockType.SugarCane)
+                    height++;
+                else
+                    break;
+            }
+
+            if (height < 3)
+            {
+                world.SetBlock(above, new Block(BlockType.SugarCane));
+                return true;
+            }
+            return false;
+        }
+    });
+
+    system.Register(new ActiveBlockModifier
+    {
+        Name = "mushroom_spread",
+        Interval = 60,
+        Chance = 0.05f,
+        Action = (blockDef, pos, world) =>
+        {
+            if (blockDef.Name is not ("mushroom_red_block" or "mushroom_brown_block")) return false;
+
+            var dx = Random.Shared.Next(-1, 2);
+            var dz = Random.Shared.Next(-1, 2);
+            var spreadPos = new Vector3s((short)(pos.X + dx), pos.Y, (short)(pos.Z + dz));
+            var target = world.GetBlock(spreadPos);
+            if (target.Type != BlockType.Air) return false;
+
+            var below = new Vector3s(spreadPos.X, (short)(spreadPos.Y - 1), spreadPos.Z);
+            var belowBlock = world.GetBlock(below);
+            if (belowBlock.Type is BlockType.Stone or BlockType.Dirt or BlockType.Mycelium)
+            {
+                world.SetBlock(spreadPos, new Block(blockDef.Name == "mushroom_red_block"
+                    ? BlockType.MushroomRedBlock : BlockType.MushroomBrownBlock));
+                return true;
+            }
+            return false;
+        }
+    });
+
     return system;
 });
 builder.Services.AddSingleton<KnockbackSystem>();
