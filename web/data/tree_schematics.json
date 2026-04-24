@@ -1,0 +1,64 @@
+{
+    "schematics": [
+        {
+            "name": "oak_tree",
+            "trunkBlock": "wood",
+            "leavesBlock": "leaves",
+            "minHeight": 4,
+            "maxHeight": 6,
+            "canopyShape": "sphere",
+            "canopyBaseOffset": -1,
+            "canopyTopOffset": 3,
+            "canopyRadius": 2,
+            "biomes": ["grassland", "forest", "savanna", "swamp"]
+        },
+        {
+            "name": "pine_tree",
+            "trunkBlock": "pine_wood",
+            "leavesBlock": "pine_needles",
+            "minHeight": 5,
+            "maxHeight": 8,
+            "canopyShape": "cone",
+            "canopyBaseOffset": -2,
+            "canopyTopOffset": 0,
+            "canopyRadius": 2,
+            "biomes": ["snow", "taiga"]
+        },
+        {
+            "name": "jungle_tree",
+            "trunkBlock": "jungle_wood",
+            "leavesBlock": "jungle_leaves",
+            "minHeight": 6,
+            "maxHeight": 10,
+            "canopyShape": "sphere",
+            "canopyBaseOffset": -2,
+            "canopyTopOffset": 4,
+            "canopyRadius": 3,
+            "biomes": ["jungle"]
+        },
+        {
+            "name": "birch_tree",
+            "trunkBlock": "wood",
+            "leavesBlock": "leaves",
+            "minHeight": 5,
+            "maxHeight": 7,
+            "canopyShape": "cylinder",
+            "canopyBaseOffset": -1,
+            "canopyTopOffset": 1,
+            "canopyRadius": 2,
+            "biomes": ["forest"]
+        },
+        {
+            "name": "cactus",
+            "trunkBlock": "cactus",
+            "leavesBlock": "none",
+            "minHeight": 1,
+            "maxHeight": 3,
+            "canopyShape": "none",
+            "canopyBaseOffset": 0,
+            "canopyTopOffset": 0,
+            "canopyRadius": 0,
+            "biomes": ["desert"]
+        }
+    ]
+}

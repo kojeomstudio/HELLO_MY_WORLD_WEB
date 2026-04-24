@@ -1,8 +1,30 @@
 @echo off
+setlocal enabledelayedexpansion
+
 echo ========================================
-echo  HelloMyWorld Web Game - Starting Server
+echo  HelloMyWorld Web Game - Development
 echo ========================================
 echo.
+
+where dotnet >nul 2>&1
+if %ERRORLEVEL% neq 0 (
+    echo ERROR: dotnet SDK not found. Please install .NET 8.0 SDK.
+    pause
+    exit /b 1
+)
+
+where node >nul 2>&1
+if %ERRORLEVEL% neq 0 (
+    echo ERROR: Node.js not found. Please install Node.js 18+.
+    pause
+    exit /b 1
+)
+
+if not exist "web\client\node_modules" (
+    echo Installing client dependencies...
+    cd /d "%~dp0web\client" && npm install
+    cd /d "%~dp0"
+)
 
 echo Starting C# server...
 start "WebGameServer" cmd /c "cd /d %~dp0web\server && dotnet run --project WebGameServer.csproj"

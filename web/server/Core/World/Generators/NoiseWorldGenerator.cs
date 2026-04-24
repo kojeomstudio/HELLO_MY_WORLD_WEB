@@ -9,29 +9,40 @@ public class NoiseWorldGenerator : IWorldGenerator
     private int _seed;
     private int[] _permutationTable = new int[512];
     private bool _generateTrees = true;
+    private bool _generateCaves = true;
+    private bool _generateOres = true;
+    private bool _generateDungeons = true;
 
     private readonly List<BiomeDefinition> _biomes = new();
     private BiomeNoiseConfig? _biomeNoiseConfig;
+    private readonly List<TreeSchematic> _treeSchematics = new();
 
     private const int GroundBase = 32;
     private const int TerrainHeight = 20;
     private const int WaterLevel = 28;
-    private const int CaveThreshold = 45;
     private const int TreeMinHeight = 5;
 
     private record BiomeDefinition(
         string Name, int YMin, int YMax, float HeatPoint, float HumidityPoint,
         string TopBlock, string FillerBlock, int FillerDepth,
-        string StoneBlock, string WaterBlock);
+        string StoneBlock, string WaterBlock,
+        string TreeType, float TreeChance,
+        string[] Decorations, string DungeonBlock, string DungeonAltBlock);
 
     private record BiomeNoiseConfig(
         float HeatOffset, float HeatScale, float[] HeatSpread,
         float HumidityOffset, float HumidityScale, float[] HumiditySpread);
 
-    public void ConfigureTrees(bool generateTrees)
-    {
-        _generateTrees = generateTrees;
-    }
+    private record TreeSchematic(
+        string Name, string TrunkBlock, string LeavesBlock,
+        int MinHeight, int MaxHeight, string CanopyShape,
+        int CanopyBaseOffset, int CanopyTopOffset, int CanopyRadius,
+        string[] Biomes);
+
+    public void ConfigureTrees(bool generateTrees) => _generateTrees = generateTrees;
+    public void ConfigureCaves(bool generateCaves) => _generateCaves = generateCaves;
+    public void ConfigureOres(bool generateOres) => _generateOres = generateOres;
+    public void ConfigureDungeons(bool generateDungeons) => _generateDungeons = generateDungeons;
 
     public void Initialize(int seed)
     {
@@ -55,41 +66,94 @@ public class NoiseWorldGenerator : IWorldGenerator
     public void LoadBiomes(string dataPath)
     {
         var biomesPath = Path.Combine(dataPath, "biomes.json");
-        if (!File.Exists(biomesPath)) return;
-
-        var json = File.ReadAllText(biomesPath);
-        using var doc = JsonDocument.Parse(json);
-        var root = doc.RootElement;
-
-        if (root.TryGetProperty("biomes", out var biomesEl))
+        if (File.Exists(biomesPath))
         {
-            foreach (var biome in biomesEl.EnumerateArray())
+            var json = File.ReadAllText(biomesPath);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("biomes", out var biomesEl))
             {
-                _biomes.Add(new BiomeDefinition(
-                    biome.GetProperty("name").GetString() ?? "",
-                    biome.GetProperty("yMin").GetInt32(),
-                    biome.GetProperty("yMax").GetInt32(),
-                    (float)biome.GetProperty("heatPoint").GetDouble(),
-                    (float)biome.GetProperty("humidityPoint").GetDouble(),
-                    biome.GetProperty("topBlock").GetString() ?? "grass",
-                    biome.GetProperty("fillerBlock").GetString() ?? "dirt",
-                    biome.GetProperty("fillerDepth").GetInt32(),
-                    biome.GetProperty("stoneBlock").GetString() ?? "stone",
-                    biome.GetProperty("waterBlock").GetString() ?? "water"
-                ));
+                foreach (var biome in biomesEl.EnumerateArray())
+                {
+                    var decorations = new List<string>();
+                    if (biome.TryGetProperty("decorations", out var decEl))
+                    {
+                        foreach (var d in decEl.EnumerateArray())
+                            decorations.Add(d.GetString() ?? "");
+                    }
+
+                    _biomes.Add(new BiomeDefinition(
+                        biome.GetProperty("name").GetString() ?? "",
+                        biome.GetProperty("yMin").GetInt32(),
+                        biome.TryGetProperty("yMax", out var yMaxEl) ? yMaxEl.GetInt32() : 31000,
+                        (float)biome.GetProperty("heatPoint").GetDouble(),
+                        (float)biome.GetProperty("humidityPoint").GetDouble(),
+                        biome.GetProperty("topBlock").GetString() ?? "grass",
+                        biome.GetProperty("fillerBlock").GetString() ?? "dirt",
+                        biome.GetProperty("fillerDepth").GetInt32(),
+                        biome.GetProperty("stoneBlock").GetString() ?? "stone",
+                        biome.GetProperty("waterBlock").GetString() ?? "water",
+                        biome.TryGetProperty("treeType", out var ttEl) ? ttEl.GetString() ?? "none" : "none",
+                        biome.TryGetProperty("treeChance", out var tcEl) ? (float)tcEl.GetDouble() : 0f,
+                        decorations.ToArray(),
+                        biome.TryGetProperty("dungeonBlock", out var dbEl) ? dbEl.GetString() ?? "cobblestone" : "cobblestone",
+                        biome.TryGetProperty("dungeonAltBlock", out var daEl) ? daEl.GetString() ?? "mossy_cobblestone" : "mossy_cobblestone"
+                    ));
+                }
+            }
+
+            if (root.TryGetProperty("noise", out var noiseEl))
+            {
+                _biomeNoiseConfig = new BiomeNoiseConfig(
+                    (float)noiseEl.GetProperty("heatOffset").GetDouble(),
+                    (float)noiseEl.GetProperty("heatScale").GetDouble(),
+                    noiseEl.GetProperty("heatSpread").EnumerateArray().Select(e => (float)e.GetDouble()).ToArray(),
+                    (float)noiseEl.GetProperty("humidityOffset").GetDouble(),
+                    (float)noiseEl.GetProperty("humidityScale").GetDouble(),
+                    noiseEl.GetProperty("humiditySpread").EnumerateArray().Select(e => (float)e.GetDouble()).ToArray()
+                );
             }
         }
 
-        if (root.TryGetProperty("noise", out var noiseEl))
+        var schematicsPath = Path.Combine(dataPath, "tree_schematics.json");
+        if (File.Exists(schematicsPath))
         {
-            _biomeNoiseConfig = new BiomeNoiseConfig(
-                (float)noiseEl.GetProperty("heatOffset").GetDouble(),
-                (float)noiseEl.GetProperty("heatScale").GetDouble(),
-                noiseEl.GetProperty("heatSpread").EnumerateArray().Select(e => (float)e.GetDouble()).ToArray(),
-                (float)noiseEl.GetProperty("humidityOffset").GetDouble(),
-                (float)noiseEl.GetProperty("humidityScale").GetDouble(),
-                noiseEl.GetProperty("humiditySpread").EnumerateArray().Select(e => (float)e.GetDouble()).ToArray()
-            );
+            var json = File.ReadAllText(schematicsPath);
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.TryGetProperty("schematics", out var schemEl))
+            {
+                foreach (var s in schemEl.EnumerateArray())
+                {
+                    var biomeList = new List<string>();
+                    if (s.TryGetProperty("biomes", out var bEl))
+                    {
+                        foreach (var b in bEl.EnumerateArray())
+                            biomeList.Add(b.GetString() ?? "");
+                    }
+
+                    _treeSchematics.Add(new TreeSchematic(
+                        s.GetProperty("name").GetString() ?? "",
+                        s.GetProperty("trunkBlock").GetString() ?? "wood",
+                        s.GetProperty("leavesBlock").GetString() ?? "leaves",
+                        s.GetProperty("minHeight").GetInt32(),
+                        s.GetProperty("maxHeight").GetInt32(),
+                        s.GetProperty("canopyShape").GetString() ?? "sphere",
+                        s.GetProperty("canopyBaseOffset").GetInt32(),
+                        s.GetProperty("canopyTopOffset").GetInt32(),
+                        s.GetProperty("canopyRadius").GetInt32(),
+                        biomeList.ToArray()
+                    ));
+                }
+            }
+        }
+
+        if (_treeSchematics.Count == 0)
+        {
+            _treeSchematics.Add(new TreeSchematic("oak_tree", "wood", "leaves", 4, 6, "sphere", -1, 3, 2, new[] { "grassland", "forest", "savanna", "swamp" }));
+            _treeSchematics.Add(new TreeSchematic("pine_tree", "pine_wood", "pine_needles", 5, 8, "cone", -2, 0, 2, new[] { "snow", "taiga" }));
+            _treeSchematics.Add(new TreeSchematic("jungle_tree", "jungle_wood", "jungle_leaves", 6, 10, "sphere", -2, 4, 3, new[] { "jungle" }));
+            _treeSchematics.Add(new TreeSchematic("birch_tree", "wood", "leaves", 5, 7, "cylinder", -1, 1, 2, new[] { "forest" }));
         }
     }
 
@@ -100,36 +164,151 @@ public class NoiseWorldGenerator : IWorldGenerator
         var baseY = chunkY * Chunk.Size;
         var baseZ = chunkZ * Chunk.Size;
 
+        var heightMap = new int[Chunk.Size, Chunk.Size];
+
         for (int x = 0; x < Chunk.Size; x++)
         {
             for (int z = 0; z < Chunk.Size; z++)
             {
                 var worldX = baseX + x;
                 var worldZ = baseZ + z;
-                var surfaceHeight = GetGroundHeight(worldX, worldZ);
+                heightMap[x, z] = GetGroundHeight(worldX, worldZ);
 
                 for (int y = 0; y < Chunk.Size; y++)
                 {
                     var worldY = baseY + y;
-                    blocks[x, y, z] = GetBlockAt(worldX, worldY, worldZ, surfaceHeight);
+                    blocks[x, y, z] = GetBlockAt(worldX, worldY, worldZ, heightMap[x, z]);
                 }
             }
         }
 
-        if (baseY >= 0 && baseY < 50)
+        if (_generateCaves)
+        {
+            GenerateCaves(blocks, baseX, baseY, baseZ);
+        }
+
+        if (_generateOres)
+        {
+            GenerateOres(blocks, baseX, baseY, baseZ);
+        }
+
+        if (_generateDungeons && baseY >= 0 && baseY < 40)
         {
             GenerateDungeons(blocks, baseX, baseY, baseZ);
         }
 
+        GenerateRivers(blocks, baseX, baseY, baseZ, heightMap);
+
         if (_generateTrees)
         {
-            GenerateTrees(blocks, baseX, baseY, baseZ);
+            GenerateTrees(blocks, baseX, baseY, baseZ, heightMap);
         }
+
+        GenerateDecorations(blocks, baseX, baseY, baseZ, heightMap);
 
         return blocks;
     }
 
-    private void GenerateTrees(ushort[,,] blocks, int baseX, int baseY, int baseZ)
+    private void GenerateCaves(ushort[,,] blocks, int baseX, int baseY, int baseZ)
+    {
+        for (int x = 0; x < Chunk.Size; x++)
+        {
+            for (int z = 0; z < Chunk.Size; z++)
+            {
+                for (int y = 0; y < Chunk.Size; y++)
+                {
+                    var worldX = baseX + x;
+                    var worldY = baseY + y;
+                    var worldZ = baseZ + z;
+
+                    if (worldY <= 1 || worldY >= GroundBase + TerrainHeight) continue;
+
+                    if (IsCave(worldX, worldY, worldZ))
+                    {
+                        blocks[x, y, z] = (ushort)BlockType.Air;
+                    }
+                }
+            }
+        }
+    }
+
+    private void GenerateOres(ushort[,,] blocks, int baseX, int baseY, int baseZ)
+    {
+        for (int x = 0; x < Chunk.Size; x++)
+        {
+            for (int z = 0; z < Chunk.Size; z++)
+            {
+                for (int y = 0; y < Chunk.Size; y++)
+                {
+                    var worldX = baseX + x;
+                    var worldY = baseY + y;
+                    var worldZ = baseZ + z;
+
+                    if (blocks[x, y, z] != (ushort)BlockType.Stone &&
+                        blocks[x, y, z] != (ushort)BlockType.DesertStone) continue;
+
+                    var oreType = GetOreAt(worldX, worldY, worldZ);
+                    if (oreType != (ushort)BlockType.Air)
+                    {
+                        blocks[x, y, z] = oreType;
+                    }
+                }
+            }
+        }
+    }
+
+    private ushort GetOreAt(int x, int y, int z)
+    {
+        var oreNoise = PerlinNoise3D(x * 0.1f, y * 0.1f, z * 0.1f);
+        if (y < 16 && oreNoise > 0.85f) return (ushort)BlockType.OreDiamond;
+        if (y < 16 && PerlinNoise3D(x * 0.13f + 8000, y * 0.13f, z * 0.13f + 8000) > 0.88f) return (ushort)BlockType.EmeraldOre;
+        if (y < 32 && oreNoise > 0.8f) return (ushort)BlockType.OreGold;
+        if (y < 32 && PerlinNoise3D(x * 0.11f + 7000, y * 0.11f, z * 0.11f + 7000) > 0.87f) return (ushort)BlockType.RedstoneOre;
+        if (y < 32 && PerlinNoise3D(x * 0.1f + 9500, y * 0.1f, z * 0.1f + 9500) > 0.86f) return (ushort)BlockType.LapisOre;
+        if (y < 48 && oreNoise > 0.75f) return (ushort)BlockType.OreIron;
+        if (y < 48 && PerlinNoise3D(x * 0.12f + 6000, y * 0.12f, z * 0.12f + 6000) > 0.85f) return (ushort)BlockType.GoldOre;
+        if (y < 64 && PerlinNoise3D(x * 0.15f, y * 0.15f, z * 0.15f) > 0.82f) return (ushort)BlockType.Coal;
+        if (y < 96 && PerlinNoise3D(x * 0.14f + 9000, y * 0.14f, z * 0.14f + 9000) > 0.84f) return (ushort)BlockType.CopperOre;
+
+        var gravelNoise = PerlinNoise3D(x * 0.12f + 2000, y * 0.12f, z * 0.12f + 2000);
+        if (gravelNoise > 0.9f && y < 40) return (ushort)BlockType.Gravel;
+
+        var clayNoise = PerlinNoise3D(x * 0.09f + 4000, y * 0.09f, z * 0.09f + 4000);
+        if (clayNoise > 0.92f && y < WaterLevel + 5 && y > WaterLevel - 5) return (ushort)BlockType.Clay;
+
+        return (ushort)BlockType.Air;
+    }
+
+    private void GenerateRivers(ushort[,,] blocks, int baseX, int baseY, int baseZ, int[,] heightMap)
+    {
+        var riverNoise = PerlinNoise2D(baseX * 0.005f + 15000, baseZ * 0.005f + 15000);
+        if (Math.Abs(riverNoise) > 0.03f) return;
+
+        for (int x = 0; x < Chunk.Size; x++)
+        {
+            for (int z = 0; z < Chunk.Size; z++)
+            {
+                var worldX = baseX + x;
+                var worldZ = baseZ + z;
+                var localRiverNoise = PerlinNoise2D(worldX * 0.008f + 15000, worldZ * 0.008f + 15000);
+
+                if (Math.Abs(localRiverNoise) < 0.025f)
+                {
+                    var surfaceY = heightMap[x, z];
+                    if (surfaceY < WaterLevel + 2 && surfaceY > WaterLevel - 2)
+                    {
+                        var localSurfaceY = surfaceY - baseY;
+                        if (localSurfaceY >= 0 && localSurfaceY < Chunk.Size)
+                        {
+                            blocks[x, localSurfaceY, z] = (ushort)BlockType.RiverWater;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private void GenerateTrees(ushort[,,] blocks, int baseX, int baseY, int baseZ, int[,] heightMap)
     {
         for (int x = 0; x < Chunk.Size; x++)
         {
@@ -137,177 +316,81 @@ public class NoiseWorldGenerator : IWorldGenerator
             {
                 var worldX = baseX + x;
                 var worldZ = baseZ + z;
-                var surfaceHeight = GetGroundHeight(worldX, worldZ);
-                var localSurfaceY = surfaceHeight - baseY;
+                var surfaceY = heightMap[x, z];
+                var localSurfaceY = surfaceY - baseY;
 
-                if (localSurfaceY < 0 || localSurfaceY >= Chunk.Size)
-                {
-                    continue;
-                }
+                if (localSurfaceY < 0 || localSurfaceY >= Chunk.Size) continue;
+                if (surfaceY <= WaterLevel) continue;
 
-                if (surfaceHeight <= WaterLevel)
-                {
-                    continue;
-                }
+                var biome = GetBiomeAt(worldX, surfaceY, worldZ, surfaceY);
+                if (biome.TreeType == "none" || biome.TreeChance <= 0) continue;
 
-                var biome = GetBiomeAt(worldX, surfaceHeight, worldZ, surfaceHeight);
                 var surfaceBlock = blocks[x, localSurfaceY, z];
 
-                if (biome.Name == "desert")
-                {
-                    if (surfaceBlock == (ushort)BlockType.DesertSand)
-                    {
-                        var cactusNoise = PerlinNoise2D(worldX * 0.8f + 7000, worldZ * 0.8f + 7000);
-                        if (cactusNoise > 0.7f)
-                        {
-                            GenerateCactus(blocks, x, localSurfaceY, z);
-                        }
-                        var deadBushNoise = PerlinNoise2D(worldX * 1.2f + 7500, worldZ * 1.2f + 7500);
-                        if (deadBushNoise > 0.6f && localSurfaceY + 1 < Chunk.Size)
-                        {
-                            blocks[x, localSurfaceY + 1, z] = (ushort)BlockType.DeadBush;
-                        }
-                    }
-                    continue;
-                }
+                var treeRng = new Random(_seed + worldX * 73856093 ^ worldZ * 19349663);
+                var treeRoll = treeRng.NextDouble();
+                if (treeRoll > biome.TreeChance) continue;
 
-                if (biome.Name == "snow")
-                {
-                    if (surfaceBlock == (ushort)BlockType.Snow)
-                    {
-                        var pineNoise = PerlinNoise2D(worldX * 0.5f + 5000, worldZ * 0.5f + 5000);
-                        if (pineNoise > 0.45f)
-                        {
-                            var rng = new Random(_seed + worldX * 73856093 ^ worldZ * 19349663);
-                            GeneratePineTree(blocks, x, localSurfaceY, z, rng.Next(5, 8));
-                        }
-                    }
-                    continue;
-                }
+                var schematic = GetSchematicForBiome(biome.TreeType);
+                if (schematic == null) continue;
 
-                if (biome.Name == "grassland_ocean")
-                {
-                    continue;
-                }
+                var trunkType = GetBlockTypeByName(schematic.TrunkBlock);
+                var leavesType = schematic.LeavesBlock == "none" ? (ushort)BlockType.Air : GetBlockTypeByName(schematic.LeavesBlock);
+                if (trunkType == (ushort)BlockType.Air) continue;
 
-                var treeNoise = PerlinNoise2D(worldX * 0.5f + 5000, worldZ * 0.5f + 5000);
-                if (treeNoise <= 0.35f)
-                {
-                    continue;
-                }
+                var height = treeRng.Next(schematic.MinHeight, schematic.MaxHeight + 1);
 
-                if (surfaceBlock != (ushort)BlockType.Grass)
+                switch (schematic.CanopyShape)
                 {
-                    continue;
-                }
-
-                var rng2 = new Random(_seed + worldX * 73856093 ^ worldZ * 19349663);
-                var tempNoise = PerlinNoise2D(worldX * 0.005f + 1000, worldZ * 0.005f + 1000);
-                if (tempNoise > 0.25f)
-                {
-                    GenerateJungleTree(blocks, x, localSurfaceY, z, rng2.Next(6, 10));
-                }
-                else
-                {
-                    GenerateTree(blocks, x, localSurfaceY, z, baseX, baseY, baseZ, worldX, worldZ);
-                }
-
-                var flowerNoise = PerlinNoise2D(worldX * 2.0f + 8000, worldZ * 2.0f + 8000);
-                if (flowerNoise > 0.6f && localSurfaceY + 1 < Chunk.Size
-                    && blocks[x, localSurfaceY + 1, z] == (ushort)BlockType.Air)
-                {
-                    blocks[x, localSurfaceY + 1, z] = flowerNoise > 0.8
-                        ? (ushort)BlockType.FlowerRed
-                        : (ushort)BlockType.FlowerYellow;
-                }
-
-                var mushroomNoise = PerlinNoise2D(worldX * 1.5f + 8500, worldZ * 1.5f + 8500);
-                if (mushroomNoise > 0.8f && localSurfaceY + 1 < Chunk.Size
-                    && blocks[x, localSurfaceY + 1, z] == (ushort)BlockType.Air)
-                {
-                    blocks[x, localSurfaceY + 1, z] = rng2.Next(2) == 0
-                        ? (ushort)BlockType.MushroomRedBlock
-                        : (ushort)BlockType.MushroomBrownBlock;
-                }
-
-                var grassNoise = PerlinNoise2D(worldX * 3.0f + 9000, worldZ * 3.0f + 9000);
-                if (grassNoise > 0.3f && localSurfaceY + 1 < Chunk.Size
-                    && blocks[x, localSurfaceY + 1, z] == (ushort)BlockType.Air)
-                {
-                    blocks[x, localSurfaceY + 1, z] = (ushort)BlockType.TallGrass;
-                }
-
-                var pumpkinNoise = PerlinNoise2D(worldX * 0.3f + 9500, worldZ * 0.3f + 9500);
-                if (pumpkinNoise > 0.85f)
-                {
-                    var px = x + rng2.Next(-2, 3);
-                    var pz = z + rng2.Next(-2, 3);
-                    if (px >= 0 && px < Chunk.Size && pz >= 0 && pz < Chunk.Size
-                        && localSurfaceY + 1 < Chunk.Size
-                        && blocks[px, localSurfaceY + 1, pz] == (ushort)BlockType.Air)
-                    {
-                        blocks[px, localSurfaceY + 1, pz] = (ushort)BlockType.PumpkinBlock;
-                    }
+                    case "sphere":
+                        GenerateSphereCanopyTree(blocks, x, localSurfaceY, z, height, trunkType, leavesType,
+                            schematic.CanopyBaseOffset, schematic.CanopyTopOffset, schematic.CanopyRadius);
+                        break;
+                    case "cone":
+                        GenerateConeCanopyTree(blocks, x, localSurfaceY, z, height, trunkType, leavesType);
+                        break;
+                    case "cylinder":
+                        GenerateCylinderCanopyTree(blocks, x, localSurfaceY, z, height, trunkType, leavesType,
+                            schematic.CanopyBaseOffset, schematic.CanopyTopOffset, schematic.CanopyRadius);
+                        break;
+                    case "none":
+                        GenerateTrunkOnly(blocks, x, localSurfaceY, z, height, trunkType);
+                        break;
+                    default:
+                        GenerateSphereCanopyTree(blocks, x, localSurfaceY, z, height, trunkType, leavesType,
+                            schematic.CanopyBaseOffset, schematic.CanopyTopOffset, schematic.CanopyRadius);
+                        break;
                 }
             }
         }
     }
 
-    private void GenerateTree(ushort[,,] blocks, int x, int surfaceY, int z, int baseX, int baseY, int baseZ, int worldX, int worldZ)
+    private TreeSchematic? GetSchematicForBiome(string treeType)
     {
-        var rng = new Random(_seed + worldX * 73856093 ^ worldZ * 19349663);
-        var trunkHeight = rng.Next(4, 7);
-        var treeType = rng.Next(4);
-
-        if (treeType == 0)
+        foreach (var s in _treeSchematics)
         {
-            GenerateOakTree(blocks, x, surfaceY, z, trunkHeight);
+            if (s.Name.StartsWith(treeType)) return s;
         }
-        else if (treeType == 1)
-        {
-            GeneratePineTree(blocks, x, surfaceY, z, trunkHeight);
-        }
-        else if (treeType == 2)
-        {
-            GenerateBirchTree(blocks, x, surfaceY, z, trunkHeight);
-        }
-        else
-        {
-            GenerateJungleTree(blocks, x, surfaceY, z, trunkHeight + 2);
-        }
+        return _treeSchematics.FirstOrDefault();
     }
 
-    private static void GenerateCactus(ushort[,,] blocks, int x, int surfaceY, int z)
+    private static void GenerateSphereCanopyTree(ushort[,,] blocks, int x, int surfaceY, int z,
+        int height, ushort trunkType, ushort leavesType, int canopyBaseOffset, int canopyTopOffset, int canopyRadius)
     {
-        var height = Random.Shared.Next(1, 4);
-        for (int dy = 1; dy <= height; dy++)
-        {
-            var ly = surfaceY + dy;
-            if (ly >= 0 && ly < Chunk.Size)
-            {
-                blocks[x, ly, z] = (ushort)BlockType.Cactus;
-            }
-        }
-    }
-
-    private void GenerateOakTree(ushort[,,] blocks, int x, int surfaceY, int z, int trunkHeight)
-    {
-        for (int ty = 1; ty <= trunkHeight; ty++)
+        for (int ty = 1; ty <= height; ty++)
         {
             var ly = surfaceY + ty;
             if (ly >= 0 && ly < Chunk.Size)
-            {
-                blocks[x, ly, z] = (ushort)BlockType.Wood;
-            }
+                blocks[x, ly, z] = trunkType;
         }
 
-        var canopyBase = surfaceY + trunkHeight - 1;
-        for (int dy = 0; dy <= 3; dy++)
+        var canopyBase = surfaceY + height + canopyBaseOffset;
+        for (int dy = 0; dy <= canopyTopOffset; dy++)
         {
             var ly = canopyBase + dy;
             if (ly < 0 || ly >= Chunk.Size) continue;
 
-            var radius = dy <= 1 ? 2 : 1;
+            var radius = dy <= canopyTopOffset / 2 ? canopyRadius : canopyRadius - 1;
             for (int dx = -radius; dx <= radius; dx++)
             {
                 for (int dz = -radius; dz <= radius; dz++)
@@ -317,32 +400,29 @@ public class NoiseWorldGenerator : IWorldGenerator
                     var lz = z + dz;
                     if (lx < 0 || lx >= Chunk.Size || lz < 0 || lz >= Chunk.Size) continue;
                     if (blocks[lx, ly, lz] == (ushort)BlockType.Air)
-                    {
-                        blocks[lx, ly, lz] = (ushort)BlockType.Leaves;
-                    }
+                        blocks[lx, ly, lz] = leavesType;
                 }
             }
         }
     }
 
-    private void GeneratePineTree(ushort[,,] blocks, int x, int surfaceY, int z, int trunkHeight)
+    private static void GenerateConeCanopyTree(ushort[,,] blocks, int x, int surfaceY, int z,
+        int height, ushort trunkType, ushort leavesType)
     {
-        var height = trunkHeight + 2;
-        for (int ty = 1; ty <= height; ty++)
+        var totalHeight = height + 2;
+        for (int ty = 1; ty <= totalHeight; ty++)
         {
             var ly = surfaceY + ty;
             if (ly >= 0 && ly < Chunk.Size)
-            {
-                blocks[x, ly, z] = (ushort)BlockType.Wood;
-            }
+                blocks[x, ly, z] = trunkType;
         }
 
-        for (int ty = trunkHeight - 2; ty <= height; ty++)
+        for (int ty = height - 2; ty <= totalHeight; ty++)
         {
             var ly = surfaceY + ty;
             if (ly < 0 || ly >= Chunk.Size) continue;
 
-            var distFromTop = height - ty;
+            var distFromTop = totalHeight - ty;
             var radius = distFromTop <= 1 ? 1 : 2;
             for (int dx = -radius; dx <= radius; dx++)
             {
@@ -353,32 +433,41 @@ public class NoiseWorldGenerator : IWorldGenerator
                     var lz = z + dz;
                     if (lx < 0 || lx >= Chunk.Size || lz < 0 || lz >= Chunk.Size) continue;
                     if (blocks[lx, ly, lz] == (ushort)BlockType.Air)
-                    {
-                        blocks[lx, ly, lz] = (ushort)BlockType.Leaves;
-                    }
+                        blocks[lx, ly, lz] = leavesType;
                 }
             }
         }
     }
 
-    private void GenerateBirchTree(ushort[,,] blocks, int x, int surfaceY, int z, int trunkHeight)
+    private static void GenerateTrunkOnly(ushort[,,] blocks, int x, int surfaceY, int z, int height, ushort trunkType)
     {
-        for (int ty = 1; ty <= trunkHeight; ty++)
+        for (int dy = 1; dy <= height; dy++)
+        {
+            var ly = surfaceY + dy;
+            if (ly >= 0 && ly < Chunk.Size)
+            {
+                blocks[x, ly, z] = trunkType;
+            }
+        }
+    }
+
+    private static void GenerateCylinderCanopyTree(ushort[,,] blocks, int x, int surfaceY, int z,
+        int height, ushort trunkType, ushort leavesType, int canopyBaseOffset, int canopyTopOffset, int canopyRadius)
+    {
+        for (int ty = 1; ty <= height; ty++)
         {
             var ly = surfaceY + ty;
             if (ly >= 0 && ly < Chunk.Size)
-            {
-                blocks[x, ly, z] = (ushort)BlockType.Wood;
-            }
+                blocks[x, ly, z] = trunkType;
         }
 
-        var canopyBase = surfaceY + trunkHeight;
-        for (int dy = -1; dy <= 1; dy++)
+        var canopyBase = surfaceY + height + canopyBaseOffset;
+        for (int dy = 0; dy <= canopyTopOffset; dy++)
         {
             var ly = canopyBase + dy;
             if (ly < 0 || ly >= Chunk.Size) continue;
 
-            var radius = dy == 0 ? 2 : 1;
+            var radius = dy == canopyTopOffset / 2 ? canopyRadius : canopyRadius - 1;
             for (int dx = -radius; dx <= radius; dx++)
             {
                 for (int dz = -radius; dz <= radius; dz++)
@@ -388,75 +477,62 @@ public class NoiseWorldGenerator : IWorldGenerator
                     var lz = z + dz;
                     if (lx < 0 || lx >= Chunk.Size || lz < 0 || lz >= Chunk.Size) continue;
                     if (blocks[lx, ly, lz] == (ushort)BlockType.Air)
+                        blocks[lx, ly, lz] = leavesType;
+                }
+            }
+        }
+    }
+
+    private void GenerateDecorations(ushort[,,] blocks, int baseX, int baseY, int baseZ, int[,] heightMap)
+    {
+        for (int x = 0; x < Chunk.Size; x++)
+        {
+            for (int z = 0; z < Chunk.Size; z++)
+            {
+                var worldX = baseX + x;
+                var worldZ = baseZ + z;
+                var surfaceY = heightMap[x, z];
+                var localSurfaceY = surfaceY - baseY;
+
+                if (localSurfaceY < 0 || localSurfaceY >= Chunk.Size - 1) continue;
+                if (surfaceY <= WaterLevel) continue;
+
+                var biome = GetBiomeAt(worldX, surfaceY, worldZ, surfaceY);
+                if (biome.Decorations.Length == 0) continue;
+
+                var rng = new Random(_seed + worldX * 73856093 ^ worldZ * 19349663);
+                var decoNoise = PerlinNoise2D(worldX * 3.0f + 9000, worldZ * 3.0f + 9000);
+
+                if (decoNoise > 0.3f && blocks[x, localSurfaceY + 1, z] == (ushort)BlockType.Air)
+                {
+                    var decoIndex = rng.Next(biome.Decorations.Length);
+                    var deco = biome.Decorations[decoIndex];
+                    var decoType = GetDecorationBlockType(deco, decoNoise);
+                    if (decoType != BlockType.Air)
                     {
-                        blocks[lx, ly, lz] = (ushort)BlockType.Leaves;
+                        blocks[x, localSurfaceY + 1, z] = (ushort)decoType;
                     }
                 }
             }
         }
     }
 
-    private static void GenerateJungleTree(ushort[,,] blocks, int x, int surfaceY, int z, int trunkHeight)
+    private static BlockType GetDecorationBlockType(string name, float noise)
     {
-        for (int ty = 1; ty <= trunkHeight; ty++)
+        return name switch
         {
-            var ly = surfaceY + ty;
-            if (ly >= 0 && ly < Chunk.Size)
-            {
-                blocks[x, ly, z] = (ushort)BlockType.JungleWood;
-
-                if (ty > 2 && ty < trunkHeight - 1)
-                {
-                    if (Random.Shared.Next(3) == 0)
-                    {
-                        var sideDx = Random.Shared.Next(2) == 0 ? -1 : 1;
-                        var sx = x + sideDx;
-                        if (sx >= 0 && sx < Chunk.Size)
-                        {
-                            blocks[sx, ly, z] = (ushort)BlockType.JungleWood;
-                        }
-                    }
-                }
-            }
-        }
-
-        var canopyBase = surfaceY + trunkHeight - 2;
-        for (int dy = 0; dy <= 4; dy++)
-        {
-            var ly = canopyBase + dy;
-            if (ly < 0 || ly >= Chunk.Size) continue;
-
-            var radius = dy <= 1 ? 3 : dy <= 3 ? 2 : 1;
-            for (int dx = -radius; dx <= radius; dx++)
-            {
-                for (int dz = -radius; dz <= radius; dz++)
-                {
-                    if (dx * dx + dz * dz > radius * radius + 2) continue;
-                    var lx = x + dx;
-                    var lz = z + dz;
-                    if (lx < 0 || lx >= Chunk.Size || lz < 0 || lz >= Chunk.Size) continue;
-                    if (blocks[lx, ly, lz] == (ushort)BlockType.Air)
-                    {
-                        blocks[lx, ly, lz] = (ushort)BlockType.JungleLeaves;
-                    }
-                }
-            }
-        }
-
-        for (int vineTry = 0; vineTry < 4; vineTry++)
-        {
-            var vx = x + Random.Shared.Next(-2, 3);
-            var vz = z + Random.Shared.Next(-2, 3);
-            if (vx < 0 || vx >= Chunk.Size || vz < 0 || vz >= Chunk.Size) continue;
-
-            for (int vy = surfaceY + 1; vy < canopyBase; vy++)
-            {
-                if (blocks[vx, vy, vz] == (ushort)BlockType.Air)
-                {
-                    blocks[vx, vy, vz] = (ushort)BlockType.JungleLeaves;
-                }
-            }
-        }
+            "tall_grass" => BlockType.TallGrass,
+            "flower_red" => BlockType.FlowerRed,
+            "flower_yellow" => BlockType.FlowerYellow,
+            "flower_rose" => BlockType.FlowerRose,
+            "flower_tulip" => BlockType.FlowerTulip,
+            "mushroom_red" => BlockType.MushroomRedBlock,
+            "mushroom_brown" => BlockType.MushroomBrownBlock,
+            "dead_bush" => BlockType.DeadBush,
+            "junglegrass" => BlockType.JungleGrass,
+            "cactus" => BlockType.Cactus,
+            _ => BlockType.Air
+        };
     }
 
     private void GenerateDungeons(ushort[,,] blocks, int baseX, int baseY, int baseZ)
@@ -579,11 +655,7 @@ public class NoiseWorldGenerator : IWorldGenerator
         if (y == 0) return (ushort)BlockType.Bedrock;
         if (y < 0) return (ushort)BlockType.Air;
 
-        var noise2D = PerlinNoise2D(x * 0.01f, z * 0.01f);
-        var detailNoise = PerlinNoise2D(x * 0.05f, z * 0.05f) * 0.3f;
-        var height = GroundBase + (int)((noise2D + detailNoise) * TerrainHeight);
-
-        if (y > height)
+        if (y > surfaceHeight)
         {
             if (y <= WaterLevel) return (ushort)BlockType.Water;
             return (ushort)BlockType.Air;
@@ -591,38 +663,19 @@ public class NoiseWorldGenerator : IWorldGenerator
 
         var biome = GetBiomeAt(x, y, z, surfaceHeight);
 
-        if (y == height)
+        if (y == surfaceHeight)
         {
-            if (height <= WaterLevel && biome.TopBlock == "grass") return (ushort)BlockType.Sand;
+            if (surfaceHeight <= WaterLevel && biome.TopBlock == "grass") return (ushort)BlockType.Sand;
             return GetBlockTypeByName(biome.TopBlock);
         }
 
-        if (y > height - biome.FillerDepth)
+        if (y > surfaceHeight - biome.FillerDepth)
         {
             return GetBlockTypeByName(biome.FillerBlock);
         }
 
         if (y > 1)
         {
-            if (IsCave(x, y, z)) return (ushort)BlockType.Air;
-
-            var oreNoise = PerlinNoise3D(x * 0.1f, y * 0.1f, z * 0.1f);
-            if (y < 16 && oreNoise > 0.85f) return (ushort)BlockType.OreDiamond;
-            if (y < 32 && oreNoise > 0.8f) return (ushort)BlockType.OreGold;
-            if (y < 48 && oreNoise > 0.75f) return (ushort)BlockType.OreIron;
-            if (y < 64 && PerlinNoise3D(x * 0.15f, y * 0.15f, z * 0.15f) > 0.82f) return (ushort)BlockType.Coal;
-            if (y < 48 && PerlinNoise3D(x * 0.12f + 6000, y * 0.12f, z * 0.12f + 6000) > 0.85f) return (ushort)BlockType.GoldOre;
-            if (y < 32 && PerlinNoise3D(x * 0.11f + 7000, y * 0.11f, z * 0.11f + 7000) > 0.87f) return (ushort)BlockType.RedstoneOre;
-            if (y < 16 && PerlinNoise3D(x * 0.13f + 8000, y * 0.13f, z * 0.13f + 8000) > 0.88f) return (ushort)BlockType.EmeraldOre;
-            if (y < 96 && PerlinNoise3D(x * 0.14f + 9000, y * 0.14f, z * 0.14f + 9000) > 0.84f) return (ushort)BlockType.CopperOre;
-            if (y < 48 && PerlinNoise3D(x * 0.1f + 9500, y * 0.1f, z * 0.1f + 9500) > 0.86f) return (ushort)BlockType.LapisOre;
-
-            var gravelNoise = PerlinNoise3D(x * 0.12f + 2000, y * 0.12f, z * 0.12f + 2000);
-            if (gravelNoise > 0.9f && y < 40) return (ushort)BlockType.Gravel;
-
-            var clayNoise = PerlinNoise3D(x * 0.09f + 4000, y * 0.09f, z * 0.09f + 4000);
-            if (clayNoise > 0.92f && y < WaterLevel + 5 && y > WaterLevel - 5) return (ushort)BlockType.Clay;
-
             return GetBlockTypeByName(biome.StoneBlock);
         }
 
@@ -634,9 +687,9 @@ public class NoiseWorldGenerator : IWorldGenerator
         if (_biomes.Count == 0)
         {
             var biomeNoise = PerlinNoise2D(x * 0.005f + 1000, z * 0.005f + 1000);
-            if (biomeNoise > 0.3f) return new BiomeDefinition("desert", 4, 31000, 90, 10, "sand", "sand", 3, "stone", "water");
-            if (biomeNoise < -0.4f) return new BiomeDefinition("snow", 4, 31000, 10, 40, "snow", "dirt", 1, "stone", "water");
-            return new BiomeDefinition("grassland", 4, 31000, 50, 50, "grass", "dirt", 1, "stone", "water");
+            if (biomeNoise > 0.3f) return new BiomeDefinition("desert", 4, 31000, 90, 10, "sand", "sand", 3, "desert_stone", "water", "none", 0, Array.Empty<string>(), "cobblestone", "mossy_cobblestone");
+            if (biomeNoise < -0.4f) return new BiomeDefinition("snow", 4, 31000, 10, 40, "snow", "dirt", 1, "stone", "water", "pine", 0.006f, new[] { "tall_grass" }, "cobblestone", "mossy_cobblestone");
+            return new BiomeDefinition("grassland", 4, 31000, 50, 50, "grass", "dirt", 1, "stone", "water", "oak", 0.003f, new[] { "tall_grass", "flower_red" }, "cobblestone", "mossy_cobblestone");
         }
 
         float heat = 50f;
@@ -679,13 +732,24 @@ public class NoiseWorldGenerator : IWorldGenerator
         {
             "grass" => (ushort)BlockType.Grass,
             "dirt" => (ushort)BlockType.Dirt,
+            "dirt_with_snow" => (ushort)BlockType.DirtWithSnow,
             "sand" => (ushort)BlockType.Sand,
             "desert_sand" => (ushort)BlockType.DesertSand,
             "snow" => (ushort)BlockType.Snow,
             "stone" => (ushort)BlockType.Stone,
             "desert_stone" => (ushort)BlockType.DesertStone,
             "water" => (ushort)BlockType.Water,
-            "grassland_ocean" => (ushort)BlockType.Sand,
+            "wood" => (ushort)BlockType.Wood,
+            "leaves" => (ushort)BlockType.Leaves,
+            "pine_wood" => (ushort)BlockType.PineWood,
+            "pine_needles" => (ushort)BlockType.PineNeedles,
+            "jungle_wood" => (ushort)BlockType.JungleWood,
+            "jungle_leaves" => (ushort)BlockType.JungleLeaves,
+            "cobblestone" => (ushort)BlockType.Cobblestone,
+            "mossy_cobblestone" => (ushort)BlockType.MossyCobblestone,
+            "sandstone" => (ushort)BlockType.SandStone,
+            "stone_brick" => (ushort)BlockType.StoneBrick,
+            "cactus" => (ushort)BlockType.Cactus,
             _ => (ushort)BlockType.Dirt
         };
     }
@@ -705,10 +769,7 @@ public class NoiseWorldGenerator : IWorldGenerator
         return false;
     }
 
-    private float PerlinNoise2D(float x, float y)
-    {
-        return PerlinNoise3D(x, y, 0);
-    }
+    private float PerlinNoise2D(float x, float y) => PerlinNoise3D(x, y, 0);
 
     private float PerlinNoise3D(float x, float y, float z)
     {
@@ -760,6 +821,8 @@ public class NoiseWorldGenerator : IWorldGenerator
     {
         var noise2D = PerlinNoise2D(x * 0.01f, z * 0.01f);
         var detailNoise = PerlinNoise2D(x * 0.05f, z * 0.05f) * 0.3f;
-        return GroundBase + (int)((noise2D + detailNoise) * TerrainHeight);
+        var mountainNoise = PerlinNoise2D(x * 0.003f + 5000, z * 0.003f + 5000);
+        var mountainFactor = mountainNoise > 0.4f ? (mountainNoise - 0.4f) * 60f : 0f;
+        return GroundBase + (int)((noise2D + detailNoise) * TerrainHeight + mountainFactor);
     }
 }

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.SignalR;
+using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using System.Text.Json;
 using WebGameServer.Core;
@@ -54,8 +55,8 @@ public interface IGameClient
 
 public class GameHub : Hub<IGameClient>
 {
-    private static readonly Dictionary<string, DateTime> _lastActionTimes = new();
-    private static readonly Dictionary<string, int> _joinAttempts = new();
+    private static readonly ConcurrentDictionary<string, DateTime> _lastActionTimes = new();
+    private static readonly ConcurrentDictionary<string, int> _joinAttempts = new();
 
     private readonly GameServer _gameServer;
     private readonly ILogger<GameHub> _logger;
@@ -145,7 +146,7 @@ public class GameHub : Hub<IGameClient>
             return;
         }
 
-        _joinAttempts.Remove(joinKey);
+        _joinAttempts.TryRemove(joinKey, out _);
 
         var player = _gameServer.GetPlayer(playerName);
         if (player == null) return;
@@ -1187,12 +1188,17 @@ public class GameHub : Hub<IGameClient>
         if (_lastActionTimes.Count > 10000)
         {
             var cutoff = now.AddMinutes(-5);
-            var expired = _lastActionTimes.Where(kvp => kvp.Value < cutoff).Select(kvp => kvp.Key).ToList();
-            foreach (var k in expired) _lastActionTimes.Remove(k);
+            foreach (var kvp in _lastActionTimes)
+            {
+                if (kvp.Value < cutoff)
+                    _lastActionTimes.TryRemove(kvp.Key, out _);
+            }
 
-            var joinExpired = _joinAttempts.Where(kvp => _lastActionTimes.TryGetValue(kvp.Key, out _) == false)
-                .Select(kvp => kvp.Key).ToList();
-            foreach (var k in joinExpired) _joinAttempts.Remove(k);
+            foreach (var kvp in _joinAttempts)
+            {
+                if (!_lastActionTimes.ContainsKey(kvp.Key))
+                    _joinAttempts.TryRemove(kvp.Key, out _);
+            }
         }
 
         return true;
