@@ -236,6 +236,9 @@ public class GameHub : Hub<IGameClient>
 
         if (!_gameServer.Privileges.HasPrivilege(player.Name, "interact")) return;
 
+        if (!_gameServer.Protection.CanInteract(player.Name, new Vector3s((short)x, (short)y, (short)z))
+            && !_gameServer.Privileges.HasPrivilege(player.Name, "protection_bypass")) return;
+
         if (blockType > 160) return;
 
         var blockCenter = new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
@@ -308,6 +311,9 @@ public class GameHub : Hub<IGameClient>
         }
 
         var newBlock = new Block((BlockType)blockType);
+        _gameServer.Rollback.RecordChange(x, y, z,
+            _gameServer.DefaultWorld.GetBlock(new Vector3s((short)x, (short)y, (short)z)).ToUInt16(),
+            newBlock.ToUInt16(), player.Name, "PLACE");
         _gameServer.DefaultWorld.SetBlock(new Vector3s((short)x, (short)y, (short)z), newBlock);
         await Clients.All.OnBlockUpdate(x, y, z, newBlock.ToUInt16());
     }
@@ -320,6 +326,9 @@ public class GameHub : Hub<IGameClient>
         if (player == null) return;
 
         if (!_gameServer.Privileges.HasPrivilege(player.Name, "interact")) return;
+
+        if (!_gameServer.Protection.CanInteract(player.Name, new Vector3s((short)x, (short)y, (short)z))
+            && !_gameServer.Privileges.HasPrivilege(player.Name, "protection_bypass")) return;
 
         var blockCenter = new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
         var distance = Vector3.Distance(player.Position, blockCenter);
@@ -358,6 +367,7 @@ public class GameHub : Hub<IGameClient>
             return;
         }
 
+        _gameServer.Rollback.RecordChange(x, y, z, oldBlock.ToUInt16(), 0, player.Name, "DIG");
         _gameServer.DefaultWorld.SetBlock(blockPos, Block.Air);
         await Clients.All.OnBlockUpdate(x, y, z, 0);
 

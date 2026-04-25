@@ -6,10 +6,17 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 
 - **Voxel World**: Procedurally generated 3D world with noise-based terrain, caves, ores, schematic-based trees (oak, pine, jungle, birch, cactus), rivers, multi-room dungeons, and 10 biomes (grassland, forest, desert, snow, taiga, jungle, savanna, mountains, swamp, ocean) selected via heat/humidity noise
 - **161 Block Types**: Including stone variants, 9 ore types (diamond, gold, iron, coal, redstone, emerald, lapis, copper), wood types (oak, jungle, pine), stairs/slabs, fences, walls, glass panes, doors, decorative blocks, flowers, mushrooms, utility blocks, light sources, fire, cobweb, Nether/End blocks, redstone components, and all wood variants (spruce/birch/jungle/acacia/dark oak doors, fences, planks)
-- **226 Block Definitions**: Full block enum (IDs 0-226) with complete defaults in code and JSON data override
-- **210+ Items**: Tools (wood/stone/iron/diamond/steel/mese), special weapons (fire sword, ice sword, blood sword, heal sword, elemental sword, daggers), steel shears, alchemy ingredients, crafting materials, armor, food, resources, and utility items
-- **Crafting System**: 125+ recipes including shaped crafting, tool creation, special weapon recipes, ore block storage, copper processing, decoration recipes, armor, building blocks, food, and tool repair
-- **Smelting System**: 25+ smelting recipes via furnace with fuel consumption
+- **226 Block Definitions**: Full block enum (IDs 0-227) with complete defaults in code and JSON data override
+- **220+ Items**: Tools (wood/stone/iron/diamond/gold/steel/mese/titanium), special weapons (fire sword, ice sword, blood sword, heal sword, elemental sword, daggers), steel shears, alchemy ingredients, crafting materials, armor (leather/iron/gold/diamond), food, resources, utility items, and fishing/breeding drops
+- **Crafting System**: 166+ recipes including shaped crafting, tool creation, special weapon recipes, ore block storage, copper processing, decoration recipes, gold tool recipes, titanium recipes, armor, building blocks, food, and tool repair
+- **Smelting System**: 20 smelting recipes via furnace with fuel consumption, correct ore-to-ingot and food mappings
+- **Redstone System**: Power propagation through wires, source blocks (torch, lever, button, pressure plate), consumer toggling (lamps)
+- **Fishing System**: Cast, wait, bite, reel phases with catch probabilities (fish/junk/treasure)
+- **Breeding System**: Feed animals to breed with baby mob growth
+- **Protection System**: Area-based protection zones with owner/allowed player lists
+- **Rollback System**: Block change recording with player/time/area-based rollback support
+- **Ban Database**: Persistent ban storage (JSON-backed) with IP and name banning
+- **Sound Spec System**: 15 sound groups with procedural audio descriptors
 - **Bucket System**: Place and pick up water/lava, drink milk for healing
 - **Tool Wear/Durability**: Tools degrade with use (minetest-matching 65536 wear scale), repair by combining two same-type tools
 - **Player Mechanics**: Health, hunger, breath, fall damage, knockback, swimming, climbing, sprinting, flying, slippery blocks, move resistance
@@ -78,23 +85,27 @@ web/
 │   │   ├── Vector3.cs / Vector3s.cs
 │   │   ├── DayNightCycle.cs
 │   │   ├── ToolConfig.cs         # Tool material definitions
-│   │   ├── Auth/                 # Authentication, privileges
+│   │   ├── Auth/                 # Authentication, privileges, protection, ban DB
 │   │   ├── Chat/                 # Chat commands with privilege checks
 │   │   ├── Crafting/             # Crafting system
-│   │   ├── Entities/             # Entities, mobs (with AI states), spawner
+│   │   ├── Entities/             # Entities, mobs (with AI states), spawner, fishing, breeding
 │   │   ├── Game/                 # Block definitions
+│   │   ├── Inventory/            # Detached inventory manager
+│   │   ├── Particles/            # Particle spawner specs
 │   │   ├── Pathfinding/          # A* pathfinding for mobs
 │   │   ├── Physics/              # Physics, knockback
 │   │   ├── Player/               # Player, inventory, DB
+│   │   ├── Rollback/             # Block change rollback system
+│   │   ├── Sound/                # Sound spec manager
 │   │   ├── ToolWear/             # Tool wear/durability system
 │   │   ├── Smelting/             # Smelting system
-│   │   └── World/                # World, chunks, generators, lighting, ABMs
+│   │   └── World/                # World, chunks, generators, lighting, ABMs, redstone
 │   └── Services/
 │       ├── GameHub.cs            # SignalR hub
 │       └── GameLoopService.cs    # Background game loop
 ├── data/                # JSON configuration
-│   ├── blocks.json       # 226 block definitions (IDs 0-226, full defaults in code)
-│   ├── items.json        # 210+ items, 125+ recipes, food values, tool capabilities
+│   ├── blocks.json       # 227 block definitions (IDs 0-227, full defaults in code)
+│   ├── items.json        # 220+ items, 166+ recipes, food values, tool capabilities
 │   ├── mobs.json         # 6 mob definitions
 │   ├── tools.json        # 8 tool material definitions
 │   ├── biomes.json       # 10 biome definitions with tree types and decorations
@@ -102,10 +113,10 @@ web/
 │   ├── physics_constants.json
 │   ├── privileges.json   # 19 privileges
 │   ├── server_config.json
-│   ├── smelting.json     # 25+ smelting recipes
+│   ├── smelting.json     # 20 smelting recipes
 │   ├── decorations.json
 │   ├── ores.json
-│   └── sky_params.json, day_night_ratio.json, sounds.json, protection.json, game_constants.json
+│   └── sky_params.json, day_night_ratio.json, sounds.json (15 groups), protection.json, game_constants.json
 └── docs/                # Architecture documentation
 ```
 
@@ -241,7 +252,7 @@ This project is a web port of the Luanti (formerly Minetest) voxel game engine, 
 - **Day/Night Cycle**: Matching minetest's 24000-tick cycle
 - **Textures**: 89+ block textures from minetest devtest with nearest-neighbor filtering
 - **World Generation**: 10 biomes (grassland, forest, desert, snow, taiga, jungle, savanna, mountains, swamp, ocean) with heat/humidity noise, schematic-based trees (oak, pine, jungle, birch, cactus), river generation, 9 ore types with realistic depth distribution, multi-room dungeons with corridors and loot chests, cave systems with large caverns
-- **Security**: XSS-safe rendering, CORS-restricted origins, player name sanitization, HTML tag stripping, rate limiting (thread-safe ConcurrentDictionary), security headers, anti-cheat physics validation, CI security scanning
+- **Security**: XSS-safe rendering, CORS-restricted origins, player name sanitization, HTML tag stripping, rate limiting (thread-safe ConcurrentDictionary), security headers, anti-cheat physics validation, area protection enforcement, rollback recording, persistent ban database, CI security scanning
 - **CI**: GitHub Actions pipeline with Ubuntu + Windows server builds, client typecheck+build, security scan, data integrity verification
 
 ## License

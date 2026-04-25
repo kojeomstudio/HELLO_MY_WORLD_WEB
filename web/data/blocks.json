@@ -212,6 +212,7 @@
         "209": { "name": "lodestone", "solid": true, "transparent": false, "color": "#4A4A4A", "interactive": true, "hardness": 3.5, "groups": { "cracky": 2 }, "soundGroup": "metal" },
         "210": { "name": "honey_block", "solid": true, "transparent": true, "color": "#E8C030", "hardness": 0.0, "moveResistance": 5, "groups": { "dig_immediate": 3 }, "soundGroup": "slime" },
         "211": { "name": "slime_block", "solid": true, "transparent": true, "color": "#60CC60", "hardness": 0.0, "groups": { "dig_immediate": 3 }, "soundGroup": "slime" },
+        "212": { "name": "mushroom_stew_block", "solid": true, "transparent": false, "color": "#C8A868", "hardness": 0.5, "groups": { "dig_immediate": 3 }, "soundGroup": "default" },
         "213": { "name": "tnt", "solid": true, "transparent": false, "color": "#CC2020", "interactive": true, "hardness": 0.0, "groups": { "dig_immediate": 3 }, "soundGroup": "default" },
         "214": { "name": "andesite", "solid": true, "transparent": false, "color": "#808080", "hardness": 1.5, "groups": { "cracky": 3 }, "soundGroup": "stone" },
         "215": { "name": "diorite", "solid": true, "transparent": false, "color": "#C8C8C8", "hardness": 1.5, "groups": { "cracky": 3 }, "soundGroup": "stone" },

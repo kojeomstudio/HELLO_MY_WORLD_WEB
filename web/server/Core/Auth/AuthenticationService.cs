@@ -21,6 +21,12 @@ public class AuthenticationService
 
     private readonly HashSet<string> _bannedNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _bannedIps = new(StringComparer.OrdinalIgnoreCase);
+    private BanDatabase? _banDatabase;
+
+    public void SetBanDatabase(BanDatabase banDatabase)
+    {
+        _banDatabase = banDatabase;
+    }
 
     public AuthResult AuthenticatePlayer(string name, string connectionId, int onlineCount, int maxPlayers, string? ipAddress = null)
     {
@@ -30,10 +36,10 @@ public class AuthenticationService
         if (ReservedNames.Contains(name))
             return AuthResult.NameInvalid;
 
-        if (ipAddress != null && _bannedIps.Contains(ipAddress))
+        if (ipAddress != null && (_bannedIps.Contains(ipAddress) || (_banDatabase?.IsIpBanned(ipAddress) ?? false)))
             return AuthResult.Banned;
 
-        if (_bannedNames.Contains(name))
+        if (_bannedNames.Contains(name) || (_banDatabase?.IsNameBanned(name) ?? false))
             return AuthResult.Banned;
 
         if (onlineCount >= maxPlayers)
@@ -42,10 +48,30 @@ public class AuthenticationService
         return AuthResult.Success;
     }
 
-    public void BanName(string name) => _bannedNames.Add(name);
-    public void BanIp(string ip) => _bannedIps.Add(ip);
-    public void UnbanName(string name) => _bannedNames.Remove(name);
-    public void UnbanIp(string ip) => _bannedIps.Remove(ip);
-    public bool IsBanned(string name) => _bannedNames.Contains(name);
-    public bool IsIpBanned(string ip) => _bannedIps.Contains(ip);
+    public void BanName(string name)
+    {
+        _bannedNames.Add(name);
+        _banDatabase?.BanName(name);
+    }
+
+    public void BanIp(string ip)
+    {
+        _bannedIps.Add(ip);
+        _banDatabase?.BanIp(ip);
+    }
+
+    public void UnbanName(string name)
+    {
+        _bannedNames.Remove(name);
+        _banDatabase?.UnbanName(name);
+    }
+
+    public void UnbanIp(string ip)
+    {
+        _bannedIps.Remove(ip);
+        _banDatabase?.UnbanIp(ip);
+    }
+
+    public bool IsBanned(string name) => _bannedNames.Contains(name) || (_banDatabase?.IsNameBanned(name) ?? false);
+    public bool IsIpBanned(string ip) => _bannedIps.Contains(ip) || (_banDatabase?.IsIpBanned(ip) ?? false);
 }

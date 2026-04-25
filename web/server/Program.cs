@@ -12,6 +12,11 @@ using WebGameServer.Core.World;
 using WebGameServer.Core.Player;
 using WebGameServer.Services;
 
+using WebGameServer.Core.Inventory;
+using WebGameServer.Core.Particles;
+using WebGameServer.Core.Rollback;
+using WebGameServer.Core.Sound;
+
 var builder = WebApplication.CreateBuilder(args);
 
 var configPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "data", "server_config.json");
@@ -297,6 +302,19 @@ if (!Directory.Exists(dataDir))
     dataDir = Path.Combine(Directory.GetCurrentDirectory(), "data", "worlds", "default");
 Directory.CreateDirectory(dataDir);
 
+builder.Services.AddSingleton<BanDatabase>(sp =>
+{
+    var banDbPath = Path.Combine(dataDir, "bans.json");
+    return new BanDatabase(banDbPath);
+});
+builder.Services.AddSingleton<RollbackSystem>();
+builder.Services.AddSingleton<ProtectionSystem>();
+builder.Services.AddSingleton<RedstoneSystem>();
+builder.Services.AddSingleton<FishingSystem>();
+builder.Services.AddSingleton<BreedingSystem>();
+builder.Services.AddSingleton<SoundSpecManager>();
+builder.Services.AddSingleton<DetachedInventoryManager>();
+
 var playerDbPath = Path.Combine(dataDir, "players.db");
 var blockMetaDbPath = Path.Combine(dataDir, "blockmeta.db");
 
@@ -387,6 +405,10 @@ var gameServer = app.Services.GetRequiredService<GameServer>();
 var hubContext = app.Services.GetRequiredService<IHubContext<GameHub, IGameClient>>();
 gameServer.SetHubContext(hubContext);
 gameServer.Start();
+
+var authService = app.Services.GetRequiredService<AuthenticationService>();
+var banDatabase = app.Services.GetRequiredService<BanDatabase>();
+authService.SetBanDatabase(banDatabase);
 
 var itemsDataPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "data", "items.json");
 if (!File.Exists(itemsDataPath))

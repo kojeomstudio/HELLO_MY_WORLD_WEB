@@ -6,7 +6,10 @@ using WebGameServer.Core.Entities;
 using WebGameServer.Core.Game;
 using WebGameServer.Core.Physics;
 using WebGameServer.Core.Player;
+using WebGameServer.Core.Protection;
+using WebGameServer.Core.Rollback;
 using WebGameServer.Core.Smelting;
+using WebGameServer.Core.Sound;
 using WebGameServer.Core.World;
 using WebGameServer.Core.World.Generators;
 using WebGameServer.Services;
@@ -38,6 +41,10 @@ public class GameServer
     private readonly EntityManager _entityManager;
     private readonly PlayerDatabase _playerDatabase;
     private readonly BlockMetadataDatabase _blockMetadataDatabase;
+    private readonly RollbackSystem _rollbackSystem;
+    private readonly ProtectionSystem _protectionSystem;
+    private readonly RedstoneSystem _redstoneSystem;
+    private readonly SoundSpecManager _soundSpecManager;
     private readonly MobSpawner _mobSpawner;
     private NodeTimerSystem _nodeTimerSystem;
     public AgricultureSystem? Agriculture { get; set; }
@@ -58,6 +65,10 @@ public class GameServer
     public float TimeSpeed { get; set; } = 1.0f;
     public DayNightCycle DayNight { get; }
     public ServerConfig Config => _config;
+    public RollbackSystem Rollback => _rollbackSystem;
+    public ProtectionSystem Protection => _protectionSystem;
+    public RedstoneSystem Redstone => _redstoneSystem;
+    public SoundSpecManager SoundSpecs => _soundSpecManager;
     public int WorldBorderSize { get; private set; }
 
     public int OnlinePlayerCount => _players.Count;
@@ -74,7 +85,11 @@ public class GameServer
         PhysicsEngine physicsEngine,
         EntityManager entityManager,
         PlayerDatabase playerDatabase,
-        BlockMetadataDatabase blockMetadataDatabase)
+        BlockMetadataDatabase blockMetadataDatabase,
+        RollbackSystem rollbackSystem,
+        ProtectionSystem protectionSystem,
+        RedstoneSystem redstoneSystem,
+        SoundSpecManager soundSpecManager)
     {
         _config = config;
         _blockDefinitionManager = blockDefinitionManager;
@@ -87,6 +102,10 @@ public class GameServer
         _entityManager = entityManager;
         _playerDatabase = playerDatabase;
         _blockMetadataDatabase = blockMetadataDatabase;
+        _rollbackSystem = rollbackSystem;
+        _protectionSystem = protectionSystem;
+        _redstoneSystem = redstoneSystem;
+        _soundSpecManager = soundSpecManager;
         _mobSpawner = new MobSpawner(entityManager);
         _mobSpawner.SetGameTimeProvider(() => GameTime);
 
@@ -325,6 +344,9 @@ public class GameServer
         Agriculture?.GrowAllCrops(1f / TickRate);
 
         UpdateFurnaces(1f / TickRate);
+
+        if (_tickCount % 10 == 0)
+            _redstoneSystem.Update(DefaultWorld);
 
         if (_tickCount % 600 == 0)
         {

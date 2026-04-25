@@ -152,7 +152,7 @@ import { GameClient } from './GameClient'; // local: named import
 ## Communication Architecture
 
 Client and server communicate via SignalR over WebSocket (`/game` endpoint).
-The Vite dev server proxies `/game` to `http://localhost:5000` (server runs on port 5266).
+The Vite dev server proxies `/game` to `http://localhost:5266` (server runs on port 5266).
 Block actions use DOM `CustomEvent('blockAction')` for decoupled communication between PlayerController and UIManager.
 
 ## Key Data Files
