@@ -697,6 +697,8 @@ public class GameHub : Hub<IGameClient>
 
         if (string.IsNullOrEmpty(text) || text.Length > 100) return;
 
+        text = SanitizeSignText(text);
+
         var blockPos = new Vector3s((short)x, (short)y, (short)z);
         var block = _gameServer.DefaultWorld.GetBlock(blockPos);
         var blockDef = _blockDefinitionManager.Get(block.ToUInt16());
@@ -1306,10 +1308,43 @@ public class GameHub : Hub<IGameClient>
 
     private static string SanitizeChatMessage(string message)
     {
-        message = message.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;").Replace("'", "&#x27;");
-        message = message.Replace("\r\n", " ").Replace("\n", " ");
-        if (message.Length > 256) message = message[..256];
-        return message;
+        var sb = new System.Text.StringBuilder(message.Length);
+        foreach (char c in message)
+        {
+            switch (c)
+            {
+                case '&': sb.Append("&amp;"); break;
+                case '<': sb.Append("&lt;"); break;
+                case '>': sb.Append("&gt;"); break;
+                case '"': sb.Append("&quot;"); break;
+                case '\'': sb.Append("&#x27;"); break;
+                case '\r': break;
+                case '\n': sb.Append(' '); break;
+                default: sb.Append(c); break;
+            }
+        }
+        var result = sb.ToString();
+        if (result.Length > 256) result = result[..256];
+        return result;
+    }
+
+    private static string SanitizeSignText(string text)
+    {
+        var sb = new System.Text.StringBuilder(text.Length);
+        foreach (char c in text)
+        {
+            if (char.IsControl(c) && c != ' ') continue;
+            switch (c)
+            {
+                case '<': sb.Append(' '); break;
+                case '>': sb.Append(' '); break;
+                case '&': sb.Append(' '); break;
+                case '"': sb.Append(' '); break;
+                case '\'': sb.Append(' '); break;
+                default: sb.Append(c); break;
+            }
+        }
+        return sb.ToString();
     }
 
     private static bool CheckRateLimit(string connectionId, string action, int cooldownMs)

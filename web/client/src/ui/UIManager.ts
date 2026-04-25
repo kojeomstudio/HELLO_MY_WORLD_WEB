@@ -767,7 +767,15 @@ export class UIManager {
             slot.style.cssText = 'width:52px;height:52px;background:rgba(0,0,0,0.4);border:2px solid #555;border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;position:relative;transition:border-color 0.1s;';
 
             const colorSwatch = document.createElement('div');
-            colorSwatch.style.cssText = `width:28px;height:28px;background:${entry.color};border-radius:3px;border:1px solid rgba(255,255,255,0.2);`;
+            colorSwatch.style.width = '28px';
+            colorSwatch.style.height = '28px';
+            colorSwatch.style.borderRadius = '3px';
+            colorSwatch.style.border = '1px solid rgba(255,255,255,0.2)';
+            if (/^#[0-9a-fA-F]{3,8}$/.test(entry.color)) {
+                colorSwatch.style.background = entry.color;
+            } else {
+                colorSwatch.style.background = '#888';
+            }
             slot.appendChild(colorSwatch);
 
             const label = document.createElement('span');
