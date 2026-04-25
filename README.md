@@ -93,7 +93,7 @@ web/
 │       ├── GameHub.cs            # SignalR hub
 │       └── GameLoopService.cs    # Background game loop
 ├── data/                # JSON configuration
-│   ├── blocks.json       # 161 block definitions (IDs 0-226, full defaults in code)
+│   ├── blocks.json       # 226 block definitions (IDs 0-226, full defaults in code)
 │   ├── items.json        # 210+ items, 125+ recipes, food values, tool capabilities
 │   ├── mobs.json         # 6 mob definitions
 │   ├── tools.json        # 8 tool material definitions

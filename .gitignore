@@ -36,6 +36,7 @@ vendor/
 .DS_Store
 Thumbs.db
 desktop.ini
+nul
 
 # Database files
 *.db
