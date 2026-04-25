@@ -26,11 +26,11 @@ try {
 	
     # Check exit code (assuming the CLI returns a non-zero code on failure)
     if ($LASTEXITCODE -ne 0) {
-        Write-Error "Kilo Code CLI execution failed. Exit Code: $LASTEXITCODE"
+        Write-Error "Code CLI execution failed. Exit Code: $LASTEXITCODE"
         exit $LASTEXITCODE
     }
     
-    Write-Host "Kilo Code CLI execution completed."
+    Write-Host "Code CLI execution completed."
 }
 catch {
     Write-Error "An exception occurred during script execution: $_"
