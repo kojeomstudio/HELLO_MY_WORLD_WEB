@@ -99,13 +99,10 @@ public class GameServer
 
         var generator = generatorFactory.Create(config.World.DefaultGenerator);
         var seed = config.World.WorldSeed == 0 ? Random.Shared.Next() : config.World.WorldSeed;
-        if (generator is NoiseWorldGenerator noiseGen)
-        {
-            var dataPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "data");
-            if (!Directory.Exists(dataPath))
-                dataPath = Path.Combine(Directory.GetCurrentDirectory(), "data");
-            noiseGen.LoadBiomes(dataPath);
-        }
+        var dataPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "data");
+        if (!Directory.Exists(dataPath))
+            dataPath = Path.Combine(Directory.GetCurrentDirectory(), "data");
+        generator.LoadBiomes(dataPath);
         DefaultWorld = new WorldMap("default", seed, generator);
         _worlds.TryAdd("default", DefaultWorld);
 

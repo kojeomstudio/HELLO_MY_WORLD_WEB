@@ -202,7 +202,7 @@ Each block has:
 - `Light`: Packed lighting (4-bit sun + 4-bit artificial)
 
 ### Block Types
-101→161 block types defined in `BlockType.cs` enum and `blocks.json` (IDs 0-160). See [game-systems.md](game-systems.md) for full list.
+226 block types defined in `BlockType.cs` enum and `blocks.json` (IDs 0-226). Full defaults in `BlockDefinition.cs` with JSON override via `blocks.json`. See [game-systems.md](game-systems.md) for full list.
 
 ### Chunk Meshing
 - Only renders exposed faces (face culling against solid neighbors)
@@ -387,7 +387,7 @@ All server services registered as **Singleton** in `Program.cs`:
 - HTML/XML tag stripping in chat messages (XSS prevention)
 - Chat message length limits
 - NaN/Infinity position validation
-- Block type range validation (0-160)
+- Block type range validation (0-226)
 - Player AABB overlap check on block placement
 - Block interaction range check (8 blocks)
 - World border enforcement with position clamping

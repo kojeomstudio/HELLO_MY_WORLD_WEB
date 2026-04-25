@@ -8,10 +8,15 @@ public class DetachedInventory
     private readonly ItemStack?[] _items;
 
     public string Name { get; }
-    public string? Owner { get; }
+    public string Owner { get; }
     public int Size => _items.Length;
+    public ItemStack?[] Items => _items.ToArray();
+    public bool AllowMove { get; set; } = true;
+    public bool AllowPut { get; set; } = true;
+    public bool AllowTake { get; set; } = true;
+    public Func<string, string, bool>? AllowAccessCallback { get; set; }
 
-    public DetachedInventory(string name, int size, string? owner)
+    public DetachedInventory(string name, int size, string owner = "server")
     {
         Name = name;
         Owner = owner;
@@ -20,7 +25,9 @@ public class DetachedInventory
 
     public bool AllowPlayerAccess(string playerName)
     {
-        return Owner == null || Owner == playerName;
+        if (AllowAccessCallback != null) return AllowAccessCallback(Name, playerName);
+        if (Owner == "server") return true;
+        return Owner == playerName;
     }
 
     public bool AddItem(ItemStack item)
@@ -87,40 +94,53 @@ public class DetachedInventoryManager
 {
     private readonly ConcurrentDictionary<string, DetachedInventory> _inventories = new();
 
-    public DetachedInventory? CreateInventory(string name, int size, string? owner)
+    public DetachedInventory? Create(string name, int size, string owner = "server",
+        Func<string, string, bool>? allowAccessCallback = null)
     {
         var inventory = new DetachedInventory(name, size, owner);
+        if (allowAccessCallback != null) inventory.AllowAccessCallback = allowAccessCallback;
         if (!_inventories.TryAdd(name, inventory)) return null;
         return inventory;
     }
 
-    public DetachedInventory? GetInventory(string name)
-    {
-        return _inventories.TryGetValue(name, out var inventory) ? inventory : null;
-    }
-
-    public bool RemoveInventory(string name)
+    public bool Remove(string name)
     {
         return _inventories.TryRemove(name, out _);
     }
 
-    public bool CanPlayerAccess(string playerName, string inventoryName)
+    public DetachedInventory? Get(string name)
     {
-        var inventory = GetInventory(inventoryName);
+        return _inventories.TryGetValue(name, out var inventory) ? inventory : null;
+    }
+
+    public bool SetItem(string inventoryName, int slot, ItemStack? item, string playerName)
+    {
+        var inventory = Get(inventoryName);
         if (inventory == null) return false;
-        return inventory.AllowPlayerAccess(playerName);
+        if (!inventory.AllowPlayerAccess(playerName)) return false;
+        if (!inventory.AllowPut) return false;
+        return inventory.SetItem(slot, item);
     }
 
-    public IEnumerable<string> GetAllInventoryNames()
+    public ItemStack? RemoveItem(string inventoryName, int slot, int count, string playerName)
     {
-        return _inventories.Keys;
+        var inventory = Get(inventoryName);
+        if (inventory == null) return null;
+        if (!inventory.AllowPlayerAccess(playerName)) return null;
+        if (!inventory.AllowTake) return null;
+        return inventory.RemoveItem(slot, count);
     }
 
-    public bool MoveItemBetweenInventories(string fromInv, int fromSlot, string toInv, int toSlot)
+    public bool MoveItem(string fromInvName, int fromSlot, string toInvName, int toSlot, string playerName)
     {
-        var source = GetInventory(fromInv);
-        var destination = GetInventory(toInv);
+        var source = Get(fromInvName);
+        var destination = Get(toInvName);
         if (source == null || destination == null) return false;
+        if (!source.AllowPlayerAccess(playerName)) return false;
+        if (!destination.AllowPlayerAccess(playerName)) return false;
+        if (!source.AllowTake) return false;
+        if (!destination.AllowPut) return false;
+        if (!destination.AllowMove && source.Name != destination.Name) return false;
 
         var item = source.GetItem(fromSlot);
         if (item == null) return false;
@@ -139,5 +159,22 @@ public class DetachedInventoryManager
 
         source.RemoveItem(fromSlot, item.Count);
         return true;
+    }
+
+    public bool CanPlayerAccess(string playerName, string inventoryName)
+    {
+        var inventory = Get(inventoryName);
+        if (inventory == null) return false;
+        return inventory.AllowPlayerAccess(playerName);
+    }
+
+    public IEnumerable<string> GetAllInventoryNames()
+    {
+        return _inventories.Keys;
+    }
+
+    public bool Exists(string name)
+    {
+        return _inventories.ContainsKey(name);
     }
 }

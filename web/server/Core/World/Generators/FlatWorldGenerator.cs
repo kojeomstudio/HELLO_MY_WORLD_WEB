@@ -11,6 +11,10 @@ public class FlatWorldGenerator : IWorldGenerator
     {
     }
 
+    public void LoadBiomes(string dataPath)
+    {
+    }
+
     public ushort[,,] GenerateChunk(int chunkX, int chunkY, int chunkZ)
     {
         var blocks = new ushort[Chunk.Size, Chunk.Size, Chunk.Size];

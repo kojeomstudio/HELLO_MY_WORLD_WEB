@@ -157,6 +157,8 @@ public class MobEntity : Entity
     public float AttackRange { get; set; } = 1.5f;
     public float DetectionRange { get; set; } = 16.0f;
     public bool IsHostile { get; set; } = true;
+    public bool IsBaby { get; set; }
+    public float GrowTimer { get; set; }
     public Guid? TargetPlayerId { get; set; }
     public MobState State { get; set; } = MobState.Wander;
     public bool IsHurt { get; private set; }
@@ -209,6 +211,16 @@ public class MobEntity : Entity
     {
         base.Update(dt);
         if (!IsAlive) return;
+
+        if (IsBaby)
+        {
+            GrowTimer -= dt;
+            if (GrowTimer <= 0)
+            {
+                IsBaby = false;
+                Speed /= 0.5f;
+            }
+        }
 
         if (Health <= 0)
         {

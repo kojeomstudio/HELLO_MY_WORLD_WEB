@@ -5,7 +5,8 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 ## Features
 
 - **Voxel World**: Procedurally generated 3D world with noise-based terrain, caves, ores, schematic-based trees (oak, pine, jungle, birch, cactus), rivers, multi-room dungeons, and 10 biomes (grassland, forest, desert, snow, taiga, jungle, savanna, mountains, swamp, ocean) selected via heat/humidity noise
-- **161 Block Types**: Including stone variants, 9 ore types (diamond, gold, iron, coal, redstone, emerald, lapis, copper), wood types (oak, jungle, pine), stairs/slabs, fences, walls, glass panes, doors, decorative blocks, flowers, mushrooms, utility blocks, light sources, fire, cobweb, and Nether/End blocks
+- **161 Block Types**: Including stone variants, 9 ore types (diamond, gold, iron, coal, redstone, emerald, lapis, copper), wood types (oak, jungle, pine), stairs/slabs, fences, walls, glass panes, doors, decorative blocks, flowers, mushrooms, utility blocks, light sources, fire, cobweb, Nether/End blocks, redstone components, and all wood variants (spruce/birch/jungle/acacia/dark oak doors, fences, planks)
+- **226 Block Definitions**: Full block enum (IDs 0-226) with complete defaults in code and JSON data override
 - **210+ Items**: Tools (wood/stone/iron/diamond/steel/mese), special weapons (fire sword, ice sword, blood sword, heal sword, elemental sword, daggers), steel shears, alchemy ingredients, crafting materials, armor, food, resources, and utility items
 - **Crafting System**: 125+ recipes including shaped crafting, tool creation, special weapon recipes, ore block storage, copper processing, decoration recipes, armor, building blocks, food, and tool repair
 - **Smelting System**: 25+ smelting recipes via furnace with fuel consumption
@@ -92,7 +93,7 @@ web/
 │       ├── GameHub.cs            # SignalR hub
 │       └── GameLoopService.cs    # Background game loop
 ├── data/                # JSON configuration
-│   ├── blocks.json       # 161 block definitions (IDs 0-160)
+│   ├── blocks.json       # 161 block definitions (IDs 0-226, full defaults in code)
 │   ├── items.json        # 210+ items, 125+ recipes, food values, tool capabilities
 │   ├── mobs.json         # 6 mob definitions
 │   ├── tools.json        # 8 tool material definitions
@@ -149,6 +150,20 @@ build.bat
 dotnet build web/server/WebGameServer.csproj --configuration Release
 cd web/client && npm install && npm run build
 ```
+
+## Protocol Test
+
+Run the integration test script to verify client-server communication:
+
+```bash
+# Windows - builds and tests
+test-protocol.bat
+
+# Manual - requires server already running
+node test-protocol.mjs
+```
+
+The test verifies: API status, SignalR connection, join/init protocol, position updates, chat, chunk requests, crafting recipes, and privilege system.
 
 ## Communication
 
