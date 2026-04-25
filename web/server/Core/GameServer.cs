@@ -27,6 +27,7 @@ public class GameServer
     private readonly ConcurrentDictionary<string, string> _connectionToPlayerId = new();
     private readonly ConcurrentDictionary<string, ItemStack?[]> _chestInventories = new();
     private readonly ConcurrentDictionary<string, FurnaceOperation> _activeFurnaces = new();
+    private readonly ConcurrentDictionary<string, DateTime> _lastDamageTime = new();
 
     private readonly Dictionary<string, FoodValue> _foodValues = new();
 
@@ -211,11 +212,13 @@ public class GameServer
         return _blockDefinitionManager.Get(blockType);
     }
 
-    public bool PlayerJoin(string connectionId, string playerName)
+    public (bool success, bool isNewPlayer) PlayerJoin(string connectionId, string playerName)
     {
-        if (_players.ContainsKey(playerName)) return false;
-        if (_connectionToPlayer.ContainsKey(connectionId)) return false;
-        if (_players.Count >= MaxPlayers) return false;
+        if (_players.ContainsKey(playerName)) return (false, false);
+        if (_connectionToPlayer.ContainsKey(connectionId)) return (false, false);
+        if (_players.Count >= MaxPlayers) return (false, false);
+
+        var isNewPlayer = !_playerDatabase.PlayerExists(playerName);
 
         var player = new PlayerEnt(playerName)
         {
@@ -223,7 +226,7 @@ public class GameServer
             State = PlayerState.Connected
         };
 
-        if (_playerDatabase.PlayerExists(playerName))
+        if (!isNewPlayer)
         {
             _playerDatabase.LoadPlayer(player);
             player.ConnectionId = connectionId;
@@ -243,7 +246,7 @@ public class GameServer
 
         _privilegeSystem.GrantDefaultPrivileges(playerName);
 
-        return true;
+        return (true, isNewPlayer);
     }
 
     public void PlayerLeave(string connectionId)
@@ -257,6 +260,12 @@ public class GameServer
             _players.TryRemove(playerName, out _);
             _connectionToPlayerId.TryRemove(playerName, out _);
             _privilegeSystem.RemovePlayer(playerName);
+
+            foreach (var key in _lastDamageTime.Keys.ToList())
+            {
+                if (key.StartsWith($"{playerName}:"))
+                    _lastDamageTime.TryRemove(key, out _);
+            }
         }
     }
 
@@ -376,8 +385,14 @@ public class GameServer
 
         if (standingBlock.Type is BlockType.Lava or BlockType.LavaFlowing)
         {
-            var lavaDamage = standingDef?.Damage ?? 4;
-            DamagePlayer(player, lavaDamage, "lava");
+            var damageKey = $"{player.Name}:lava";
+            var now = DateTime.UtcNow;
+            if (!_lastDamageTime.TryGetValue(damageKey, out var lastDmg) || (now - lastDmg).TotalMilliseconds >= 500)
+            {
+                _lastDamageTime[damageKey] = now;
+                var lavaDamage = standingDef?.Damage ?? 4;
+                DamagePlayer(player, lavaDamage, "lava");
+            }
         }
         else if (standingBlock.Type is BlockType.Water or BlockType.WaterFlowing)
         {

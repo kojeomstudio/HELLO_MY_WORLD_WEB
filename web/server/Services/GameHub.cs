@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.SignalR;
 using System.Collections.Concurrent;
-using System.Text.RegularExpressions;
 using System.Text.Json;
 using WebGameServer.Core;
 using WebGameServer.Core.Auth;
@@ -140,7 +139,9 @@ public class GameHub : Hub<IGameClient>
             return;
         }
 
-        if (!_gameServer.PlayerJoin(Context.ConnectionId, playerName))
+        var (joinSuccess, isNewPlayer) = _gameServer.PlayerJoin(Context.ConnectionId, playerName);
+
+        if (!joinSuccess)
         {
             await Clients.Caller.OnChatMessage("Server", "Failed to join. Name taken or server full.");
             return;
@@ -154,10 +155,13 @@ public class GameHub : Hub<IGameClient>
         await Groups.AddToGroupAsync(Context.ConnectionId, "players");
         player.State = PlayerState.Playing;
 
-        player.Inventory.AddItem(new ItemStack("wooden_pickaxe", 1));
-        player.Inventory.AddItem(new ItemStack("wooden_sword", 1));
-        player.Inventory.AddItem(new ItemStack("torch", 16));
-        player.Inventory.AddItem(new ItemStack("bread", 5));
+        if (isNewPlayer)
+        {
+            player.Inventory.AddItem(new ItemStack("wooden_pickaxe", 1));
+            player.Inventory.AddItem(new ItemStack("wooden_sword", 1));
+            player.Inventory.AddItem(new ItemStack("torch", 16));
+            player.Inventory.AddItem(new ItemStack("bread", 5));
+        }
 
         await Clients.All.OnPlayerJoined(playerName);
         await Clients.Caller.OnPlayerListUpdate(_gameServer.OnlinePlayers.Select(p => p.Name).ToArray());
@@ -1175,9 +1179,8 @@ public class GameHub : Hub<IGameClient>
 
     private static string SanitizeChatMessage(string message)
     {
-        message = Regex.Replace(message, "<[^>]*>", string.Empty);
+        message = message.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;").Replace("'", "&#x27;");
         message = message.Replace("\r\n", " ").Replace("\n", " ");
-        message = message.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
         if (message.Length > 256) message = message[..256];
         return message;
     }
@@ -1195,7 +1198,7 @@ public class GameHub : Hub<IGameClient>
 
         _lastActionTimes[key] = now;
 
-        if (_lastActionTimes.Count > 10000)
+        if (_lastActionTimes.Count > 5000)
         {
             var cutoff = now.AddMinutes(-5);
             foreach (var kvp in _lastActionTimes)
@@ -1203,11 +1206,14 @@ public class GameHub : Hub<IGameClient>
                 if (kvp.Value < cutoff)
                     _lastActionTimes.TryRemove(kvp.Key, out _);
             }
+        }
 
+        if (_joinAttempts.Count > 1000)
+        {
+            var joinCutoff = now.AddMinutes(-1);
             foreach (var kvp in _joinAttempts)
             {
-                if (!_lastActionTimes.ContainsKey(kvp.Key))
-                    _joinAttempts.TryRemove(kvp.Key, out _);
+                _joinAttempts.TryRemove(kvp.Key, out _);
             }
         }
 

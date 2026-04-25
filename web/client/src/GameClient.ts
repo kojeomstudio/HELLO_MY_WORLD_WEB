@@ -420,8 +420,14 @@ export class GameClient {
         this.sendPositionUpdate();
     }
 
+    private lastPositionSendTime: number = 0;
+
     private sendPositionUpdate(): void {
         if (!this.connection) return;
+        const now = performance.now();
+        if (now - this.lastPositionSendTime < 50) return;
+        this.lastPositionSendTime = now;
+
         const pos = this.playerController.getPosition();
         const vel = this.playerController.getVelocity();
         const yaw = this.playerController.getYaw();

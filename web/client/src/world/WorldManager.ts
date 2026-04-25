@@ -74,7 +74,7 @@ class FallingBlockAnimation {
 
         this.elapsedTime += dt;
         this.velocityY -= FALL_GRAVITY * dt;
-        const newY = this.startY + 0.5 + (this.velocityY * this.elapsedTime) + (0.5 * FALL_GRAVITY * this.elapsedTime * this.elapsedTime);
+        const newY = this.mesh.position.y + this.velocityY * dt;
 
         if (newY <= this.toY + 0.5)
         {
@@ -213,6 +213,9 @@ export class WorldManager {
     }
 
     loadChunk(chunkX: number, chunkY: number, chunkZ: number, data: Uint8Array): void {
+        const expectedSize = 16 * 16 * 16 * 4;
+        if (data.byteLength < expectedSize) return;
+
         const key = `${chunkX},${chunkY},${chunkZ}`;
 
         const existing = this.chunks.get(key);

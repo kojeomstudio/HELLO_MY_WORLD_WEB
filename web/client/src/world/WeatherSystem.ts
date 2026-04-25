@@ -72,7 +72,6 @@ export class WeatherSystem {
 
         this.groundLevel = playerY - 10;
         const posAttr = this.rainPoints.geometry.getAttribute('position') as THREE.BufferAttribute;
-        let needsUpdate = false;
 
         for (let i = 0; i < RAIN_COUNT; i++) {
             const i3 = i * 3;
@@ -84,11 +83,10 @@ export class WeatherSystem {
                 this.rainPositions[i3] = playerX + (Math.random() - 0.5) * RAIN_RADIUS * 2;
                 this.rainPositions[i3 + 1] = playerY + RAIN_HEIGHT * 0.5 + Math.random() * RAIN_HEIGHT * 0.5;
                 this.rainPositions[i3 + 2] = playerZ + (Math.random() - 0.5) * RAIN_RADIUS * 2;
-                needsUpdate = true;
             }
         }
 
         this.rainPoints.position.set(playerX, 0, playerZ);
-        posAttr.needsUpdate = needsUpdate || true;
+        posAttr.needsUpdate = true;
     }
 }

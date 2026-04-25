@@ -353,6 +353,16 @@ All server services registered as **Singleton** in `Program.cs`:
 
 ## Recent Improvements
 
+### Bug Fixes
+- **FallingBlockAnimation**: Fixed double-counting gravity (was using both Euler integration and kinematic equation simultaneously)
+- **WeatherSystem**: Fixed rain particle update always being marked as dirty
+- **Position throttle**: Client now sends position updates at 50ms intervals instead of every frame (~60Hz)
+- **Lava damage cooldown**: Added 500ms cooldown to prevent 80 DPS instant death from lava
+- **Starter items**: New players now correctly receive starting items only on first join (not on reconnect)
+- **HTML sanitization**: Replaced regex-based tag stripping with proper HTML entity encoding to prevent XSS bypass
+- **Rate limit cleanup**: Lowered cleanup threshold from 10k to 5k entries, improved join attempt cleanup
+- **Chunk data validation**: Client validates incoming chunk data size before processing
+
 ### Hunger Bar System
 - Server broadcasts food level via `OnFoodUpdate` SignalR event
 - Client renders hunger bar with drumstick icons below the hotbar
