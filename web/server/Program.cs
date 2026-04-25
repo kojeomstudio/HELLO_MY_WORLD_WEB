@@ -388,6 +388,18 @@ app.Use(async (context, next) =>
     context.Response.Headers["X-Content-Type-Options"] = "nosniff";
     context.Response.Headers["X-Frame-Options"] = "DENY";
     context.Response.Headers["X-XSS-Protection"] = "1; mode=block";
+    context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    context.Response.Headers["Content-Security-Policy"] =
+        "default-src 'self'; " +
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+        "style-src 'self' 'unsafe-inline'; " +
+        "img-src 'self' data: blob:; " +
+        "connect-src 'self' ws: wss: http://localhost:5173 http://localhost:5266; " +
+        "media-src 'self' blob:; " +
+        "font-src 'self'; " +
+        "object-src 'none'; " +
+        "base-uri 'self'";
+    context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
     await next();
 });
 app.UseAuthorization();
@@ -410,6 +422,10 @@ var authService = app.Services.GetRequiredService<AuthenticationService>();
 var banDatabase = app.Services.GetRequiredService<BanDatabase>();
 authService.SetBanDatabase(banDatabase);
 
+var privilegeSystem = app.Services.GetRequiredService<PrivilegeSystem>();
+var privilegeSavePath = Path.Combine(dataDir, "player_privileges.json");
+privilegeSystem.SetSavePath(privilegeSavePath);
+
 var itemsDataPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "data", "items.json");
 if (!File.Exists(itemsDataPath))
     itemsDataPath = Path.Combine(Directory.GetCurrentDirectory(), "data", "items.json");
@@ -425,6 +441,7 @@ app.Lifetime.ApplicationStopping.Register(() =>
 {
     gameServer.SaveAllMetadata();
     gameServer.DefaultWorld.Save(worldDataPath);
+    privilegeSystem.Save();
     gameServer.Stop();
 });
 

@@ -111,16 +111,22 @@ public class GameHub : Hub<IGameClient>
 
     public async Task Join(string playerName)
     {
-        var joinKey = Context.ConnectionId;
-        _joinAttempts.TryGetValue(joinKey, out var attempts);
+        var ipAddress = Context.GetHttpContext()?.Connection?.RemoteIpAddress?.ToString() ?? Context.ConnectionId;
+        _joinAttempts.TryGetValue(ipAddress, out var attempts);
         if (attempts >= 5)
         {
-            await Clients.Caller.OnChatMessage("Server", "Too many join attempts. Wait a minute.");
-            return;
+            var oldestAttempt = _joinAttempts.TryGetValue(ipAddress + "_time", out var t) ? t : 0;
+            if (DateTimeOffset.UtcNow.ToUnixTimeSeconds() - oldestAttempt < 60)
+            {
+                await Clients.Caller.OnChatMessage("Server", "Too many join attempts. Wait a minute.");
+                return;
+            }
+            _joinAttempts.TryRemove(ipAddress, out _);
+            _joinAttempts.TryRemove(ipAddress + "_time", out _);
         }
-        _joinAttempts[joinKey] = attempts + 1;
+        _joinAttempts[ipAddress] = attempts + 1;
+        _joinAttempts[ipAddress + "_time"] = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
-        var ipAddress = Context.GetHttpContext()?.Connection?.RemoteIpAddress?.ToString();
         var authResult = _authService.AuthenticatePlayer(
             playerName, Context.ConnectionId,
             _gameServer.OnlinePlayerCount, _gameServer.MaxPlayers, ipAddress);
@@ -147,7 +153,8 @@ public class GameHub : Hub<IGameClient>
             return;
         }
 
-        _joinAttempts.TryRemove(joinKey, out _);
+        _joinAttempts.TryRemove(ipAddress, out _);
+        _joinAttempts.TryRemove(ipAddress + "_time", out _);
 
         var player = _gameServer.GetPlayer(playerName);
         if (player == null) return;
@@ -243,7 +250,8 @@ public class GameHub : Hub<IGameClient>
         if (!_gameServer.Protection.CanInteract(player.Name, new Vector3s((short)x, (short)y, (short)z))
             && !_gameServer.Privileges.HasPrivilege(player.Name, "protection_bypass")) return;
 
-        if (blockType > 160) return;
+        var maxBlockId = (ushort)Enum.GetValues<BlockType>().Cast<ushort>().Max();
+        if (blockType > maxBlockId) return;
 
         var blockCenter = new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
         var distance = Vector3.Distance(player.Position, blockCenter);
@@ -838,6 +846,125 @@ public class GameHub : Hub<IGameClient>
         await Clients.Client(target.ConnectionId).OnKnockback(knockback.X, knockback.Y, knockback.Z);
     }
 
+    public async Task PunchEntity(Guid entityId)
+    {
+        if (!CheckRateLimit(Context.ConnectionId, "punch", 500)) return;
+
+        var player = GetAuthenticatedPlayer();
+        if (player == null || player.IsDead) return;
+
+        var entity = _entityManager.Get(entityId);
+        if (entity == null || !entity.IsAlive) return;
+
+        var distance = Vector3.Distance(player.Position, entity.Position);
+        if (distance > _gameServer.Config.Physics.PunchRange) return;
+
+        var toolItem = player.GetSelectedHotbarItem();
+        var damage = 1.0f;
+        if (toolItem != null)
+        {
+            var toolName = toolItem.ItemId.ToLowerInvariant();
+            damage = ToolConfig.GetWeaponDamage(toolName);
+        }
+
+        if (entity is MobEntity mob)
+        {
+            mob.TakeDamage(damage);
+        }
+    }
+
+    public async Task StartFishing(float x, float y, float z)
+    {
+        if (!CheckRateLimit(Context.ConnectionId, "fish", 1000)) return;
+
+        var player = GetAuthenticatedPlayer();
+        if (player == null || player.IsDead) return;
+
+        var fishingSystem = _gameServer.FishingSystem;
+        if (fishingSystem == null) return;
+
+        var bobberPos = new Vector3(x, y, z);
+        var started = fishingSystem.StartFishing(player.Name, player.Position, bobberPos, _gameServer.DefaultWorld);
+        if (!started)
+        {
+            await Clients.Caller.OnChatMessage("Server", "Cannot fish here. Need water nearby and be within range.");
+        }
+    }
+
+    public async Task ReelIn()
+    {
+        var player = GetAuthenticatedPlayer();
+        if (player == null || player.IsDead) return;
+
+        var fishingSystem = _gameServer.FishingSystem;
+        if (fishingSystem == null) return;
+
+        var caught = fishingSystem.ReelIn(player.Name);
+        if (caught != null)
+        {
+            player.Inventory.AddItem(new ItemStack(caught.ItemId, caught.Count));
+            await SendInventoryUpdate(player);
+            _gameServer.AwardExperience(player, 2);
+            await Clients.Caller.OnChatMessage("Server", $"Caught: {caught.ItemId} x{caught.Count}");
+        }
+    }
+
+    public async Task CancelFishing()
+    {
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
+
+        var fishingSystem = _gameServer.FishingSystem;
+        fishingSystem?.CancelFishing(player.Name);
+    }
+
+    public async Task FeedMob(Guid entityId)
+    {
+        if (!CheckRateLimit(Context.ConnectionId, "feed", 500)) return;
+
+        var player = GetAuthenticatedPlayer();
+        if (player == null || player.IsDead) return;
+
+        var entity = _entityManager.Get(entityId);
+        if (entity is not MobEntity mob || !mob.IsAlive) return;
+
+        var distance = Vector3.Distance(player.Position, mob.Position);
+        if (distance > 6.0f) return;
+
+        var heldItem = player.GetSelectedHotbarItem();
+        if (heldItem == null) return;
+
+        var breedingSystem = _gameServer.Breeding;
+        if (breedingSystem == null) return;
+
+        if (!breedingSystem.TryFeedMob(mob, heldItem.ItemId)) return;
+
+        var consumed = player.Inventory.RemoveItem(player.SelectedHotbarSlot, 1);
+        if (consumed == null) return;
+        await SendInventoryUpdate(player);
+
+        var nearbyMobs = _entityManager.GetByType<MobEntity>()
+            .Where(m => m.IsAlive && !m.IsBaby && m.MobType == mob.MobType && m.Id != mob.Id)
+            .Where(m => Vector3.Distance(m.Position, mob.Position) < 8.0f)
+            .ToList();
+
+        var partner = nearbyMobs.FirstOrDefault(m =>
+        {
+            var session = _gameServer.Breeding;
+            return session != null;
+        });
+
+        if (partner != null)
+        {
+            var baby = breedingSystem.CheckBreeding(mob, partner);
+            if (baby != null)
+            {
+                _entityManager.Add(baby);
+                await Clients.Caller.OnChatMessage("Server", "Animals bred successfully!");
+            }
+        }
+    }
+
     public async Task GetPrivileges()
     {
         var player = GetAuthenticatedPlayer();
@@ -1210,10 +1337,18 @@ public class GameHub : Hub<IGameClient>
 
         if (_joinAttempts.Count > 1000)
         {
-            var joinCutoff = now.AddMinutes(-1);
-            foreach (var kvp in _joinAttempts)
+            foreach (var kvp in _joinAttempts.ToList())
             {
-                _joinAttempts.TryRemove(kvp.Key, out _);
+                if (kvp.Key.EndsWith("_time"))
+                {
+                    var timestamp = DateTimeOffset.FromUnixTimeSeconds(kvp.Value).UtcDateTime;
+                    if ((now - timestamp).TotalMinutes > 5)
+                    {
+                        var baseKey = kvp.Key[..^5];
+                        _joinAttempts.TryRemove(baseKey, out _);
+                        _joinAttempts.TryRemove(kvp.Key, out _);
+                    }
+                }
             }
         }
 

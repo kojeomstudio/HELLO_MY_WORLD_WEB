@@ -35,9 +35,12 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Minimap**: 3 modes (surface, radar, normal) with player direction indicator
 - **Active Block Modifiers**: Sand/gravel falling, farmland decay, grass spreading, dirt-to-grass, ice melting, fire spread, cactus/sugar cane growth, mushroom spreading
 - **Agriculture**: Farmable crops (wheat, carrot, potato), farmland hydration
-- **Persistence**: Player data, world chunks, block metadata, chest inventories, and node timers saved to disk
+- **Persistence**: Player data, world chunks, block metadata, chest inventories, node timers, and player privileges saved to disk
 - **Server-Authoritative Physics**: Anti-cheat with speed validation, teleport detection, noclip prevention, position correction
 - **PvP**: Distance check, weapon damage with Minetest knockback formula
+- **PvM**: Player vs mob combat with damage, knockback, and mob death drops
+- **Fishing System**: Cast, wait, bite, reel phases with catch probabilities; accessible via hub methods
+- **Breeding System**: Feed animals (cow/pig with wheat, chicken with seeds) to breed with baby mobs
 - **Texture Atlas**: 89+ block textures from minetest devtest with nearest-neighbor filtering
 - **Block Geometry System**: Custom mesh generation for stairs, slabs, fences, walls, glass panes, doors, ladders, torches, plants, fire
 - **Procedural Audio**: Web Audio API generated sounds (no audio files needed)
@@ -252,7 +255,7 @@ This project is a web port of the Luanti (formerly Minetest) voxel game engine, 
 - **Day/Night Cycle**: Matching minetest's 24000-tick cycle
 - **Textures**: 89+ block textures from minetest devtest with nearest-neighbor filtering
 - **World Generation**: 10 biomes (grassland, forest, desert, snow, taiga, jungle, savanna, mountains, swamp, ocean) with heat/humidity noise, schematic-based trees (oak, pine, jungle, birch, cactus), river generation, 9 ore types with realistic depth distribution, multi-room dungeons with corridors and loot chests, cave systems with large caverns
-- **Security**: XSS-safe rendering, CORS-restricted origins, player name sanitization, HTML tag stripping, rate limiting (thread-safe ConcurrentDictionary), security headers, anti-cheat physics validation, area protection enforcement, rollback recording, persistent ban database, CI security scanning
+- **Security**: XSS-safe rendering, CORS-restricted origins, CSP headers, Referrer-Policy, Permissions-Policy, player name sanitization, HTML tag stripping, IP-based rate limiting with join cooldown, thread-safe privilege persistence, area protection with ownership checks, rollback recording, persistent ban database, CI security scanning
 - **CI**: GitHub Actions pipeline with Ubuntu + Windows server builds, client typecheck+build, security scan, data integrity verification
 
 ## License

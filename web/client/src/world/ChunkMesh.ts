@@ -246,14 +246,25 @@ function buildTorch(ctx: BuildCtx, wx: number, wy: number, wz: number, param2: n
     else if (param2 === 4) oz = 0.8;
     else if (param2 === 5) oz = 0.2;
 
+    const y0 = 0.1;
+    const y1 = 0.7;
+
     pushQuad(ctx, wx, wy, wz,
-        [ox - s, 0.2, oz - s], [ox + s, 0.2, oz + s],
-        [ox + s, 0.8, oz + s], [ox - s, 0.8, oz - s],
+        [ox - s, y0, oz - s], [ox + s, y0, oz + s],
+        [ox + s, y1, oz + s], [ox - s, y1, oz - s],
         [0, 0, 1], color, lm, 1.0);
     pushQuad(ctx, wx, wy, wz,
-        [ox + s, 0.2, oz - s], [ox - s, 0.2, oz + s],
-        [ox - s, 0.8, oz + s], [ox + s, 0.8, oz - s],
-        [0, 0, 1], color, lm, 1.0);
+        [ox - s, y0, oz + s], [ox + s, y0, oz - s],
+        [ox + s, y1, oz - s], [ox - s, y1, oz + s],
+        [0, 0, -1], color, lm, 1.0);
+    pushQuad(ctx, wx, wy, wz,
+        [ox - s, y0, oz - s], [ox - s, y0, oz + s],
+        [ox - s, y1, oz + s], [ox - s, y1, oz - s],
+        [-1, 0, 0], color, lm, 1.0);
+    pushQuad(ctx, wx, wy, wz,
+        [ox + s, y0, oz + s], [ox + s, y0, oz - s],
+        [ox + s, y1, oz - s], [ox + s, y1, oz + s],
+        [1, 0, 0], color, lm, 1.0);
 }
 
 function buildPlantlike(ctx: BuildCtx, wx: number, wy: number, wz: number, color: THREE.Color): void {
@@ -264,9 +275,17 @@ function buildPlantlike(ctx: BuildCtx, wx: number, wy: number, wz: number, color
         [0.85, 1, 0.85], [0.15, 1, 0.15],
         [0, 0, 1], color, lm, 1.0);
     pushQuad(ctx, wx, wy, wz,
+        [0.85, 0, 0.85], [0.15, 0, 0.15],
+        [0.15, 1, 0.15], [0.85, 1, 0.85],
+        [0, 0, -1], color, lm, 1.0);
+    pushQuad(ctx, wx, wy, wz,
         [0.85, 0, 0.15], [0.15, 0, 0.85],
         [0.15, 1, 0.85], [0.85, 1, 0.15],
         [0, 0, 1], color, lm, 1.0);
+    pushQuad(ctx, wx, wy, wz,
+        [0.15, 0, 0.85], [0.85, 0, 0.15],
+        [0.85, 1, 0.15], [0.15, 1, 0.85],
+        [0, 0, -1], color, lm, 1.0);
 }
 
 function buildFirelike(ctx: BuildCtx, wx: number, wy: number, wz: number, color: THREE.Color): void {

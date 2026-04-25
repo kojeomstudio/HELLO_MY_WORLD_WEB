@@ -8,6 +8,7 @@ public class PrivilegeSystem
 {
     private readonly Dictionary<string, Privilege> _privileges = new();
     private readonly Dictionary<string, HashSet<string>> _playerPrivileges = new();
+    private string _savePath = string.Empty;
 
     public PrivilegeSystem()
     {
@@ -51,6 +52,57 @@ public class PrivilegeSystem
         }
     }
 
+    public void SetSavePath(string path)
+    {
+        _savePath = path;
+        LoadPlayerPrivileges();
+    }
+
+    private void LoadPlayerPrivileges()
+    {
+        if (string.IsNullOrEmpty(_savePath) || !File.Exists(_savePath)) return;
+        try
+        {
+            var json = File.ReadAllText(_savePath);
+            var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("players", out var playersEl)) return;
+            foreach (var playerProp in playersEl.EnumerateObject())
+            {
+                var privs = new HashSet<string>();
+                foreach (var priv in playerProp.Value.EnumerateArray())
+                {
+                    var privName = priv.GetString();
+                    if (privName != null) privs.Add(privName);
+                }
+                _playerPrivileges[playerProp.Name] = privs;
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    public void Save()
+    {
+        if (string.IsNullOrEmpty(_savePath)) return;
+        try
+        {
+            var players = new Dictionary<string, string[]>();
+            foreach (var kvp in _playerPrivileges)
+            {
+                if (kvp.Value.Count > 0)
+                    players[kvp.Key] = kvp.Value.ToArray();
+            }
+            var json = JsonSerializer.Serialize(new { players }, new JsonSerializerOptions { WriteIndented = true });
+            var dir = Path.GetDirectoryName(_savePath);
+            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+            File.WriteAllText(_savePath, json);
+        }
+        catch
+        {
+        }
+    }
+
     public bool HasPrivilege(string playerName, string privilege)
     {
         if (privilege == "server")
@@ -69,6 +121,7 @@ public class PrivilegeSystem
             _playerPrivileges[playerName] = new HashSet<string>();
 
         _playerPrivileges[playerName].Add(privilege);
+        Save();
     }
 
     public void RevokePrivilege(string playerName, string privilege)
@@ -80,6 +133,7 @@ public class PrivilegeSystem
 
         if (privs.Count == 0)
             _playerPrivileges.Remove(playerName);
+        Save();
     }
 
     public string[] GetPlayerPrivileges(string playerName)

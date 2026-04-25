@@ -149,10 +149,8 @@ export class Renderer {
 
         const sky = this.scene.getObjectByName('sky');
         if (sky) {
-            (sky as THREE.Mesh).material = new THREE.MeshBasicMaterial({
-                color: this.skyColor,
-                side: THREE.BackSide,
-            });
+            const mat = (sky as THREE.Mesh).material as THREE.MeshBasicMaterial;
+            mat.color.copy(this.skyColor);
         }
     }
 

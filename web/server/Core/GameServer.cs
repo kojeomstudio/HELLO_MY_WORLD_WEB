@@ -46,9 +46,13 @@ public class GameServer
     private readonly ProtectionSystem _protectionSystem;
     private readonly RedstoneSystem _redstoneSystem;
     private readonly SoundSpecManager _soundSpecManager;
+    private readonly FishingSystem _fishingSystem;
+    private readonly BreedingSystem _breedingSystem;
     private readonly MobSpawner _mobSpawner;
     private NodeTimerSystem _nodeTimerSystem;
     public AgricultureSystem? Agriculture { get; set; }
+    public FishingSystem FishingSystem => _fishingSystem;
+    public BreedingSystem Breeding => _breedingSystem;
 
     private IHubContext<GameHub, IGameClient>? _hubContext;
     private int _tickCount;
@@ -90,7 +94,9 @@ public class GameServer
         RollbackSystem rollbackSystem,
         ProtectionSystem protectionSystem,
         RedstoneSystem redstoneSystem,
-        SoundSpecManager soundSpecManager)
+        SoundSpecManager soundSpecManager,
+        FishingSystem fishingSystem,
+        BreedingSystem breedingSystem)
     {
         _config = config;
         _blockDefinitionManager = blockDefinitionManager;
@@ -107,6 +113,8 @@ public class GameServer
         _protectionSystem = protectionSystem;
         _redstoneSystem = redstoneSystem;
         _soundSpecManager = soundSpecManager;
+        _fishingSystem = fishingSystem;
+        _breedingSystem = breedingSystem;
         _mobSpawner = new MobSpawner(entityManager);
         _mobSpawner.SetGameTimeProvider(() => GameTime);
 
@@ -356,6 +364,8 @@ public class GameServer
 
         if (_tickCount % 10 == 0)
             _redstoneSystem.Update(DefaultWorld);
+
+        _fishingSystem.Update();
 
         if (_tickCount % 600 == 0)
         {

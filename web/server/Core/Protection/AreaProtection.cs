@@ -35,7 +35,7 @@ public record ProtectionArea(
 public class AreaProtectionSystem
 {
     private readonly ConcurrentDictionary<int, ProtectionArea> _areas = new();
-    private readonly HashSet<string> _bypassPlayers = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, byte> _bypassPlayers = new(StringComparer.OrdinalIgnoreCase);
     private readonly GameServer _gameServer;
     private int _nextAreaId = 1;
     private int _maxAreasPerPlayer = 16;
@@ -80,7 +80,7 @@ public class AreaProtectionSystem
             return false;
         }
 
-        if (_bypassPlayers.Contains(playerName))
+        if (_bypassPlayers.ContainsKey(playerName))
         {
             return true;
         }
@@ -171,17 +171,21 @@ public class AreaProtectionSystem
         return (true, areaId, null);
     }
 
-    public (bool Success, string? Error) RemoveArea(int areaId)
+    public (bool Success, string? Error) RemoveArea(int areaId, string? requester = null)
     {
-        if (_areas.TryRemove(areaId, out var removed))
-        {
+        if (!_areas.TryGetValue(areaId, out var area))
+            return (false, $"Area {areaId} not found.");
+
+        if (requester != null && !string.Equals(area.OwnerName, requester, StringComparison.OrdinalIgnoreCase))
+            return (false, "You do not own this area.");
+
+        if (_areas.TryRemove(areaId, out _))
             return (true, null);
-        }
 
         return (false, $"Area {areaId} not found.");
     }
 
-    public (bool Success, string? Error) TransferArea(int areaId, string newOwner)
+    public (bool Success, string? Error) TransferArea(int areaId, string newOwner, string? requester = null)
     {
         if (string.IsNullOrWhiteSpace(newOwner))
         {
@@ -192,6 +196,9 @@ public class AreaProtectionSystem
         {
             return (false, $"Area {areaId} not found.");
         }
+
+        if (requester != null && !string.Equals(existing.OwnerName, requester, StringComparison.OrdinalIgnoreCase))
+            return (false, "You do not own this area.");
 
         var ownedCount = 0;
         foreach (var kvp in _areas)
@@ -264,17 +271,17 @@ public class AreaProtectionSystem
     {
         if (!string.IsNullOrEmpty(playerName))
         {
-            _bypassPlayers.Add(playerName);
+            _bypassPlayers[playerName] = 0;
         }
     }
 
     public void RevokeBypass(string playerName)
     {
-        _bypassPlayers.Remove(playerName ?? string.Empty);
+        _bypassPlayers.TryRemove(playerName ?? string.Empty, out _);
     }
 
     public bool HasBypass(string playerName) =>
-        !string.IsNullOrEmpty(playerName) && _bypassPlayers.Contains(playerName);
+        !string.IsNullOrEmpty(playerName) && _bypassPlayers.ContainsKey(playerName);
 
     public async Task<(bool Success, string? Error)> LoadProtection(string dataPath)
     {
@@ -318,7 +325,7 @@ public class AreaProtectionSystem
                 {
                     if (!string.IsNullOrEmpty(player))
                     {
-                        _bypassPlayers.Add(player);
+                        _bypassPlayers[player] = 0;
                     }
                 }
             }
@@ -357,7 +364,7 @@ public class AreaProtectionSystem
             var data = new ProtectionData
             {
                 Areas = _areas.Values.ToList(),
-                BypassPlayers = _bypassPlayers.ToList(),
+                BypassPlayers = _bypassPlayers.Keys.ToList(),
                 MaxAreasPerPlayer = _maxAreasPerPlayer,
                 MaxClaimSize = _maxClaimSize
             };
