@@ -338,8 +338,8 @@ builder.Services.AddSingleton<ChatCommandManager>(sp =>
         (playerName) => { gameServer.ClearInventory(playerName); },
         () => gameServer.OnlinePlayers.Select(p => p.Name).ToArray(),
         (playerName) => { gameServer.KickPlayer(gameServer.GetPlayerConnectionId(playerName) ?? ""); },
-        (playerName) => { gameServer.BanPlayer(playerName); },
-        (playerName) => { gameServer.UnbanPlayer(playerName); },
+        (playerName) => { authService.BanName(playerName); gameServer.BanPlayer(playerName); },
+        (playerName) => { authService.UnbanName(playerName); gameServer.UnbanPlayer(playerName); },
         (playerName) => gameServer.GetPlayerPrivilegeList(playerName),
         (playerName, priv) => { privilegeSystem.GrantPrivilege(playerName, priv); },
         (playerName, priv) => { privilegeSystem.RevokePrivilege(playerName, priv); },
@@ -347,7 +347,9 @@ builder.Services.AddSingleton<ChatCommandManager>(sp =>
         () => { gameServer.Stop(); },
         (entityType, pos) => { gameServer.SpawnEntity(entityType, pos); },
         () => { gameServer.ClearAllEntities(); },
-        (size) => { gameServer.SetWorldBorder(size); });
+        (size) => { gameServer.SetWorldBorder(size); },
+        (playerName) => gameServer.Privileges.HasPrivilege(playerName, "server"),
+        (from, to, msg) => gameServer.SendPrivateMessage(from, to, msg));
 });
 builder.Services.AddSingleton<CraftingSystem>(sp =>
 {
@@ -391,7 +393,7 @@ app.Use(async (context, next) =>
     context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
     context.Response.Headers["Content-Security-Policy"] =
         "default-src 'self'; " +
-        "script-src 'self' 'unsafe-inline'; " +
+        "script-src 'self'; " +
         "style-src 'self' 'unsafe-inline'; " +
         "img-src 'self' data: blob:; " +
         "connect-src 'self' ws: wss: http://localhost:5173 http://localhost:5266; " +

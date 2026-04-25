@@ -44,6 +44,7 @@ public class ChatCommandManager
     private readonly Action? _clearAllEntities;
     private readonly Action<int>? _setWorldBorder;
     private readonly Func<string, bool>? _hasPrivilege;
+    private readonly Func<string, string, string, bool>? _sendPrivateMessage;
 
     public ChatCommandManager(
         Func<long> getGameTime,
@@ -65,7 +66,8 @@ public class ChatCommandManager
         Action<string, Vector3>? spawnEntity = null,
         Action? clearAllEntities = null,
         Action<int>? setWorldBorder = null,
-        Func<string, bool>? hasPrivilege = null)
+        Func<string, bool>? hasPrivilege = null,
+        Func<string, string, string, bool>? sendPrivateMessage = null)
     {
         _getGameTime = getGameTime;
         _getTps = getTps;
@@ -87,6 +89,7 @@ public class ChatCommandManager
         _clearAllEntities = clearAllEntities;
         _setWorldBorder = setWorldBorder;
         _hasPrivilege = hasPrivilege;
+        _sendPrivateMessage = sendPrivateMessage;
         RegisterBuiltInCommands();
     }
 
@@ -246,10 +249,12 @@ public class ChatCommandManager
             }));
 
         Register(new ChatCommand("grant", "Grant a privilege to a player", Array.Empty<string>(),
-            (_, args) =>
+            (playerName, args) =>
             {
                 if (_grantPrivilege == null) return Task.FromResult("Grant command is not available.");
                 if (args.Length < 2) return Task.FromResult("Usage: /grant <player> <privilege>");
+                if (args[1] == "server" && _hasPrivilege != null && !_hasPrivilege(playerName))
+                    return Task.FromResult("Only server admins can grant the 'server' privilege.");
                 _grantPrivilege(args[0], args[1]);
                 return Task.FromResult($"Granted '{args[1]}' to {args[0]}");
             }, "privs"));
@@ -347,6 +352,8 @@ public class ChatCommandManager
                 if (args.Length < 2) return Task.FromResult("Usage: /msg <player> <message>");
                 var target = args[0];
                 var message = string.Join(' ', args[1..]);
+                if (_sendPrivateMessage == null || !_sendPrivateMessage(playerName, target, message))
+                    return Task.FromResult($"Player '{target}' not found or offline.");
                 return Task.FromResult($"[PM] To {target}: {message}");
             }));
 

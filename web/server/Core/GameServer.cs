@@ -1194,6 +1194,14 @@ public class GameServer
         return _privilegeSystem.GetPlayerPrivileges(playerName);
     }
 
+    public bool SendPrivateMessage(string fromPlayer, string toPlayer, string message)
+    {
+        var targetConnId = GetConnectionId(toPlayer);
+        if (targetConnId == null || _hubContext == null) return false;
+        _ = _hubContext.Clients.Client(targetConnId).OnChatMessage($"[PM] From {fromPlayer}", message);
+        return true;
+    }
+
     public void BanPlayer(string playerName)
     {
         var player = GetPlayer(playerName);

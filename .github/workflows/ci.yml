@@ -1,5 +1,8 @@
 name: CI
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -120,59 +123,61 @@ jobs:
           if grep -rn --include="*.cs" \
             -E '(Password\s*=\s*"[^"]+"|ApiKey\s*=\s*"[^"]+"|Secret\s*=\s*"[^"]+")' \
             web/server/ | grep -vi 'example\|placeholder\|todo\|config\|empty\|{'; then
-            echo "::warning::Potential hardcoded secrets found in C# source"
+            echo "::error::Potential hardcoded secrets found in C# source"
             FOUND=1
           fi
           if grep -rn --include="*.ts" \
             -E '(api[_-]?key\s*[:=]\s*["\x27][^"\x27]+|password\s*[:=]\s*["\x27][^"\x27]+|secret\s*[:=]\s*["\x27][^"\x27]+)' \
             web/client/src/ | grep -vi 'example\|placeholder\|todo'; then
-            echo "::warning::Potential hardcoded secrets found in TypeScript source"
+            echo "::error::Potential hardcoded secrets found in TypeScript source"
             FOUND=1
           fi
           if grep -rn --include="*.json" \
             -E '"(password|secret|api_key|token)":\s*"[^"]+"' \
             web/data/ | grep -vi 'example\|placeholder\|default\|empty\|changeme'; then
-            echo "::warning::Potential hardcoded secrets found in JSON config"
+            echo "::error::Potential hardcoded secrets found in JSON config"
             FOUND=1
           fi
-          if [ $FOUND -eq 0 ]; then
-            echo "No hardcoded secrets detected"
+          if [ $FOUND -ne 0 ]; then
+            echo "::error::Hardcoded secrets detected — failing build"
+            exit 1
           fi
+          echo "No hardcoded secrets detected"
 
       - name: Check for .env files in repository
         run: |
-          if find . -name ".env" -o -name ".env.local" -o -name ".env.production" | grep -q .; then
-            echo "::warning::.env files detected in repository. Ensure they are in .gitignore"
-          else
-            echo "No .env files found in repository"
-          fi
+          FOUND=0
+          while IFS= read -r f; do
+            echo "::error::.env file found in repository: $f"
+            FOUND=1
+          done < <(find . -name ".env" -o -name ".env.local" -o -name ".env.production" | grep -v '.git/')
+          if [ $FOUND -ne 0 ]; then exit 1; fi
+          echo "No .env files found in repository"
 
       - name: Check for debug endpoints
         run: |
           if grep -rn --include="*.cs" 'MapGet.*debug\|MapGet.*dump\|MapGet.*admin' web/server/; then
-            echo "::warning::Potential debug/admin endpoints found"
-          else
-            echo "No suspicious debug endpoints found"
+            echo "::error::Potential debug/admin endpoints found"
+            exit 1
           fi
+          echo "No suspicious debug endpoints found"
 
       - name: Verify .gitignore covers sensitive files
         run: |
           MISSING=0
           for pattern in ".env" ".env.local" "*.db" "node_modules" "bin/" "obj/"; do
             if ! grep -q "$pattern" .gitignore 2>/dev/null; then
-              echo "::warning::.gitignore missing pattern: $pattern"
+              echo "::error::.gitignore missing pattern: $pattern"
               MISSING=1
             fi
           done
-          if [ $MISSING -eq 0 ]; then
-            echo ".gitignore covers all sensitive file patterns"
-          fi
+          if [ $MISSING -ne 0 ]; then exit 1; fi
+          echo ".gitignore covers all sensitive file patterns"
 
       - name: npm audit (client)
         run: |
           cd web/client
-          npm audit --audit-level=high || echo "::warning::npm audit found high/critical vulnerabilities"
-        continue-on-error: true
+          npm audit --audit-level=high
 
       - name: Check for sensitive file patterns
         run: |
@@ -189,9 +194,8 @@ jobs:
             echo "::error::Potential cloud/API keys detected"
             FOUND=1
           fi
-          if [ $FOUND -eq 0 ]; then
-            echo "No sensitive files or key patterns detected"
-          fi
+          if [ $FOUND -ne 0 ]; then exit 1; fi
+          echo "No sensitive files or key patterns detected"
 
   data-integrity:
     name: Verify Data Files
@@ -209,9 +213,8 @@ jobs:
               FAILED=1
             fi
           done
-          if [ $FAILED -eq 0 ]; then
-            echo "All JSON data files are valid"
-          fi
+          if [ $FAILED -ne 0 ]; then exit 1; fi
+          echo "All JSON data files are valid"
 
       - name: Verify texture assets exist
         run: |
@@ -219,7 +222,7 @@ jobs:
           if [ -d "web/client/public/textures/blocks" ]; then
             COUNT=$(find web/client/public/textures/blocks -name "*.png" | wc -l)
             echo "Block textures found: $COUNT"
-            if [ "$COUNT" -lt 50 ]; then
+            if [ "$COUNT" -lt 80 ]; then
               echo "::warning::Low block texture count ($COUNT). Expected 80+"
             fi
           else

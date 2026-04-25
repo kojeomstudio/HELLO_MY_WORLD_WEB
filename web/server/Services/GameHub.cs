@@ -125,7 +125,10 @@ public class GameHub : Hub<IGameClient>
             _joinAttempts.TryRemove(ipAddress + "_time", out _);
         }
         _joinAttempts[ipAddress] = attempts + 1;
-        _joinAttempts[ipAddress + "_time"] = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        if (attempts == 0)
+        {
+            _joinAttempts[ipAddress + "_time"] = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        }
 
         var authResult = _authService.AuthenticatePlayer(
             playerName, Context.ConnectionId,
@@ -240,6 +243,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task PlaceBlock(int x, int y, int z, ushort blockType)
     {
+        if (!IsValidBlockCoord(x, y, z)) return;
         if (!CheckRateLimit(Context.ConnectionId, "place", 250)) return;
 
         var player = GetAuthenticatedPlayer();
@@ -332,6 +336,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task DigBlock(int x, int y, int z)
     {
+        if (!IsValidBlockCoord(x, y, z)) return;
         if (!CheckRateLimit(Context.ConnectionId, "dig", 250)) return;
 
         var player = GetAuthenticatedPlayer();
@@ -424,6 +429,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task<float> DigBlockStart(int x, int y, int z)
     {
+        if (!IsValidBlockCoord(x, y, z)) return -1f;
         var player = GetAuthenticatedPlayer();
         if (player == null) return -1f;
         var blockPos = new Vector3s((short)x, (short)y, (short)z);
@@ -455,6 +461,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task<bool> UseBucket(int x, int y, int z, bool place)
     {
+        if (!IsValidBlockCoord(x, y, z)) return false;
         if (!CheckRateLimit(Context.ConnectionId, "bucket", 500)) return false;
 
         var player = GetAuthenticatedPlayer();
@@ -658,6 +665,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task InteractBlock(int x, int y, int z)
     {
+        if (!IsValidBlockCoord(x, y, z)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
 
@@ -690,6 +698,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task SetSignText(int x, int y, int z, string text)
     {
+        if (!IsValidBlockCoord(x, y, z)) return;
         if (!CheckRateLimit(Context.ConnectionId, "sign", 300)) return;
 
         var player = GetAuthenticatedPlayer();
@@ -714,6 +723,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task InteractWithBlock(int x, int y, int z)
     {
+        if (!IsValidBlockCoord(x, y, z)) return;
         if (!CheckRateLimit(Context.ConnectionId, "interact", 300)) return;
 
         var player = GetAuthenticatedPlayer();
@@ -1089,6 +1099,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task StartSmelting(string inputItemId, string resultItemId, int x, int y, int z)
     {
+        if (!IsValidBlockCoord(x, y, z)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
 
@@ -1109,6 +1120,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task GetChestInventory(int x, int y, int z)
     {
+        if (!IsValidBlockCoord(x, y, z)) return;
         var posKey = GameServer.PositionKey(x, y, z);
         var chestInv = _gameServer.GetOrCreateChestInventory(posKey);
         var items = chestInv
@@ -1119,6 +1131,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task MoveItemToChest(int slotIndex, int chestSlot, int x, int y, int z)
     {
+        if (!IsValidBlockCoord(x, y, z)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
 
@@ -1141,6 +1154,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task TakeItemFromChest(int chestSlot, int slotIndex, int x, int y, int z)
     {
+        if (!IsValidBlockCoord(x, y, z)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
 
@@ -1388,5 +1402,12 @@ public class GameHub : Hub<IGameClient>
         }
 
         return true;
+    }
+
+    private static bool IsValidBlockCoord(int x, int y, int z)
+    {
+        return x >= short.MinValue && x <= short.MaxValue &&
+               y >= short.MinValue && y <= short.MaxValue &&
+               z >= short.MinValue && z <= short.MaxValue;
     }
 }
