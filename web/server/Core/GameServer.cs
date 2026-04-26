@@ -120,7 +120,6 @@ public class GameServer
         _breedingSystem = breedingSystem;
         _mobSpawner = new MobSpawner(entityManager);
         _mobSpawner.SetGameTimeProvider(() => GameTime);
-        _pathfinder = new WorldPathfinder(DefaultWorld, _blockDefinitionManager);
 
         _breedingSystem.SpawnMob = baby =>
         {
@@ -143,6 +142,8 @@ public class GameServer
         generator.LoadBiomes(dataPath);
         DefaultWorld = new WorldMap("default", seed, generator);
         _worlds.TryAdd("default", DefaultWorld);
+
+        _pathfinder = new WorldPathfinder(DefaultWorld, _blockDefinitionManager);
 
         _nodeTimerSystem = new NodeTimerSystem(DefaultWorld, OnNodeTimerExpired);
         DefaultWorld.WaterFlowInterval = config.Liquid.WaterFlowInterval;

@@ -1219,6 +1219,9 @@ public class GameHub : Hub<IGameClient>
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
 
+        var blockCenter = new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
+        if (Vector3.Distance(player.Position, blockCenter) > 6.0f) return;
+
         var posKey = GameServer.PositionKey(x, y, z);
         var started = _gameServer.StartSmelting(player, posKey, inputItemId, resultItemId);
 
@@ -1237,6 +1240,12 @@ public class GameHub : Hub<IGameClient>
     public async Task GetChestInventory(int x, int y, int z)
     {
         if (!IsValidBlockCoord(x, y, z)) return;
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
+
+        var blockCenter = new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
+        if (Vector3.Distance(player.Position, blockCenter) > 6.0f) return;
+
         var posKey = GameServer.PositionKey(x, y, z);
         var chestInv = _gameServer.GetOrCreateChestInventory(posKey);
         var items = chestInv
@@ -1250,6 +1259,9 @@ public class GameHub : Hub<IGameClient>
         if (!IsValidBlockCoord(x, y, z)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
+
+        var blockCenter = new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
+        if (Vector3.Distance(player.Position, blockCenter) > 6.0f) return;
 
         var posKey = GameServer.PositionKey(x, y, z);
         var moved = _gameServer.MoveItemToChest(player, posKey, slotIndex, chestSlot);
@@ -1273,6 +1285,9 @@ public class GameHub : Hub<IGameClient>
         if (!IsValidBlockCoord(x, y, z)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
+
+        var blockCenter = new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
+        if (Vector3.Distance(player.Position, blockCenter) > 6.0f) return;
 
         var posKey = GameServer.PositionKey(x, y, z);
         var taken = _gameServer.TakeItemFromChest(player, posKey, chestSlot, slotIndex);
