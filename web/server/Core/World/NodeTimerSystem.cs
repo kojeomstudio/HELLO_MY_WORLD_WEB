@@ -77,11 +77,16 @@ public class NodeTimerSystem
         }
     }
 
-    public List<(int X, int Y, int Z, string BlockName, double Expiration)> GetAllTimers()
+    public List<(int X, int Y, int Z, string BlockName, double Remaining)> GetAllTimers()
     {
         lock (_lock)
         {
-            return _timers.Select(t => (t.Key.X, t.Key.Y, t.Key.Z, t.Value.Timeout.ToString(), t.Value.Timeout - t.Value.Elapsed)).ToList();
+            return _timers.Select(t =>
+            {
+                var block = _world.GetBlock(new Vector3s((short)t.Key.X, (short)t.Key.Y, (short)t.Key.Z));
+                var remaining = t.Value.Timeout - t.Value.Elapsed;
+                return (t.Key.X, t.Key.Y, t.Key.Z, block.Type.ToString(), remaining);
+            }).ToList();
         }
     }
 }

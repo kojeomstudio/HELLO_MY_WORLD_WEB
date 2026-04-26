@@ -218,7 +218,7 @@ public class MobEntity : Entity
             if (GrowTimer <= 0)
             {
                 IsBaby = false;
-                Speed /= 0.5f;
+                Speed *= 2.0f;
             }
         }
 

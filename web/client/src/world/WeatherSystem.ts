@@ -80,9 +80,9 @@ export class WeatherSystem {
             this.rainPositions[i3 + 2] += Math.cos(WIND_ANGLE) * this.rainVelocities[i] * dt * 0.3;
 
             if (this.rainPositions[i3 + 1] < this.groundLevel) {
-                this.rainPositions[i3] = playerX + (Math.random() - 0.5) * RAIN_RADIUS * 2;
-                this.rainPositions[i3 + 1] = playerY + RAIN_HEIGHT * 0.5 + Math.random() * RAIN_HEIGHT * 0.5;
-                this.rainPositions[i3 + 2] = playerZ + (Math.random() - 0.5) * RAIN_RADIUS * 2;
+                this.rainPositions[i3] = (Math.random() - 0.5) * RAIN_RADIUS * 2;
+                this.rainPositions[i3 + 1] = RAIN_HEIGHT * 0.5 + Math.random() * RAIN_HEIGHT * 0.5;
+                this.rainPositions[i3 + 2] = (Math.random() - 0.5) * RAIN_RADIUS * 2;
             }
         }
 

@@ -104,7 +104,7 @@ See [server-api.md](server-api.md) for full method/event signatures.
 
 **CraftingSystem** (`Crafting/CraftingSystem.cs`) — Recipe matching from inventory contents. 85+ recipes loaded from `items.json`.
 
-**SmeltingSystem** (`Smelting/SmeltingSystem.cs`) — Furnace operations with cook time and experience. 25 recipes from `smelting.json`.
+**SmeltingSystem** (`Smelting/SmeltingSystem.cs`) — Furnace operations with cook time and experience. 25 recipes from `smelting.json`. Fuel registry loaded from `fuels` section in `items.json` with configurable burn times.
 
 ### Other Systems
 
@@ -384,6 +384,18 @@ All server services registered as **Singleton** in `Program.cs`:
 - Security scanning job with secrets detection, npm audit, debug endpoint checks
 - Data integrity job with JSON validation and texture asset verification
 - .gitignore coverage validation
+
+### Bug Fixes (Round 2)
+- **MobSpawner IsNight()**: Fixed always-true night detection (`||` → `&&` for time range check)
+- **MobSpawner spawn target**: Mobs now spawn around random players instead of always near world origin
+- **MobSpawner despawn**: Distance-based despawn checks nearest player instead of origin reference
+- **Baby mob growth**: Fixed speed doubling bug on baby→adult transition (`/= 0.5` → `*= 2.0`)
+- **NodeTimerSystem GetAllTimers**: Fixed returning timeout string instead of actual block name
+- **Fall damage**: Eliminated duplicate fall damage application between ground/not-ground branches
+- **ClearAllEntities**: Now clears all entity types (mobs + items), not just item entities
+- **Inventory.AddItem**: Fixed item loss when adding to partially full slots (proper overflow handling)
+- **WeatherSystem rain**: Fixed double-position-offset bug in rain particle system
+- **Entity bobbing**: Fixed frame-rate-dependent animation using `Date.now()` → accumulated `dt`
 
 ## Security Model
 

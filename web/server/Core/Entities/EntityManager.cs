@@ -1,12 +1,15 @@
 using System.Collections.Concurrent;
-
+using PlayerEnt = WebGameServer.Core.Player.Player;
+ 
 namespace WebGameServer.Core.Entities;
-
+ 
 public class EntityManager
 {
     private readonly ConcurrentDictionary<Guid, Entity> _entities = new();
     private readonly int _maxEntities = 10000;
-
+ 
+    public Func<IEnumerable<PlayerEnt>>? GetPlayersFunc { get; set; }
+ 
     public event Action<Entity>? OnEntitySpawned;
     public event Action<Entity>? OnEntityDespawned;
     public event Action<Entity>? OnEntityUpdated;

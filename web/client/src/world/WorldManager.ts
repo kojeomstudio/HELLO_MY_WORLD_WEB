@@ -558,9 +558,13 @@ export class WorldManager {
         this.fallingBlocks.push(anim);
     }
 
+    private entityAnimTime: number = 0;
+
     update(dt: number): void {
+        this.entityAnimTime += dt;
+
         for (const [entityId, mesh] of this.entityMeshes) {
-            mesh.position.y += Math.sin(Date.now() * 0.003) * 0.002;
+            mesh.position.y += Math.sin(this.entityAnimTime * 3.0) * 0.002;
             if (entityId.startsWith('mob_')) {
                 mesh.rotation.y += dt * 0.5;
             }

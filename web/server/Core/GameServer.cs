@@ -30,6 +30,7 @@ public class GameServer
     private readonly ConcurrentDictionary<string, DateTime> _lastDamageTime = new();
 
     private readonly Dictionary<string, FoodValue> _foodValues = new();
+    private readonly Dictionary<string, float> _fuelValues = new();
 
     private readonly ServerConfig _config;
     private readonly BlockDefinitionManager _blockDefinitionManager;
@@ -157,6 +158,8 @@ public class GameServer
     public void Start()
     {
         if (IsRunning) return;
+
+        _entityManager.GetPlayersFunc = () => _players.Values;
 
         MobEntity.FindNearestPlayer = (pos, range) =>
         {
@@ -411,14 +414,7 @@ public class GameServer
 
         if (!player.IsOnGround)
         {
-            var fallDist = player.LastGroundY - player.Position.Y;
-            if (fallDist > _config.Player.FallDamageThreshold)
-            {
-                var damage = (fallDist - _config.Player.FallDamageThreshold) * _config.Player.FallDamageMultiplier;
-                DamagePlayer(player, damage, "fall");
-                player.LastGroundY = player.Position.Y;
-                player.FallDistance = 0;
-            }
+            player.FallDistance = player.LastGroundY - player.Position.Y;
         }
         else
         {
@@ -848,8 +844,7 @@ public class GameServer
             .Sum(i => i.Count) >= 1;
 
         var hasFuel = availableItems
-            .Where(i => i.ItemId is "coal" or "charcoal")
-            .Sum(i => i.Count) >= 1;
+            .Any(i => IsFuel(i.ItemId));
 
         if (!hasInput || !hasFuel) return false;
 
@@ -868,8 +863,7 @@ public class GameServer
 
         for (int i = 0; i < player.Inventory.Size && !removedFuel; i++)
         {
-            if (player.Inventory[i] != null &&
-                (player.Inventory[i]!.ItemId == "coal" || player.Inventory[i]!.ItemId == "charcoal"))
+            if (player.Inventory[i] != null && IsFuel(player.Inventory[i]!.ItemId))
             {
                 var removed = player.Inventory.RemoveItem(i, 1);
                 removedFuel = removed != null;
@@ -946,15 +940,30 @@ public class GameServer
         if (!File.Exists(filePath)) return;
         var json = File.ReadAllText(filePath);
         var doc = JsonDocument.Parse(json);
-        if (!doc.RootElement.TryGetProperty("foodValues", out var foodValuesEl)) return;
-
-        foreach (var prop in foodValuesEl.EnumerateObject())
+        if (doc.RootElement.TryGetProperty("foodValues", out var foodValuesEl))
         {
-            var nutrition = prop.Value.GetProperty("nutrition").GetInt32();
-            var saturation = prop.Value.GetProperty("saturation").GetSingle();
-            _foodValues[prop.Name] = new FoodValue(nutrition, saturation);
+            foreach (var prop in foodValuesEl.EnumerateObject())
+            {
+                var nutrition = prop.Value.GetProperty("nutrition").GetInt32();
+                var saturation = prop.Value.GetProperty("saturation").GetSingle();
+                _foodValues[prop.Name] = new FoodValue(nutrition, saturation);
+            }
+        }
+
+        if (doc.RootElement.TryGetProperty("fuels", out var fuelsEl))
+        {
+            foreach (var prop in fuelsEl.EnumerateObject())
+            {
+                var burnTime = prop.Value.GetProperty("burnTime").GetSingle();
+                _fuelValues[prop.Name] = burnTime;
+            }
         }
     }
+
+    public bool IsFuel(string itemId) => _fuelValues.ContainsKey(itemId);
+
+    public float GetFuelBurnTime(string itemId) =>
+        _fuelValues.TryGetValue(itemId, out var burnTime) ? burnTime : 0f;
 
     public void AwardExperience(PlayerEnt player, int xp)
     {
@@ -1238,7 +1247,7 @@ public class GameServer
     public int ClearAllEntities()
     {
         var count = 0;
-        foreach (var entity in _entityManager.GetByType<ItemEntity>().ToList())
+        foreach (var entity in _entityManager.GetAll().ToList())
         {
             _entityManager.Remove(entity.Id);
             count++;

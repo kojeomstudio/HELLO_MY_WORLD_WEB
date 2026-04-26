@@ -28,20 +28,29 @@ public class Inventory
 
     public bool AddItem(ItemStack item)
     {
-        for (int i = 0; i < Size; i++)
+        var remaining = item.Count;
+
+        for (int i = 0; i < Size && remaining > 0; i++)
+        {
+            if (_slots[i] != null && _slots[i]!.ItemId == item.ItemId && _slots[i]!.Count < 64)
+            {
+                var canAdd = Math.Min(remaining, 64 - _slots[i]!.Count);
+                _slots[i] = _slots[i]! with { Count = _slots[i]!.Count + canAdd };
+                remaining -= canAdd;
+            }
+        }
+
+        for (int i = 0; i < Size && remaining > 0; i++)
         {
             if (_slots[i] == null)
             {
-                _slots[i] = item;
-                return true;
-            }
-            if (_slots[i]!.ItemId == item.ItemId && _slots[i]!.Count < 64)
-            {
-                _slots[i] = _slots[i]! with { Count = Math.Min(64, _slots[i]!.Count + item.Count) };
-                return true;
+                var canAdd = Math.Min(remaining, 64);
+                _slots[i] = item with { Count = canAdd };
+                remaining -= canAdd;
             }
         }
-        return false;
+
+        return remaining == 0;
     }
 
     public ItemStack? RemoveItem(int index, int count = 1)

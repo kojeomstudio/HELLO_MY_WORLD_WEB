@@ -434,6 +434,24 @@
         "cooked_beef": { "nutrition": 8, "saturation": 12.8 },
         "spider_eye": { "nutrition": 2, "saturation": 1.2 }
     },
+    "fuels": {
+        "coal": { "burnTime": 80 },
+        "charcoal": { "burnTime": 80 },
+        "wood": { "burnTime": 15 },
+        "oak_log": { "burnTime": 15 },
+        "jungle_log": { "burnTime": 15 },
+        "pine_log": { "burnTime": 15 },
+        "oak_planks": { "burnTime": 15 },
+        "stick": { "burnTime": 5 },
+        "wooden_pickaxe": { "burnTime": 10 },
+        "wooden_sword": { "burnTime": 10 },
+        "wooden_axe": { "burnTime": 10 },
+        "wooden_shovel": { "burnTime": 10 },
+        "wooden_hoe": { "burnTime": 10 },
+        "lava_bucket": { "burnTime": 200 },
+        "blaze_rod": { "burnTime": 120 },
+        "coal_block": { "burnTime": 800 }
+    },
     "toolCapabilities": {
         "wooden": { "maxLevel": 1, "uses": 60, "speed": 2.0, "damageGroups": { "fleshy": 1 } },
         "stone": { "maxLevel": 2, "uses": 132, "speed": 4.0, "damageGroups": { "fleshy": 2 } },

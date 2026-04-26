@@ -1,6 +1,8 @@
 using BlockType = WebGameServer.Core.World.BlockType;
 using WorldMap = WebGameServer.Core.World.World;
 using WebGameServer.Core.World;
+using PlayerEnt = WebGameServer.Core.Player.Player;
+using PlayerState = WebGameServer.Core.Player.PlayerState;
 
 namespace WebGameServer.Core.Entities;
 
@@ -56,7 +58,7 @@ public class MobSpawner
     private bool IsNight()
     {
         var gameTime = _getGameTime?.Invoke() ?? 0;
-        return gameTime >= NightStart || gameTime < NightEnd;
+        return gameTime >= NightStart && gameTime < NightEnd;
     }
 
     private bool IsSpawnPositionDark(WorldMap world, int x, int y, int z)
@@ -97,13 +99,16 @@ public class MobSpawner
             if (roll <= cumulative) { chosen = mob; break; }
         }
 
-        var nearestPlayer = MobEntity.FindNearestPlayer?.Invoke(Vector3.Zero, 9999);
-        if (nearestPlayer == null) return;
+        var players = _entityManager.GetPlayersFunc?.Invoke() ?? Enumerable.Empty<PlayerEnt>();
+        var playerList = players.Where(p => p.State == PlayerState.Playing && !p.IsDead).ToList();
+        if (playerList.Count == 0) return;
+
+        var spawnPlayer = playerList[_random.Next(playerList.Count)];
 
         var angle = _random.NextSingle() * MathF.PI * 2;
         var distance = 24 + _random.NextSingle() * 24;
-        var spawnX = nearestPlayer.Position.X + MathF.Cos(angle) * distance;
-        var spawnZ = nearestPlayer.Position.Z + MathF.Sin(angle) * distance;
+        var spawnX = spawnPlayer.Position.X + MathF.Cos(angle) * distance;
+        var spawnZ = spawnPlayer.Position.Z + MathF.Sin(angle) * distance;
         var blockX = (int)Math.Floor(spawnX);
         var blockZ = (int)Math.Floor(spawnZ);
 
@@ -130,14 +135,15 @@ public class MobSpawner
 
     private void DespawnDistantMobs()
     {
-        var nearestPlayer = MobEntity.FindNearestPlayer?.Invoke(Vector3.Zero, 9999);
-        if (nearestPlayer == null) return;
+        var players = _entityManager.GetPlayersFunc?.Invoke() ?? Enumerable.Empty<PlayerEnt>();
+        var activePlayers = players.Where(p => !p.IsDead).ToList();
+        if (activePlayers.Count == 0) return;
 
         var mobs = _entityManager.GetByType<MobEntity>().ToList();
         foreach (var mob in mobs)
         {
-            var dist = Vector3.Distance(mob.Position, nearestPlayer.Position);
-            if (dist > _despawnDistance)
+            var nearestDist = activePlayers.Min(p => Vector3.Distance(mob.Position, p.Position));
+            if (nearestDist > _despawnDistance)
             {
                 mob.Health = 0;
             }
