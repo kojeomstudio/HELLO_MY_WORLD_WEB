@@ -114,10 +114,12 @@ See [server-api.md](server-api.md) for full method/event signatures.
 - **ChatCommandManager** (`Chat/ChatCommandManager.cs`) — Commands: /time, /gamemode, /tp, /give, /kill, /clear, /kick, /ban, /spawn, /privs, /setborder, /protect, /unprotect, /areas, /area_info
 - **PrivilegeSystem** (`Auth/PrivilegeSystem.cs`) — Permission management (interact, shout, fly, etc.)
 - **AreaProtectionSystem** (`Protection/AreaProtection.cs`) — Advanced area protection with claim system, overlap detection, ownership transfer, bypass grants, JSON persistence
-- **AuthenticationService** (`Auth/AuthenticationService.cs`) — Name validation (regex + reserved names), ban checks, IP ban enforcement, server capacity, SHA256 password hashing with optional per-account password protection
+- **AuthenticationService** (`Auth/AuthenticationService.cs`) — Name validation (regex + reserved names), ban checks, IP ban enforcement, server capacity, PBKDF2 (100k iterations, SHA256) password hashing with per-user random salt, constant-time comparison
 - **PhysicsEngine** (`Physics/PhysicsEngine.cs`) — Server-authoritative movement validation with position correction, NaN/Infinity checks, block type range validation, player AABB overlap checks on placement
 - **KnockbackSystem** (`Physics/KnockbackSystem.cs`) — Damage knockback calculation
-- **Security**: HTML/XML tag stripping in chat, security headers (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection), configurable CORS origins from `server_config.json`, enhanced rate limiting (join spam, punch, interact)
+- **ToolWearSystem** (`ToolWear/ToolWearSystem.cs`) — 65536-scale tool wear matching Minetest's wear system, integrated into dig and combat actions
+- **SoundSpecManager** (`Sound/SoundSpecManager.cs`) — Block sound group definitions loaded from `sounds.json`, positional sound events
+- **Security**: HTML/XML tag stripping in chat, security headers (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, CSP, Referrer-Policy, Permissions-Policy), configurable CORS origins from `server_config.json`, enhanced rate limiting (join spam, punch, interact), privilege escalation protection (no self-grant/self-revoke/server privilege protection)
 
 ## Client Architecture
 
@@ -179,7 +181,7 @@ Creates `UIManager`, then `GameClient`, connects to server.
 
 ### Other Client Modules
 - **InputManager** (`input/InputManager.ts`) — Keyboard/mouse state tracking
-- **AudioManager** (`audio/AudioManager.ts`) — Procedural audio via Web Audio API (8 sound types: block break, block place, footstep, hurt, pickup, death, note block, jukebox)
+- **AudioManager** (`audio/AudioManager.ts`) — Procedural audio via Web Audio API (8 sound types: block break, block place, footstep, hurt, pickup, death, note block, jukebox) plus material-based block sound groups (stone, dirt, grass, wood, leaves, glass, sand, gravel, cloth, metal, snow, water, lava)
 - **Minimap** (`ui/Minimap.ts`) — 2D overhead minimap
 - **WeatherSystem** (`world/WeatherSystem.ts`) — Rain and snow particle systems with cyclable weather modes
 - **ParticleSystem** (`world/ParticleSystem.ts`) — Block break/place/damage particles
@@ -399,13 +401,28 @@ All server services registered as **Singleton** in `Program.cs`:
 - **WeatherSystem rain**: Fixed double-position-offset bug in rain particle system
 - **Entity bobbing**: Fixed frame-rate-dependent animation using `Date.now()` → accumulated `dt`
 
+### Porting Completeness (Round 3)
+- **ToolWearSystem integration**: Replaced inline durability tracking in `DigBlock` and `PunchPlayer` with centralized `ToolWearSystem.ApplyDigWear()`/`ApplyAttackWear()` matching Minetest's 65536 wear scale
+- **Sound system integration**: `SoundSpecManager` now loads `sounds.json` at startup; sound group definitions available for all block types
+- **Block sound groups**: Client `AudioManager` now plays material-specific procedural sounds (stone, dirt, grass, wood, leaves, glass, sand, gravel, cloth, metal, snow, water, lava) based on block's `soundGroup` property
+- **Passive hunger drain**: Food saturation drains at 0.01/tick, food level drains at 0.05/tick when saturation depleted, matching Minetest's hunger mechanics
+- **TNT explosion**: Right-click on TNT triggers radius-3 spherical explosion destroying blocks, damaging nearby players, and dropping items
+- **Player head tracking**: Multiplayer player avatars now rotate their head mesh based on pitch from position updates
+- **Creative mode flight**: Switching to creative/spectator mode auto-enables flight; switching back disables it
+- **Furnace visual state**: Lit furnaces (active smelting) render with orange glow tint; unlit furnaces retain default color
+- **Note block/jukebox routing**: Right-click on note_block and jukebox properly routes through interaction handler
+- **Window blur handling**: InputManager dispatches blur event; PlayerController releases pointer lock and zeroes velocity on focus loss
+- **Security hardening**: Removed legacy static salt from password verification, added self-revoke and server privilege revocation protection
+
 ## Security Model
 
 ### Authentication & Authorization
 - Player name validation: regex `^[a-zA-Z0-9_-]{1,20}$` + reserved name list (server, admin, system, console, root, moderator)
-- Optional password authentication with SHA256 hashing + salt
+- Password authentication with PBKDF2 (100,000 iterations, SHA256, 16-byte random salt, constant-time comparison)
+- Legacy SHA256 hashes (no salt) are rejected — forced password reset required
 - IP-based and name-based ban system (`AuthenticationService`)
 - 19 privilege system with per-player grant/revoke loaded from `privileges.json`
+- Privilege escalation protection: cannot self-grant, cannot self-revoke, `server` privilege cannot be revoked via command
 - Server capacity enforcement (max players check)
 
 ### Input Validation

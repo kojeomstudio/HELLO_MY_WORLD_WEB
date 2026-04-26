@@ -11,6 +11,7 @@ using WebGameServer.Core.Physics;
 using WebGameServer.Core.Player;
 using WebGameServer.Core.Protection;
 using WebGameServer.Core.Smelting;
+using WebGameServer.Core.ToolWear;
 using WebGameServer.Core.World;
 using PlayerEnt = WebGameServer.Core.Player.Player;
 using PlayerState = WebGameServer.Core.Player.PlayerState;
@@ -431,27 +432,20 @@ public class GameHub : Hub<IGameClient>
         {
             var toolName = heldItem.ItemId.ToLowerInvariant();
             var isTool = toolName.Contains("sword") || toolName.Contains("pickaxe") ||
-                toolName.Contains("axe") || toolName.Contains("shovel") || toolName.Contains("hoe");
+                toolName.Contains("axe") || toolName.Contains("shovel") || toolName.Contains("hoe") ||
+                toolName.Contains("shears") || toolName.Contains("dagger");
 
             if (isTool)
             {
-                var durabilityStr = heldItem.Metadata;
-                int maxDurability = ToolConfig.GetDurability(toolName);
-                int currentDurability = maxDurability;
-                if (int.TryParse(durabilityStr, out var parsed))
-                {
-                    currentDurability = parsed;
-                }
-                currentDurability--;
-
-                if (currentDurability <= 0)
+                var wornTool = ToolWearSystem.ApplyDigWear(heldItem);
+                if (wornTool == null)
                 {
                     player.Inventory.RemoveItem(player.SelectedHotbarSlot, 1);
                     await Clients.Caller.OnChatMessage("Server", $"Your {toolName} broke!");
                 }
                 else
                 {
-                    player.Inventory[player.SelectedHotbarSlot] = heldItem with { Metadata = currentDurability.ToString() };
+                    player.Inventory[player.SelectedHotbarSlot] = wornTool;
                 }
 
                 await SendInventoryUpdate(player);
@@ -841,6 +835,56 @@ public class GameHub : Hub<IGameClient>
             {
                 await Clients.Caller.OnBlockSound(blockName, x, y, z);
             }
+            else if (blockName == "tnt")
+            {
+                var tntPos = new Vector3s((short)x, (short)y, (short)z);
+                _gameServer.DefaultWorld.SetBlock(tntPos, Block.Air);
+                await Clients.All.OnBlockUpdate(x, y, z, 0);
+
+                const int explosionRadius = 3;
+                for (int dx = -explosionRadius; dx <= explosionRadius; dx++)
+                {
+                    for (int dy = -explosionRadius; dy <= explosionRadius; dy++)
+                    {
+                        for (int dz = -explosionRadius; dz <= explosionRadius; dz++)
+                        {
+                            if (dx * dx + dy * dy + dz * dz > explosionRadius * explosionRadius) continue;
+                            var targetPos = new Vector3s((short)(x + dx), (short)(y + dy), (short)(z + dz));
+                            var targetBlock = _gameServer.DefaultWorld.GetBlock(targetPos);
+                            if (targetBlock.Type == BlockType.Air) continue;
+                            var targetDef = _blockDefinitionManager.Get((ushort)targetBlock.Type);
+                            if (targetDef != null && !targetDef.Breakable) continue;
+                            if (targetBlock.Type == BlockType.Bedrock) continue;
+
+                            _gameServer.Rollback.RecordChange(x + dx, y + dy, z + dz,
+                                targetBlock.ToPacked(), 0, player.Name, "TNT");
+                            _gameServer.DefaultWorld.SetBlock(targetPos, Block.Air);
+                            await Clients.All.OnBlockUpdate(x + dx, y + dy, z + dz, 0);
+
+                            if (targetDef != null)
+                            {
+                                var dropName = targetDef.Drops ?? targetDef.Name;
+                                var dropEntity = new ItemEntity(dropName, 1,
+                                    new Vector3(x + dx + 0.5f, y + dy + 0.5f, z + dz + 0.5f));
+                                _entityManager.Add(dropEntity);
+                            }
+                        }
+                    }
+                }
+
+                var nearbyPlayers = _gameServer.GetPlayersInRange(new Vector3(x, y, z), explosionRadius * 2);
+                foreach (var nearby in nearbyPlayers)
+                {
+                    var dist = Vector3.Distance(nearby.Position, new Vector3(x + 0.5f, y + 0.5f, z + 0.5f));
+                    if (dist < explosionRadius * 2)
+                    {
+                        var explosionDamage = Math.Max(1, 20 * (1 - dist / (explosionRadius * 2)));
+                        _gameServer.DamagePlayer(nearby, explosionDamage, "tnt");
+                    }
+                }
+
+                await Clients.Caller.OnChatMessage("Server", "TNT exploded!");
+            }
         }
 
         var playerItem = player.GetSelectedHotbarItem();
@@ -892,6 +936,27 @@ public class GameHub : Hub<IGameClient>
         }
         var knockback = _gameServer.DamagePlayerWithKnockback(target, damage, attacker.Position, "player");
         await Clients.Client(target.ConnectionId).OnKnockback(knockback.X, knockback.Y, knockback.Z);
+
+        if (toolItem != null)
+        {
+            var toolName = toolItem.ItemId.ToLowerInvariant();
+            var isTool = toolName.Contains("sword") || toolName.Contains("axe") ||
+                toolName.Contains("dagger") || toolName.Contains("shears");
+            if (isTool)
+            {
+                var wornTool = ToolWearSystem.ApplyAttackWear(toolItem);
+                if (wornTool == null)
+                {
+                    attacker.Inventory.RemoveItem(attacker.SelectedHotbarSlot, 1);
+                    await Clients.Caller.OnChatMessage("Server", $"Your {toolName} broke!");
+                }
+                else
+                {
+                    attacker.Inventory[attacker.SelectedHotbarSlot] = wornTool;
+                }
+                await SendInventoryUpdate(attacker);
+            }
+        }
     }
 
     public async Task PunchEntity(Guid entityId)

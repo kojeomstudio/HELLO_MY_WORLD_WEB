@@ -62,6 +62,8 @@ export class UIManager {
             } else if (blockName === 'crafting_table') {
                 this.showCraftingUI();
                 this._connection.invoke('GetCraftingRecipes');
+            } else if (blockName === 'note_block' || blockName === 'jukebox') {
+                this._connection.invoke('InteractBlock', x, y, z);
             }
         }) as EventListener);
 

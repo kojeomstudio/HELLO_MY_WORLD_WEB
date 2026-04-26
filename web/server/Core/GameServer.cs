@@ -438,6 +438,16 @@ public class GameServer
             player.FallDistance = 0;
         }
 
+        if (player.FoodLevel > 0)
+        {
+            player.FoodSaturation -= 0.01f;
+            if (player.FoodSaturation <= 0)
+            {
+                player.FoodSaturation = 0;
+                player.FoodLevel = Math.Max(0, player.FoodLevel - 0.05f);
+            }
+        }
+
         if (player.FoodLevel > 18 && player.Health < player.MaxHealth && player.Health > 0)
         {
             HealPlayer(player, 0.2f);

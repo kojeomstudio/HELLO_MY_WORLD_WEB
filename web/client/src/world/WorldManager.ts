@@ -91,6 +91,7 @@ class FallingBlockAnimation {
 export interface PlayerInfo {
     mesh: THREE.Group;
     label: THREE.Sprite;
+    head: THREE.Mesh;
     leftLeg: THREE.Mesh;
     rightLeg: THREE.Mesh;
     leftArm: THREE.Mesh;
@@ -370,6 +371,7 @@ export class WorldManager {
         const head = new THREE.Mesh(headGeo, headMat);
         head.position.y = 0.875;
         group.add(head);
+        group.add(head);
 
         const legGeo = new THREE.BoxGeometry(0.25, 0.75, 0.25);
         const legMat = new THREE.MeshLambertMaterial({ color: 0x112266 });
@@ -412,7 +414,7 @@ export class WorldManager {
         group.position.y = 0.9;
         this.renderer.addToScene(group);
 
-        this.playerMeshes.set(name, { mesh: group, label, leftLeg, rightLeg, leftArm, rightArm });
+        this.playerMeshes.set(name, { mesh: group, label, head, leftLeg, rightLeg, leftArm, rightArm });
     }
 
     removePlayer(name: string): void {
@@ -423,14 +425,15 @@ export class WorldManager {
         }
     }
 
-    updatePlayerPosition(name: string, x: number, y: number, z: number, _yaw: number, _pitch: number): void {
+    updatePlayerPosition(name: string, x: number, y: number, z: number, yaw: number, pitch: number): void {
         if (!this.playerMeshes.has(name)) {
             this.addPlayer(name);
         }
 
         const playerInfo = this.playerMeshes.get(name)!;
         playerInfo.mesh.position.set(x, y, z);
-        playerInfo.mesh.rotation.y = _yaw * Math.PI / 180;
+        playerInfo.mesh.rotation.y = yaw * Math.PI / 180;
+        playerInfo.head.rotation.x = pitch * Math.PI / 180;
     }
 
     private playerAnimTime: number = 0;

@@ -140,6 +140,11 @@ export class PlayerController {
         });
 
         document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        document.addEventListener('windowBlur', () => {
+            document.exitPointerLock();
+            this._velocity.set(0, 0, 0);
+        });
     }
 
     private async startDig(): Promise<void> {
@@ -645,6 +650,15 @@ export class PlayerController {
 
     setFlying(flying: boolean): void {
         this._isFlying = flying;
+    }
+
+    setGameMode(mode: string): void {
+        if (mode === 'creative' || mode === 'spectator') {
+            this._isFlying = true;
+        } else {
+            this._isFlying = false;
+            this._velocity.y = 0;
+        }
     }
 
     setHealth(health: number, maxHealth?: number): void {

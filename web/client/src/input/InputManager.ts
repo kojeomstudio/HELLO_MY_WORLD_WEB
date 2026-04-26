@@ -18,6 +18,7 @@ export class InputManager {
         window.addEventListener('blur', () => {
             this.keys.clear();
             this.pointerLocked = false;
+            document.dispatchEvent(new CustomEvent('windowBlur'));
         });
     }
 

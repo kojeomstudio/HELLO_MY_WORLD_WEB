@@ -20,14 +20,14 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Ban Database**: Persistent ban storage (JSON-backed) with IP and name banning
 - **Sound Spec System**: 15 sound groups with procedural audio descriptors
 - **Bucket System**: Place and pick up water/lava, drink milk for healing
-- **Tool Wear/Durability**: Tools degrade with use (minetest-matching 65536 wear scale), repair by combining two same-type tools
-- **Player Mechanics**: Health, hunger, breath, fall damage, knockback, swimming, climbing, sprinting, flying, slippery blocks, move resistance
+- **Tool Wear/Durability**: Tools degrade with use via centralized ToolWearSystem (minetest-matching 65536 wear scale), integrated into dig and combat actions, repair by combining two same-type tools
+- **Player Mechanics**: Health, hunger (passive drain matching Minetest), breath, fall damage, knockback, swimming, climbing, sprinting, flying, slippery blocks, move resistance
 - **Experience System**: XP gains from mining, crafting, smelting, and mob kills with level progression
 - **Mob System**: Hostile mobs (Zombie, Skeleton, Spider) and passive mobs (Cow, Pig, Chicken) with full AI state machine and pathfinding support
 - **Entity System**: Dropped items with merge behavior, mob entities with AI, physics and lifespan
 - **Dungeon Generation**: Multi-room procedural dungeons with corridors, mossy/stone brick walls, torch/lantern lighting, and loot chests
 - **World Border**: Configurable size with position clamping
-- **Interactive Blocks**: Sign text input, bed spawn point, note block/jukebox procedural audio, crafting table, chest, furnace
+- **Interactive Blocks**: Sign text input, bed spawn point, note block/jukebox procedural audio, crafting table, chest, furnace, TNT explosion
 - **Day/Night Cycle**: Full 24000-tick day/night cycle with sky brightness transitions
 - **Weather**: Rain and snow particle systems with day/night color transitions, cyclable weather modes
 - **Multiplayer**: Real-time multiplayer via SignalR WebSocket with chat, player list
@@ -292,7 +292,7 @@ This project is a web port of the Luanti (formerly Minetest) voxel game engine, 
 - **Day/Night Cycle**: Matching minetest's 24000-tick cycle
 - **Textures**: 89+ block textures from minetest devtest with nearest-neighbor filtering
 - **World Generation**: 10 biomes (grassland, forest, desert, snow, taiga, jungle, savanna, mountains, swamp, ocean) with heat/humidity noise, schematic-based trees (oak, pine, jungle, birch, cactus), river generation, 9 ore types with realistic depth distribution, multi-room dungeons with corridors and loot chests, cave systems with large caverns
-- **Security**: XSS-safe rendering (textContent/DOM APIs, CSS color validation), CORS-restricted origins with scoped headers/methods, CSP headers (no unsafe-eval, no unsafe-inline scripts), Referrer-Policy, Permissions-Policy, HTML entity encoding for chat, sign text sanitization, player name sanitization, IP-based rate limiting with join cooldown, thread-safe privilege persistence, tiered privilege escalation protection, area protection with ownership checks, rollback recording, persistent ban database, block coordinate range validation, server-authoritative physics with anti-cheat, CI security scanning with fail-on-detect, npm audit in CI, minimal `permissions: read` for CI workflows
+- **Security**: XSS-safe rendering (textContent/DOM APIs, CSS color validation), CORS-restricted origins with scoped headers/methods, CSP headers (no unsafe-eval, no unsafe-inline scripts), Referrer-Policy, Permissions-Policy, HTML entity encoding for chat, sign text sanitization, player name sanitization, IP-based rate limiting with join cooldown, PBKDF2 password hashing (100k iterations, SHA256, random salt), constant-time comparison, privilege escalation protection (no self-grant/self-revoke/server privilege revocation), thread-safe privilege persistence, tiered privilege escalation protection, area protection with ownership checks, rollback recording, persistent ban database, block coordinate range validation, server-authoritative physics with anti-cheat, CI security scanning with fail-on-detect, npm audit in CI, minimal `permissions: read` for CI workflows
 - **CI**: GitHub Actions pipeline with Ubuntu + Windows server builds, client typecheck+build, security scan, data integrity verification
 
 ## License

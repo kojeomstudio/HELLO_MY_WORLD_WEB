@@ -315,7 +315,15 @@ builder.Services.AddSingleton<ParticleSpawnerManager>();
 builder.Services.AddSingleton<RedstoneSystem>();
 builder.Services.AddSingleton<FishingSystem>();
 builder.Services.AddSingleton<BreedingSystem>();
-builder.Services.AddSingleton<SoundSpecManager>();
+builder.Services.AddSingleton<SoundSpecManager>(sp =>
+{
+    var blockDefs = sp.GetRequiredService<BlockDefinitionManager>();
+    var manager = new SoundSpecManager(blockDefs);
+    var soundsPath = Path.Combine(dataPath, "sounds.json");
+    if (File.Exists(soundsPath))
+        manager.LoadFromFile(soundsPath);
+    return manager;
+});
 builder.Services.AddSingleton<DetachedInventoryManager>();
 
 var playerDbPath = Path.Combine(dataDir, "players.db");

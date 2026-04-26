@@ -202,11 +202,7 @@ export class GameClient {
 
         this.connection.on('OnGameModeChanged', (mode: string) => {
             this.uiManager.addChatMessage('Server', `Game mode changed to: ${mode}`);
-            if (mode === 'creative' || mode === 'spectator') {
-                this.playerController.setFlying(true);
-            } else {
-                this.playerController.setFlying(false);
-            }
+            this.playerController.setGameMode(mode);
         });
 
         this.connection.on('OnTeleported', (x: number, y: number, z: number) => {

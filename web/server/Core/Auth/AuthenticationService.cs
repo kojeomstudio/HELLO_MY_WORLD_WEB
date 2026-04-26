@@ -41,16 +41,9 @@ public class AuthenticationService
 
     public static bool VerifyPassword(string password, string storedHash)
     {
-        var legacyPrefix = "HelloMyWorld_2024_Salt";
         if (!storedHash.Contains(':'))
         {
-            var bytes = System.Text.Encoding.UTF8.GetBytes(password + legacyPrefix);
-            using var sha = SHA256.Create();
-            var hash = sha.ComputeHash(bytes);
-            var hex = Convert.ToHexString(hash);
-            return CryptographicOperations.FixedTimeEquals(
-                System.Text.Encoding.UTF8.GetBytes(hex),
-                System.Text.Encoding.UTF8.GetBytes(storedHash));
+            return false;
         }
 
         var parts = storedHash.Split(':');

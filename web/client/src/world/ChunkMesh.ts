@@ -450,16 +450,26 @@ export class ChunkMesh {
                             if (neighborDef && neighborDef.solid && !neighborDef.transparent) continue;
                         }
 
-                        const color = new THREE.Color(blockDef.color);
-                        let faceColor = color;
-                        if (face.dir[1] === 1) faceColor = color.clone().multiplyScalar(1.1);
-                        if (face.dir[1] === -1) faceColor = color.clone().multiplyScalar(0.7);
-                        if (isLavaBlock) {
-                            faceColor = faceColor.clone().multiplyScalar(1.5);
-                            faceColor.r = Math.min(faceColor.r, 1.0);
-                            faceColor.g = Math.min(faceColor.g, 1.0);
-                            faceColor.b = Math.min(faceColor.b, 1.0);
+                    const color = new THREE.Color(blockDef.color);
+                    let faceColor = color;
+                    if (face.dir[1] === 1) faceColor = color.clone().multiplyScalar(1.1);
+                    if (face.dir[1] === -1) faceColor = color.clone().multiplyScalar(0.7);
+                    if (isLavaBlock) {
+                        faceColor = faceColor.clone().multiplyScalar(1.5);
+                        faceColor.r = Math.min(faceColor.r, 1.0);
+                        faceColor.g = Math.min(faceColor.g, 1.0);
+                        faceColor.b = Math.min(faceColor.b, 1.0);
+                    }
+                    const isFurnaceBlock = blockName === 'furnace' || blockName === 'blast_furnace' || blockName === 'smoker';
+                    if (isFurnaceBlock) {
+                        const param2 = this.getParam2(x, y, z);
+                        if (param2 > 0) {
+                            faceColor = faceColor.clone();
+                            faceColor.r = Math.min(faceColor.r + 0.4, 1.0);
+                            faceColor.g = Math.min(faceColor.g + 0.2, 1.0);
+                            faceColor.b = Math.min(faceColor.b * 0.5, 1.0);
                         }
+                    }
 
                         for (let ci = 0; ci < 4; ci++) {
                             const corner = face.corners[ci];

@@ -179,6 +179,163 @@ export class AudioManager {
             this.playNoteBlockTone();
         } else if (type === 'jukebox') {
             this.playJukeboxMelody();
+        } else {
+            this.playBlockSoundGroup(type, 'place');
+        }
+    }
+
+    playBlockSoundGroup(soundGroup: string, action: string): void {
+        if (!this.audioContext) return;
+        if (this.audioContext.state === 'suspended') {
+            this.audioContext.resume();
+        }
+
+        const ctx = this.audioContext;
+        const vol = this.volume;
+
+        switch (soundGroup) {
+            case 'stone':
+            case 'metal': {
+                const duration = action === 'break' ? 0.12 : 0.08;
+                const bufferSize = Math.floor(ctx.sampleRate * duration);
+                const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+                }
+                const source = ctx.createBufferSource();
+                source.buffer = buffer;
+                const filter = ctx.createBiquadFilter();
+                filter.type = 'highpass';
+                filter.frequency.setValueAtTime(2000, ctx.currentTime);
+                const gain = ctx.createGain();
+                gain.gain.setValueAtTime(vol * 0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+                source.connect(filter);
+                filter.connect(gain);
+                gain.connect(ctx.destination);
+                source.start();
+                break;
+            }
+            case 'dirt':
+            case 'grass':
+            case 'sand':
+            case 'gravel': {
+                const duration = action === 'break' ? 0.15 : 0.1;
+                const bufferSize = Math.floor(ctx.sampleRate * duration);
+                const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+                }
+                const source = ctx.createBufferSource();
+                source.buffer = buffer;
+                const filter = ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(800, ctx.currentTime);
+                const gain = ctx.createGain();
+                gain.gain.setValueAtTime(vol * 0.25, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+                source.connect(filter);
+                filter.connect(gain);
+                gain.connect(ctx.destination);
+                source.start();
+                break;
+            }
+            case 'wood': {
+                const duration = 0.06;
+                const osc = ctx.createOscillator();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(300, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + duration);
+                const gain = ctx.createGain();
+                gain.gain.setValueAtTime(vol * 0.35, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + duration);
+                break;
+            }
+            case 'glass': {
+                const duration = 0.2;
+                const osc = ctx.createOscillator();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(1200, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + duration);
+                const gain = ctx.createGain();
+                gain.gain.setValueAtTime(vol * 0.2, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + duration);
+                break;
+            }
+            case 'leaves':
+            case 'cloth': {
+                const duration = 0.1;
+                const bufferSize = Math.floor(ctx.sampleRate * duration);
+                const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = (Math.random() * 2 - 1) * 0.3 * (1 - i / bufferSize);
+                }
+                const source = ctx.createBufferSource();
+                source.buffer = buffer;
+                const filter = ctx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.setValueAtTime(3000, ctx.currentTime);
+                filter.Q.setValueAtTime(0.5, ctx.currentTime);
+                const gain = ctx.createGain();
+                gain.gain.setValueAtTime(vol * 0.15, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+                source.connect(filter);
+                filter.connect(gain);
+                gain.connect(ctx.destination);
+                source.start();
+                break;
+            }
+            case 'snow': {
+                const duration = 0.08;
+                const bufferSize = Math.floor(ctx.sampleRate * duration);
+                const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = (Math.random() * 2 - 1) * 0.15 * (1 - i / bufferSize);
+                }
+                const source = ctx.createBufferSource();
+                source.buffer = buffer;
+                const filter = ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(1500, ctx.currentTime);
+                const gain = ctx.createGain();
+                gain.gain.setValueAtTime(vol * 0.15, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+                source.connect(filter);
+                filter.connect(gain);
+                gain.connect(ctx.destination);
+                source.start();
+                break;
+            }
+            default: {
+                const duration = action === 'break' ? 0.1 : 0.08;
+                const bufferSize = Math.floor(ctx.sampleRate * duration);
+                const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+                }
+                const source = ctx.createBufferSource();
+                source.buffer = buffer;
+                const gain = ctx.createGain();
+                gain.gain.setValueAtTime(vol * 0.2, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+                source.connect(gain);
+                gain.connect(ctx.destination);
+                source.start();
+                break;
+            }
         }
     }
 

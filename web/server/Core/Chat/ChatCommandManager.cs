@@ -283,10 +283,14 @@ public class ChatCommandManager
             }, "privs"));
 
         Register(new ChatCommand("revoke", "Revoke a privilege from a player", Array.Empty<string>(),
-            (_, args) =>
+            (playerName, args) =>
             {
                 if (_revokePrivilege == null) return Task.FromResult("Revoke command is not available.");
                 if (args.Length < 2) return Task.FromResult("Usage: /revoke <player> <privilege>");
+                if (string.Equals(args[0], playerName, StringComparison.OrdinalIgnoreCase))
+                    return Task.FromResult("You cannot revoke privileges from yourself.");
+                if (args[1] == "server")
+                    return Task.FromResult("The 'server' privilege cannot be revoked via command.");
                 _revokePrivilege(args[0], args[1]);
                 return Task.FromResult($"Revoked '{args[1]}' from {args[0]}");
             }, "privs"));
