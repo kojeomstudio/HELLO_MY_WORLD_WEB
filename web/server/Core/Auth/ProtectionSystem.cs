@@ -12,58 +12,71 @@ public class ProtectionZone
 public class ProtectionSystem
 {
     private readonly List<ProtectionZone> _zones = new();
+    private readonly object _lock = new();
 
     public bool IsProtected(Vector3 position, string playerName, string action)
     {
-        foreach (var zone in _zones)
+        lock (_lock)
         {
-            if (position.X < zone.Min.X || position.X > zone.Max.X) continue;
-            if (position.Y < zone.Min.Y || position.Y > zone.Max.Y) continue;
-            if (position.Z < zone.Min.Z || position.Z > zone.Max.Z) continue;
+            foreach (var zone in _zones)
+            {
+                if (position.X < zone.Min.X || position.X > zone.Max.X) continue;
+                if (position.Y < zone.Min.Y || position.Y > zone.Max.Y) continue;
+                if (position.Z < zone.Min.Z || position.Z > zone.Max.Z) continue;
 
-            if (zone.Owner == playerName) return false;
-            if (zone.AllowedPlayers.Contains(playerName)) return false;
+                if (zone.Owner == playerName) return false;
+                if (zone.AllowedPlayers.Contains(playerName)) return false;
 
-            if (action == "interact") return true;
-            if (action == "build") return true;
+                if (action == "interact") return true;
+                if (action == "build") return true;
+            }
+
+            return false;
         }
-
-        return false;
     }
 
     public bool CreateZone(string owner, Vector3 min, Vector3 max, string name)
     {
-        if (_zones.Any(z => z.Name == name)) return false;
-
-        _zones.Add(new ProtectionZone
+        lock (_lock)
         {
-            Owner = owner,
-            Min = min,
-            Max = max,
-            Name = name
-        });
+            if (_zones.Any(z => z.Name == name)) return false;
 
-        return true;
+            _zones.Add(new ProtectionZone
+            {
+                Owner = owner,
+                Min = min,
+                Max = max,
+                Name = name
+            });
+
+            return true;
+        }
     }
 
     public bool RemoveZone(string name, string requester)
     {
-        var zone = _zones.FirstOrDefault(z => z.Name == name);
-        if (zone == null) return false;
-        if (zone.Owner != requester) return false;
+        lock (_lock)
+        {
+            var zone = _zones.FirstOrDefault(z => z.Name == name);
+            if (zone == null) return false;
+            if (zone.Owner != requester) return false;
 
-        _zones.Remove(zone);
-        return true;
+            _zones.Remove(zone);
+            return true;
+        }
     }
 
     public bool AddPlayerToZone(string zoneName, string playerName, string requester)
     {
-        var zone = _zones.FirstOrDefault(z => z.Name == zoneName);
-        if (zone == null) return false;
-        if (zone.Owner != requester) return false;
+        lock (_lock)
+        {
+            var zone = _zones.FirstOrDefault(z => z.Name == zoneName);
+            if (zone == null) return false;
+            if (zone.Owner != requester) return false;
 
-        zone.AllowedPlayers.Add(playerName);
-        return true;
+            zone.AllowedPlayers.Add(playerName);
+            return true;
+        }
     }
 
     public bool CanInteract(string playerName, Vector3s position)
@@ -72,5 +85,8 @@ public class ProtectionSystem
         return !IsProtected(pos, playerName, "interact") && !IsProtected(pos, playerName, "build");
     }
 
-    public IReadOnlyList<ProtectionZone> GetZones() => _zones.AsReadOnly();
+    public IReadOnlyList<ProtectionZone> GetZones()
+    {
+        lock (_lock) { return _zones.AsReadOnly(); }
+    }
 }

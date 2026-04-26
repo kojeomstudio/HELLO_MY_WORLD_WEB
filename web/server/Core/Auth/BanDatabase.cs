@@ -16,35 +16,49 @@ public class BanDatabase
 
     private void Load()
     {
-        if (!File.Exists(_filePath)) return;
-        var json = File.ReadAllText(_filePath);
-        var doc = JsonDocument.Parse(json);
-        if (doc.RootElement.TryGetProperty("bannedNames", out var names))
+        try
         {
-            foreach (var name in names.EnumerateArray())
+            if (!File.Exists(_filePath)) return;
+            var json = File.ReadAllText(_filePath);
+            var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.TryGetProperty("bannedNames", out var names))
             {
-                _bannedNames.Add(name.GetString() ?? string.Empty);
+                foreach (var name in names.EnumerateArray())
+                {
+                    _bannedNames.Add(name.GetString() ?? string.Empty);
+                }
+            }
+            if (doc.RootElement.TryGetProperty("bannedIps", out var ips))
+            {
+                foreach (var ip in ips.EnumerateArray())
+                {
+                    _bannedIps.Add(ip.GetString() ?? string.Empty);
+                }
             }
         }
-        if (doc.RootElement.TryGetProperty("bannedIps", out var ips))
+        catch (Exception ex)
         {
-            foreach (var ip in ips.EnumerateArray())
-            {
-                _bannedIps.Add(ip.GetString() ?? string.Empty);
-            }
+            Console.WriteLine($"[BanDatabase] Failed to load: {ex.Message}");
         }
     }
 
     private void Save()
     {
-        var dir = Path.GetDirectoryName(_filePath);
-        if (dir != null) Directory.CreateDirectory(dir);
-        var json = JsonSerializer.Serialize(new
+        try
         {
-            bannedNames = _bannedNames.ToArray(),
-            bannedIps = _bannedIps.ToArray()
-        });
-        File.WriteAllText(_filePath, json);
+            var dir = Path.GetDirectoryName(_filePath);
+            if (dir != null) Directory.CreateDirectory(dir);
+            var json = JsonSerializer.Serialize(new
+            {
+                bannedNames = _bannedNames.ToArray(),
+                bannedIps = _bannedIps.ToArray()
+            });
+            File.WriteAllText(_filePath, json);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[BanDatabase] Failed to save: {ex.Message}");
+        }
     }
 
     public void BanName(string name)

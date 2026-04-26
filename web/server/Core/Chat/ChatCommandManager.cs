@@ -47,6 +47,7 @@ public class ChatCommandManager
     private readonly Func<string, bool>? _hasPrivilege;
     private readonly Func<string, string, string, bool>? _sendPrivateMessage;
     private readonly AreaProtectionSystem? _areaProtection;
+    private readonly Func<string, string, bool>? _setPassword;
 
     public ChatCommandManager(
         Func<long> getGameTime,
@@ -70,7 +71,8 @@ public class ChatCommandManager
         Action<int>? setWorldBorder = null,
         Func<string, bool>? hasPrivilege = null,
         Func<string, string, string, bool>? sendPrivateMessage = null,
-        AreaProtectionSystem? areaProtection = null)
+        AreaProtectionSystem? areaProtection = null,
+        Func<string, string, bool>? setPassword = null)
     {
         _getGameTime = getGameTime;
         _getTps = getTps;
@@ -94,6 +96,7 @@ public class ChatCommandManager
         _hasPrivilege = hasPrivilege;
         _sendPrivateMessage = sendPrivateMessage;
         _areaProtection = areaProtection;
+        _setPassword = setPassword;
         RegisterBuiltInCommands();
     }
 
@@ -262,8 +265,19 @@ public class ChatCommandManager
             {
                 if (_grantPrivilege == null) return Task.FromResult("Grant command is not available.");
                 if (args.Length < 2) return Task.FromResult("Usage: /grant <player> <privilege>");
+                if (string.Equals(args[0], playerName, StringComparison.OrdinalIgnoreCase))
+                    return Task.FromResult("You cannot grant privileges to yourself.");
                 if (args[1] == "server" && _hasPrivilege != null && !_hasPrivilege(playerName))
                     return Task.FromResult("Only server admins can grant the 'server' privilege.");
+                var granterPrivs = _getPlayerPrivileges?.Invoke(playerName);
+                var hasBasicPrivs = granterPrivs != null && Array.Exists(granterPrivs, p => p == "basic_privs");
+                var hasFullPrivs = granterPrivs != null && Array.Exists(granterPrivs, p => p == "privs");
+                if (!hasFullPrivs && hasBasicPrivs)
+                {
+                    var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "interact", "shout" };
+                    if (!allowed.Contains(args[1]))
+                        return Task.FromResult("basic_privs can only grant 'interact' and 'shout'.");
+                }
                 _grantPrivilege(args[0], args[1]);
                 return Task.FromResult($"Granted '{args[1]}' to {args[0]}");
             }, "privs"));
@@ -427,6 +441,18 @@ public class ChatCommandManager
                     $"#{a.Id}: owner={a.OwnerName} ({a.MinX},{a.MinY},{a.MinZ}) to ({a.MaxX},{a.MaxY},{a.MaxZ})");
                 return Task.FromResult($"Protected areas at ({x},{y},{z}):\n{string.Join("\n", lines)}");
             }));
+
+        Register(new ChatCommand("password", "Set your account password", new[] { "changepassword", "setpassword" },
+            (playerName, args) =>
+            {
+                if (_setPassword == null) return Task.FromResult("Password command is not available.");
+                if (args.Length == 0) return Task.FromResult("Usage: /password <new_password>");
+                var newPassword = args[0];
+                if (newPassword.Length < 4) return Task.FromResult("Password must be at least 4 characters.");
+                if (newPassword.Length > 64) return Task.FromResult("Password must be at most 64 characters.");
+                var success = _setPassword(playerName, newPassword);
+                return Task.FromResult(success ? "Password set successfully." : "Failed to set password.");
+            }));
     }
 
     public void Register(ChatCommand command)
@@ -451,7 +477,14 @@ public class ChatCommandManager
         if (!string.IsNullOrEmpty(command.RequiredPrivilege))
         {
             var playerPrivs = _getPlayerPrivileges?.Invoke(playerName);
-            if (playerPrivs == null || !Array.Exists(playerPrivs, p => p == command.RequiredPrivilege))
+            if (playerPrivs == null) return $"You don't have the '{command.RequiredPrivilege}' privilege to use /{command.Name}";
+            var requiredPriv = command.RequiredPrivilege;
+            var hasRequired = Array.Exists(playerPrivs, p => p == requiredPriv);
+            if (!hasRequired && requiredPriv == "privs")
+            {
+                hasRequired = Array.Exists(playerPrivs, p => p == "basic_privs");
+            }
+            if (!hasRequired)
             {
                 return $"You don't have the '{command.RequiredPrivilege}' privilege to use /{command.Name}";
             }

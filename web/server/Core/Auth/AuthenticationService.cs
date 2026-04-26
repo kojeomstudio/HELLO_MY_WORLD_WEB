@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using WebGameServer.Core.Player;
 
@@ -16,6 +17,10 @@ public enum AuthResult
 
 public class AuthenticationService
 {
+    private const int Pbkdf2Iterations = 100000;
+    private const int SaltSize = 16;
+    private const int HashSize = 32;
+
     private static readonly Regex NameRegex = new("^[a-zA-Z0-9_-]{1,20}$", RegexOptions.Compiled);
     private static readonly HashSet<string> ReservedNames = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -28,16 +33,34 @@ public class AuthenticationService
 
     public static string HashPassword(string password)
     {
-        var salt = "HelloMyWorld_2024_Salt";
-        var bytes = System.Text.Encoding.UTF8.GetBytes(password + salt);
-        using var sha = System.Security.Cryptography.SHA256.Create();
-        var hash = sha.ComputeHash(bytes);
-        return Convert.ToHexString(hash);
+        var salt = RandomNumberGenerator.GetBytes(SaltSize);
+        using var pbkdf2 = new Rfc2898DeriveBytes(password, salt, Pbkdf2Iterations, HashAlgorithmName.SHA256);
+        var hash = pbkdf2.GetBytes(HashSize);
+        return $"{Pbkdf2Iterations}:{Convert.ToHexString(salt)}:{Convert.ToHexString(hash)}";
     }
 
-    public static bool VerifyPassword(string password, string hash)
+    public static bool VerifyPassword(string password, string storedHash)
     {
-        return HashPassword(password) == hash;
+        var legacyPrefix = "HelloMyWorld_2024_Salt";
+        if (!storedHash.Contains(':'))
+        {
+            var bytes = System.Text.Encoding.UTF8.GetBytes(password + legacyPrefix);
+            using var sha = SHA256.Create();
+            var hash = sha.ComputeHash(bytes);
+            var hex = Convert.ToHexString(hash);
+            return CryptographicOperations.FixedTimeEquals(
+                System.Text.Encoding.UTF8.GetBytes(hex),
+                System.Text.Encoding.UTF8.GetBytes(storedHash));
+        }
+
+        var parts = storedHash.Split(':');
+        if (parts.Length != 3) return false;
+        if (!int.TryParse(parts[0], out var iterations)) return false;
+        var salt = Convert.FromHexString(parts[1]);
+        var storedHashBytes = Convert.FromHexString(parts[2]);
+        using var pbkdf2 = new Rfc2898DeriveBytes(password, salt, iterations, HashAlgorithmName.SHA256);
+        var computedHash = pbkdf2.GetBytes(storedHashBytes.Length);
+        return CryptographicOperations.FixedTimeEquals(computedHash, storedHashBytes);
     }
 
     public AuthResult AuthenticateWithPassword(string name, string? password, string connectionId, int onlineCount, int maxPlayers, string? ipAddress, PlayerDatabase playerDb)

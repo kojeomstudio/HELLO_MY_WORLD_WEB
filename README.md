@@ -33,7 +33,7 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Multiplayer**: Real-time multiplayer via SignalR WebSocket with chat, player list
 - **Chat Commands**: 32+ commands with privilege enforcement
 - **Privilege System**: 19 privileges fully loaded from JSON with per-command privilege checks
-- **Password Authentication**: SHA256 password hashing with salt, optional per-account password protection
+- **Password Authentication**: PBKDF2 (100k iterations, SHA-256) with per-user random salts, constant-time comparison, legacy SHA-256 migration support
 - **Inventory UI**: Hotbar, main inventory, crafting, furnace, chest, creative inventory, armor
 - **Minimap**: 3 modes (surface, radar, normal) with player direction indicator
 - **Active Block Modifiers**: Sand/gravel falling, farmland decay, grass spreading, dirt-to-grass, ice melting, fire spread, cactus/sugar cane growth, mushroom spreading
@@ -251,8 +251,9 @@ The Vite dev server proxies `/game` to the server.
 | /time | Show game time |
 | /settime 0-24000 | Set time of day |
 | /privs [player] | Show privileges |
-| /grant player priv | Grant privilege |
+| /grant player priv | Grant privilege (no self-grant; basic_privs limited to interact/shout) |
 | /revoke player priv | Revoke privilege |
+| /password <pw> | Set your account password |
 | /ban player | Ban player |
 | /unban player | Unban player |
 | /kick player | Kick player |

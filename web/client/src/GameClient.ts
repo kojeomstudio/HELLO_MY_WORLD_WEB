@@ -85,7 +85,7 @@ export class GameClient {
         this.audioManager.setVolume(settings.soundVolume);
     }
 
-    async connect(playerName: string): Promise<void> {
+    async connect(playerName: string, password?: string): Promise<void> {
         this.connection = new HubConnection.HubConnectionBuilder()
             .withUrl('/game')
             .withAutomaticReconnect()
@@ -99,7 +99,7 @@ export class GameClient {
 
         try {
             await this.connection.start();
-            await this.connection.invoke('Join', playerName);
+            await this.connection.invoke('Join', playerName, password || '');
             this.isRunning = true;
             this.lastTime = performance.now();
             this.gameLoop();

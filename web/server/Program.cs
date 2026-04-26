@@ -354,7 +354,17 @@ builder.Services.AddSingleton<ChatCommandManager>(sp =>
         (size) => { gameServer.SetWorldBorder(size); },
         (playerName) => gameServer.Privileges.HasPrivilege(playerName, "server"),
         (from, to, msg) => gameServer.SendPrivateMessage(from, to, msg),
-        areaProtection);
+        areaProtection,
+        (playerName, newPassword) => {
+            try
+            {
+                var playerDb = sp.GetRequiredService<PlayerDatabase>();
+                var hash = AuthenticationService.HashPassword(newPassword);
+                playerDb.SetPasswordHash(playerName, hash);
+                return true;
+            }
+            catch { return false; }
+        });
 });
 builder.Services.AddSingleton<CraftingSystem>(sp =>
 {

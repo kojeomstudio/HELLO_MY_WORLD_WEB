@@ -18,13 +18,15 @@ class App {
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const nameInput = document.getElementById('player-name-input') as HTMLInputElement;
+            const passwordInput = document.getElementById('player-password-input') as HTMLInputElement;
             const playerName = nameInput.value.trim();
             if (!playerName) return;
+            const password = passwordInput.value;
 
             const loginScreen = document.getElementById('login-screen')!;
             loginScreen.style.display = 'none';
 
-            await this.gameClient.connect(playerName);
+            await this.gameClient.connect(playerName, password);
         });
 
         chatInput.addEventListener('keydown', (e) => {

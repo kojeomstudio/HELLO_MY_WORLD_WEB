@@ -1380,17 +1380,10 @@ public class GameHub : Hub<IGameClient>
         var sb = new System.Text.StringBuilder(message.Length);
         foreach (char c in message)
         {
-            switch (c)
-            {
-                case '&': sb.Append("&amp;"); break;
-                case '<': sb.Append("&lt;"); break;
-                case '>': sb.Append("&gt;"); break;
-                case '"': sb.Append("&quot;"); break;
-                case '\'': sb.Append("&#x27;"); break;
-                case '\r': break;
-                case '\n': sb.Append(' '); break;
-                default: sb.Append(c); break;
-            }
+            if (c == '\r') continue;
+            if (c == '\n') { sb.Append(' '); continue; }
+            if (char.IsControl(c)) continue;
+            sb.Append(c);
         }
         var result = sb.ToString();
         if (result.Length > 256) result = result[..256];
