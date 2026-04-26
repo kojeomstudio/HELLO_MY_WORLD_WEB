@@ -33,6 +33,7 @@ export class PlayerController {
     private _footstepTimer: number = 0;
     private _footstepInterval: number = 0.45;
     private _connection: HubConnection.HubConnection | null = null;
+    private lastSpacePressTime: number = 0;
     private digStartTime: number = 0;
     private digTarget: { x: number; y: number; z: number } | null = null;
     private digDuration: number = 0;
@@ -98,6 +99,13 @@ export class PlayerController {
 
         document.addEventListener('keydown', (e: KeyboardEvent) => {
             switch (e.code) {
+                case 'Space':
+                    const now = performance.now();
+                    if (now - this.lastSpacePressTime < 300) {
+                        this._connection?.invoke('ToggleFlight');
+                    }
+                    this.lastSpacePressTime = now;
+                    break;
                 case 'KeyF':
                     this._isFlying = !this._isFlying;
                     break;

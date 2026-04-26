@@ -14,6 +14,7 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Redstone System**: Power propagation through wires, source blocks (torch, lever, button, pressure plate), consumer toggling (lamps)
 - **Fishing System**: Cast, wait, bite, reel phases with catch probabilities (fish/junk/treasure)
 - **Breeding System**: Feed animals to breed with baby mob growth
+- **Area Protection**: Advanced claim-based area protection with ownership, transfer, bypass grants, and JSON persistence
 - **Protection System**: Area-based protection zones with owner/allowed player lists
 - **Rollback System**: Block change recording with player/time/area-based rollback support
 - **Ban Database**: Persistent ban storage (JSON-backed) with IP and name banning
@@ -28,10 +29,11 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **World Border**: Configurable size with position clamping
 - **Interactive Blocks**: Sign text input, bed spawn point, note block/jukebox procedural audio, crafting table, chest, furnace
 - **Day/Night Cycle**: Full 24000-tick day/night cycle with sky brightness transitions
-- **Weather**: Rain particle system with day/night color transitions
+- **Weather**: Rain and snow particle systems with day/night color transitions, cyclable weather modes
 - **Multiplayer**: Real-time multiplayer via SignalR WebSocket with chat, player list
-- **Chat Commands**: 28+ commands with privilege enforcement
+- **Chat Commands**: 32+ commands with privilege enforcement
 - **Privilege System**: 19 privileges fully loaded from JSON with per-command privilege checks
+- **Password Authentication**: SHA256 password hashing with salt, optional per-account password protection
 - **Inventory UI**: Hotbar, main inventory, crafting, furnace, chest, creative inventory, armor
 - **Minimap**: 3 modes (surface, radar, normal) with player direction indicator
 - **Active Block Modifiers**: Sand/gravel falling, farmland decay, grass spreading, dirt-to-grass, ice melting, fire spread, cactus/sugar cane growth, mushroom spreading
@@ -44,7 +46,7 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Breeding System**: Feed animals (cow/pig with wheat, chicken with seeds) to breed with baby mobs
 - **Texture Atlas**: 89+ block textures from minetest devtest with nearest-neighbor filtering
 - **Block Geometry System**: Custom mesh generation for stairs, slabs, fences, walls, glass panes, doors, ladders, torches, plants, fire
-- **Procedural Audio**: Web Audio API generated sounds (no audio files needed)
+- **Particle Spawner**: Configurable particle spawner system with server-side spec management
 - **Settings**: Mouse sensitivity, render distance, FOV, volume controls, cloud/AO toggles
 
 ## Architecture
@@ -231,6 +233,7 @@ The Vite dev server proxies `/game` to the server.
 | O | Settings |
 | P | Armor panel |
 | F3 | Debug info |
+| B | Toggle weather |
 | M | Minimap cycle |
 | Esc | Release mouse |
 
@@ -263,6 +266,10 @@ The Vite dev server proxies `/game` to the server.
 | /msg player message | Send private message |
 | /giveme item [count] | Give item to self |
 | /admin | Show server admin |
+| /protect x1 y1 z1 x2 y2 z2 | Claim protection area |
+| /unprotect id | Remove protection area |
+| /areas | List your protected areas |
+| /area_info x y z | Show protection at position |
 
 ## Ported from minetest_sub_project
 

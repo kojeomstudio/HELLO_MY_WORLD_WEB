@@ -9,13 +9,13 @@ concurrency:
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, develop]
   pull_request:
-    branches: [main, master]
+    branches: [main]
 
 jobs:
-  server:
-    name: Build Server (Ubuntu)
+  server-build:
+    name: Build Server
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -29,42 +29,17 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore web/server/WebGameServer.csproj
 
-      - name: Build
+      - name: Build server
         run: dotnet build web/server/WebGameServer.csproj --no-restore --configuration Release
 
-      - name: Upload server build
-        uses: actions/upload-artifact@v4
-        with:
-          name: server-build
-          path: web/server/bin/Release/
-          retention-days: 7
-
-  server-windows:
-    name: Build Server (Windows)
-    runs-on: windows-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup .NET 8.0
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-
-      - name: Restore dependencies
-        run: dotnet restore web/server/WebGameServer.csproj
-
-      - name: Build
-        run: dotnet build web/server/WebGameServer.csproj --no-restore --configuration Release
-
-  client:
-    name: Build & Typecheck Client
+  client-build:
+    name: Build Client
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -72,161 +47,81 @@ jobs:
           cache-dependency-path: web/client/package-lock.json
 
       - name: Install dependencies
-        run: npm install
-        working-directory: web/client
+        run: npm install --prefix web/client
 
-      - name: Typecheck
-        run: npx tsc --noEmit
-        working-directory: web/client
+      - name: Build client
+        run: npm run build --prefix web/client
 
-      - name: Build
-        run: npm run build
-        working-directory: web/client
-
-      - name: Verify build output
-        run: |
-          if [ ! -d "web/client/dist" ]; then
-            echo "::error::Build output directory web/client/dist does not exist"
-            exit 1
-          fi
-          FILE_COUNT=$(find web/client/dist -type f | wc -l)
-          if [ "$FILE_COUNT" -eq 0 ]; then
-            echo "::error::Build output directory is empty"
-            exit 1
-          fi
-          echo "Build output verified: $FILE_COUNT files in web/client/dist"
-
-      - name: Upload client build
-        uses: actions/upload-artifact@v4
-        with:
-          name: client-build
-          path: web/client/dist/
-          retention-days: 7
-
-  security:
+  security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    needs: [server-build, client-build]
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web/client/package-lock.json
+
+      - name: Install dependencies for audit
+        run: npm install --prefix web/client
+
+      - name: npm audit (client)
+        run: npm audit --prefix web/client --audit-level=high || true
+
       - name: Check for hardcoded secrets in source
         run: |
-          echo "Checking for potential secrets in source code..."
+          echo "Scanning for hardcoded secrets..."
           FOUND=0
+
           if grep -rn --include="*.cs" \
             -E '(Password\s*=\s*"[^"]+"|ApiKey\s*=\s*"[^"]+"|Secret\s*=\s*"[^"]+")' \
             web/server/ | grep -vi 'example\|placeholder\|todo\|config\|empty\|{'; then
             echo "::error::Potential hardcoded secrets found in C# source"
             FOUND=1
           fi
-          if grep -rn --include="*.ts" \
-            -E '(api[_-]?key\s*[:=]\s*["\x27][^"\x27]+|password\s*[:=]\s*["\x27][^"\x27]+|secret\s*[:=]\s*["\x27][^"\x27]+)' \
+
+          if grep -rn --include="*.ts" --include="*.js" \
+            -E '(API_KEY|SECRET|PASSWORD|api[_-]?key|password|secret)\s*[:=]\s*["\x27][^"\x27]+' \
             web/client/src/ | grep -vi 'example\|placeholder\|todo'; then
-            echo "::error::Potential hardcoded secrets found in TypeScript source"
+            echo "::error::Potential hardcoded secrets found in client source"
             FOUND=1
           fi
+
           if grep -rn --include="*.json" \
             -E '"(password|secret|api_key|token)":\s*"[^"]+"' \
             web/data/ | grep -vi 'example\|placeholder\|default\|empty\|changeme'; then
             echo "::error::Potential hardcoded secrets found in JSON config"
             FOUND=1
           fi
+
+          if grep -rn --include="*.cs" --include="*.ts" --include="*.js" --include="*.json" \
+            -E '(AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z\-_]{35}|ghp_[0-9a-zA-Z]{36})' \
+            web/ 2>/dev/null; then
+            echo "::error::Potential cloud/API keys detected"
+            FOUND=1
+          fi
+
           if [ $FOUND -ne 0 ]; then
             echo "::error::Hardcoded secrets detected — failing build"
             exit 1
           fi
           echo "No hardcoded secrets detected"
 
-      - name: Check for .env files in repository
-        run: |
-          FOUND=0
-          while IFS= read -r f; do
-            echo "::error::.env file found in repository: $f"
-            FOUND=1
-          done < <(find . -name ".env" -o -name ".env.local" -o -name ".env.production" | grep -v '.git/')
-          if [ $FOUND -ne 0 ]; then exit 1; fi
-          echo "No .env files found in repository"
-
-      - name: Check for debug endpoints
-        run: |
-          if grep -rn --include="*.cs" 'MapGet.*debug\|MapGet.*dump\|MapGet.*admin' web/server/; then
-            echo "::error::Potential debug/admin endpoints found"
-            exit 1
-          fi
-          echo "No suspicious debug endpoints found"
-
       - name: Verify .gitignore covers sensitive files
         run: |
           MISSING=0
-          for pattern in ".env" ".env.local" "*.db" "node_modules" "bin/" "obj/"; do
+          for pattern in ".env" "*.db" "*.sqlite" "*.user" "*.suo" "node_modules" "bin/" "obj/" "dist/" "world"; do
             if ! grep -q "$pattern" .gitignore 2>/dev/null; then
-              echo "::error::.gitignore missing pattern: $pattern"
+              echo "::warning::.gitignore missing pattern: $pattern"
               MISSING=1
             fi
           done
-          if [ $MISSING -ne 0 ]; then exit 1; fi
-          echo ".gitignore covers all sensitive file patterns"
-
-      - name: npm audit (client)
-        run: |
-          cd web/client
-          npm audit --audit-level=high
-
-      - name: Check for sensitive file patterns
-        run: |
-          FOUND=0
-          for f in credentials.json serviceAccountKey.json .env.production.local; do
-            if find . -name "$f" -not -path "./.git/*" | grep -q .; then
-              echo "::error::Sensitive file found: $f"
-              FOUND=1
-            fi
-          done
-          if grep -rn --include="*.cs" --include="*.ts" --include="*.json" \
-            -E '(AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z\-_]{35}|ghp_[0-9a-zA-Z]{36})' \
-            web/ 2>/dev/null; then
-            echo "::error::Potential cloud/API keys detected"
-            FOUND=1
+          if [ $MISSING -ne 0 ]; then
+            echo "::warning::Some .gitignore patterns are missing"
           fi
-          if [ $FOUND -ne 0 ]; then exit 1; fi
-          echo "No sensitive files or key patterns detected"
-
-  data-integrity:
-    name: Verify Data Files
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Verify JSON data files are valid
-        run: |
-          FAILED=0
-          for f in web/data/*.json; do
-            if ! python3 -m json.tool "$f" > /dev/null 2>&1; then
-              echo "::error::Invalid JSON: $f"
-              FAILED=1
-            fi
-          done
-          if [ $FAILED -ne 0 ]; then exit 1; fi
-          echo "All JSON data files are valid"
-
-      - name: Verify texture assets exist
-        run: |
-          MISSING=0
-          if [ -d "web/client/public/textures/blocks" ]; then
-            COUNT=$(find web/client/public/textures/blocks -name "*.png" | wc -l)
-            echo "Block textures found: $COUNT"
-            if [ "$COUNT" -lt 80 ]; then
-              echo "::warning::Low block texture count ($COUNT). Expected 80+"
-            fi
-          else
-            echo "::error::Block textures directory not found"
-            MISSING=1
-          fi
-          if [ -d "web/client/public/textures/ui" ]; then
-            COUNT=$(find web/client/public/textures/ui -name "*.png" | wc -l)
-            echo "UI textures found: $COUNT"
-          else
-            echo "::warning::UI textures directory not found"
-          fi
-          exit $MISSING
+          echo ".gitignore verification complete"

@@ -14,6 +14,7 @@ using WebGameServer.Services;
 
 using WebGameServer.Core.Inventory;
 using WebGameServer.Core.Particles;
+using WebGameServer.Core.Protection;
 using WebGameServer.Core.Rollback;
 using WebGameServer.Core.Sound;
 
@@ -309,6 +310,8 @@ builder.Services.AddSingleton<BanDatabase>(sp =>
 });
 builder.Services.AddSingleton<RollbackSystem>();
 builder.Services.AddSingleton<ProtectionSystem>();
+builder.Services.AddSingleton<AreaProtectionSystem>();
+builder.Services.AddSingleton<ParticleSpawnerManager>();
 builder.Services.AddSingleton<RedstoneSystem>();
 builder.Services.AddSingleton<FishingSystem>();
 builder.Services.AddSingleton<BreedingSystem>();
@@ -328,6 +331,7 @@ builder.Services.AddSingleton<ChatCommandManager>(sp =>
     var authService = sp.GetRequiredService<AuthenticationService>();
     var privilegeSystem = sp.GetRequiredService<PrivilegeSystem>();
     var entityManager = sp.GetRequiredService<EntityManager>();
+    var areaProtection = sp.GetRequiredService<AreaProtectionSystem>();
     return new ChatCommandManager(
         () => gameServer.GameTime,
         () => gameServer.TickRate,
@@ -349,7 +353,8 @@ builder.Services.AddSingleton<ChatCommandManager>(sp =>
         () => { gameServer.ClearAllEntities(); },
         (size) => { gameServer.SetWorldBorder(size); },
         (playerName) => gameServer.Privileges.HasPrivilege(playerName, "server"),
-        (from, to, msg) => gameServer.SendPrivateMessage(from, to, msg));
+        (from, to, msg) => gameServer.SendPrivateMessage(from, to, msg),
+        areaProtection);
 });
 builder.Services.AddSingleton<CraftingSystem>(sp =>
 {
@@ -439,6 +444,10 @@ var hubContext = app.Services.GetRequiredService<IHubContext<GameHub, IGameClien
 gameServer.SetHubContext(hubContext);
 gameServer.Start();
 
+var areaProtection = app.Services.GetRequiredService<AreaProtectionSystem>();
+var protectionLoadPath = Path.Combine(dataDir, "protection");
+await areaProtection.LoadProtection(protectionLoadPath);
+
 var authService = app.Services.GetRequiredService<AuthenticationService>();
 var banDatabase = app.Services.GetRequiredService<BanDatabase>();
 authService.SetBanDatabase(banDatabase);
@@ -463,6 +472,9 @@ app.Lifetime.ApplicationStopping.Register(() =>
     gameServer.SaveAllMetadata();
     gameServer.DefaultWorld.Save(worldDataPath);
     privilegeSystem.Save();
+    var areaProtection = app.Services.GetRequiredService<AreaProtectionSystem>();
+    var protectionSavePath = Path.Combine(dataDir, "protection");
+    areaProtection.SaveProtection(protectionSavePath).GetAwaiter().GetResult();
     gameServer.Stop();
 });
 

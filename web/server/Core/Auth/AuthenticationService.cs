@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using WebGameServer.Core.Player;
 
 namespace WebGameServer.Core.Auth;
 
@@ -8,7 +9,9 @@ public enum AuthResult
     NameTaken,
     NameInvalid,
     Banned,
-    ServerFull
+    ServerFull,
+    PasswordRequired,
+    PasswordIncorrect
 }
 
 public class AuthenticationService
@@ -22,6 +25,38 @@ public class AuthenticationService
     private readonly HashSet<string> _bannedNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _bannedIps = new(StringComparer.OrdinalIgnoreCase);
     private BanDatabase? _banDatabase;
+
+    public static string HashPassword(string password)
+    {
+        var salt = "HelloMyWorld_2024_Salt";
+        var bytes = System.Text.Encoding.UTF8.GetBytes(password + salt);
+        using var sha = System.Security.Cryptography.SHA256.Create();
+        var hash = sha.ComputeHash(bytes);
+        return Convert.ToHexString(hash);
+    }
+
+    public static bool VerifyPassword(string password, string hash)
+    {
+        return HashPassword(password) == hash;
+    }
+
+    public AuthResult AuthenticateWithPassword(string name, string? password, string connectionId, int onlineCount, int maxPlayers, string? ipAddress, PlayerDatabase playerDb)
+    {
+        var baseResult = AuthenticatePlayer(name, connectionId, onlineCount, maxPlayers, ipAddress);
+        if (baseResult != AuthResult.Success) return baseResult;
+
+        if (playerDb.PlayerExists(name))
+        {
+            var existingHash = playerDb.GetPasswordHash(name);
+            if (existingHash != null)
+            {
+                if (string.IsNullOrEmpty(password)) return AuthResult.PasswordRequired;
+                if (!VerifyPassword(password, existingHash)) return AuthResult.PasswordIncorrect;
+            }
+        }
+
+        return AuthResult.Success;
+    }
 
     public void SetBanDatabase(BanDatabase banDatabase)
     {

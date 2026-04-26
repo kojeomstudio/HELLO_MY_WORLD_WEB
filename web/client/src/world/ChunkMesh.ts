@@ -694,7 +694,72 @@ export class ChunkMesh {
         }
     }
 
-    static updateAnimations(_time: number, _dt: number): void {
+    get hasAnimatedBlocks(): boolean {
+        return this.isVegetation || this.isWater || this.isLava;
+    }
+
+    static updateAnimations(chunks: Map<string, ChunkMesh>, time: number): void {
+        for (const chunk of chunks.values()) {
+            if (!chunk.hasAnimatedBlocks) continue;
+
+            const meshes: THREE.Mesh[] = [];
+            if (chunk.mesh) meshes.push(chunk.mesh);
+            if (chunk.transparentMesh) meshes.push(chunk.transparentMesh);
+
+            for (const mesh of meshes) {
+                const posAttr = mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+                if (!posAttr) continue;
+
+                if (mesh.userData.isVegetation) {
+                    const indices: number[] = mesh.userData.topVertexIndices;
+                    const basePositions: Float32Array = mesh.userData.topBasePositions;
+                    if (!indices || !basePositions) continue;
+                    const amplitude = 0.05;
+                    for (let i = 0; i < indices.length; i++) {
+                        const idx = indices[i];
+                        if (idx * 3 + 1 >= posAttr.array.length) continue;
+                        if (idx * 3 + 1 >= basePositions.length) continue;
+                        const baseY = basePositions[idx * 3 + 1];
+                        const wx = basePositions[idx * 3];
+                        posAttr.array[idx * 3 + 1] = baseY + Math.sin(time * 1.5 + wx * 0.5) * amplitude;
+                    }
+                    posAttr.needsUpdate = true;
+                }
+
+                if (mesh.userData.isWater) {
+                    const indices: number[] = mesh.userData.waterVertices;
+                    const basePositions: Float32Array = mesh.userData.waterBasePositions;
+                    if (!indices || !basePositions) continue;
+                    const amplitude = 0.04;
+                    for (let i = 0; i < indices.length; i++) {
+                        const idx = indices[i];
+                        if (idx * 3 + 1 >= posAttr.array.length) continue;
+                        if (idx * 3 + 1 >= basePositions.length) continue;
+                        const baseY = basePositions[idx * 3 + 1];
+                        const wx = basePositions[idx * 3];
+                        const wz = basePositions[idx * 3 + 2];
+                        posAttr.array[idx * 3 + 1] = baseY + Math.sin(time * 1.5 + wx * 0.5 + wz * 0.3) * amplitude;
+                    }
+                    posAttr.needsUpdate = true;
+                }
+
+                if (mesh.userData.isLava) {
+                    const indices: number[] = mesh.userData.lavaVertices;
+                    const basePositions: Float32Array = mesh.userData.lavaBasePositions;
+                    if (!indices || !basePositions) continue;
+                    const amplitude = 0.02;
+                    for (let i = 0; i < indices.length; i++) {
+                        const idx = indices[i];
+                        if (idx * 3 + 1 >= posAttr.array.length) continue;
+                        if (idx * 3 + 1 >= basePositions.length) continue;
+                        const baseY = basePositions[idx * 3 + 1];
+                        const wx = basePositions[idx * 3];
+                        posAttr.array[idx * 3 + 1] = baseY + Math.sin(time * 2.0 + wx * 0.8) * amplitude;
+                    }
+                    posAttr.needsUpdate = true;
+                }
+            }
+        }
     }
 
     animateVegetation(time: number): void {

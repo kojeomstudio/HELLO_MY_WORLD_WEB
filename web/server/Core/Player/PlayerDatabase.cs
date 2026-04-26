@@ -43,7 +43,8 @@ public class PlayerDatabase
                 spawn_x REAL DEFAULT 0,
                 spawn_y REAL DEFAULT 0,
                 spawn_z REAL DEFAULT 0,
-                has_spawn_point INTEGER DEFAULT 0
+                has_spawn_point INTEGER DEFAULT 0,
+                password_hash TEXT
             )";
         cmd.ExecuteNonQuery();
     }
@@ -150,6 +151,33 @@ public class PlayerDatabase
         cmd.Parameters.AddWithValue("$name", name);
         var count = Convert.ToInt32(cmd.ExecuteScalar());
         return count > 0;
+    }
+
+    public void SetPasswordHash(string playerName, string hash)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = "UPDATE players SET password_hash = $hash WHERE name = $name";
+        cmd.Parameters.AddWithValue("$hash", hash);
+        cmd.Parameters.AddWithValue("$name", playerName);
+        cmd.ExecuteNonQuery();
+    }
+
+    public string? GetPasswordHash(string playerName)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT password_hash FROM players WHERE name = $name";
+        cmd.Parameters.AddWithValue("$name", playerName);
+        var result = cmd.ExecuteScalar();
+        return result == null || result == DBNull.Value ? null : (string?)result;
+    }
+
+    public bool HasPassword(string playerName)
+    {
+        return GetPasswordHash(playerName) != null;
     }
 
     private static string SerializeInventory(Inventory inventory)

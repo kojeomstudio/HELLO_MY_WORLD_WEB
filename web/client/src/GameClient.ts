@@ -12,6 +12,7 @@ import { ParticleSystem } from './world/ParticleSystem';
 import { WieldItem } from './rendering/WieldItem';
 import { SelectionBox } from './rendering/SelectionBox';
 import { WeatherSystem } from './world/WeatherSystem';
+import { ItemRegistry } from './world/ItemRegistry';
 
 export class GameClient {
     private connection: HubConnection.HubConnection | null = null;
@@ -26,6 +27,7 @@ export class GameClient {
     private wieldItem: WieldItem;
     private selectionBox: SelectionBox;
     private weatherSystem: WeatherSystem;
+    private itemRegistry: ItemRegistry;
     private isRunning: boolean = false;
     private lastTime: number = 0;
     private frameCount: number = 0;
@@ -40,6 +42,8 @@ export class GameClient {
         this.uiManager = uiManager;
         this.renderer = new Renderer(document.getElementById('game-container')!);
         this.worldManager = new WorldManager(this.renderer);
+        this.itemRegistry = new ItemRegistry(this.worldManager.getBlockRegistry());
+        this.itemRegistry.load();
         this.inputManager = new InputManager();
         this.audioManager = new AudioManager();
         this.minimap = new Minimap(document.getElementById('game-container')!, this.worldManager);
@@ -62,6 +66,14 @@ export class GameClient {
         this.uiManager.getSettingsPanel().setOnSettingsChanged((settings) => {
             this.applySettings(settings);
         });
+    }
+
+    get items() { return this.itemRegistry; }
+
+    toggleWeather(): string {
+        const weatherType = this.weatherSystem.toggleWeather();
+        this.renderer.setRaining(weatherType === 'rain');
+        return weatherType;
     }
 
     private applySettings(settings: GameSettings): void {
@@ -381,11 +393,7 @@ export class GameClient {
         this.weatherTimer += dt;
         if (this.weatherTimer >= 5.0) {
             this.weatherTimer = 0;
-            if (this.skyBrightness < 0.3) {
-                this.weatherSystem.setRaining(true);
-            } else {
-                this.weatherSystem.setRaining(Math.random() < 0.2);
-            }
+            this.weatherSystem.setRaining(this.skyBrightness < 0.3 || Math.random() < 0.2);
             this.renderer.setRaining(this.weatherSystem.getIsRaining());
         }
 

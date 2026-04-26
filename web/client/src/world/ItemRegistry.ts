@@ -10,8 +10,12 @@ interface ItemDefinition {
 
 export class ItemRegistry {
     private items: Map<string, ItemDefinition> = new Map();
-    private blockRegistry: BlockRegistry | null = null;
+    private blockRegistry: BlockRegistry | null;
     private loaded: boolean = false;
+
+    constructor(blockRegistry?: BlockRegistry) {
+        this.blockRegistry = blockRegistry ?? null;
+    }
 
     setBlockRegistry(registry: BlockRegistry): void {
         this.blockRegistry = registry;

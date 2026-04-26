@@ -1,5 +1,6 @@
 using WebGameServer.Core.Entities;
 using WebGameServer.Core.Player;
+using WebGameServer.Core.Protection;
 
 namespace WebGameServer.Core.Chat;
 
@@ -45,6 +46,7 @@ public class ChatCommandManager
     private readonly Action<int>? _setWorldBorder;
     private readonly Func<string, bool>? _hasPrivilege;
     private readonly Func<string, string, string, bool>? _sendPrivateMessage;
+    private readonly AreaProtectionSystem? _areaProtection;
 
     public ChatCommandManager(
         Func<long> getGameTime,
@@ -67,7 +69,8 @@ public class ChatCommandManager
         Action? clearAllEntities = null,
         Action<int>? setWorldBorder = null,
         Func<string, bool>? hasPrivilege = null,
-        Func<string, string, string, bool>? sendPrivateMessage = null)
+        Func<string, string, string, bool>? sendPrivateMessage = null,
+        AreaProtectionSystem? areaProtection = null)
     {
         _getGameTime = getGameTime;
         _getTps = getTps;
@@ -90,6 +93,7 @@ public class ChatCommandManager
         _setWorldBorder = setWorldBorder;
         _hasPrivilege = hasPrivilege;
         _sendPrivateMessage = sendPrivateMessage;
+        _areaProtection = areaProtection;
         RegisterBuiltInCommands();
     }
 
@@ -373,6 +377,56 @@ public class ChatCommandManager
                 _giveItem(playerName, playerName, args[0], count);
                 return Task.FromResult($"Gave {count}x {args[0]} to yourself");
             }, "give"));
+
+        Register(new ChatCommand("protect", "Claim a protected area", Array.Empty<string>(),
+            (playerName, args) =>
+            {
+                if (_areaProtection == null) return Task.FromResult("Area protection is not available.");
+                if (args.Length < 6) return Task.FromResult("Usage: /protect <x1> <y1> <z1> <x2> <y2> <z2>");
+                if (!int.TryParse(args[0], out var x1) || !int.TryParse(args[1], out var y1) ||
+                    !int.TryParse(args[2], out var z1) || !int.TryParse(args[3], out var x2) ||
+                    !int.TryParse(args[4], out var y2) || !int.TryParse(args[5], out var z2))
+                    return Task.FromResult("Invalid coordinates. Usage: /protect <x1> <y1> <z1> <x2> <y2> <z2>");
+                var (success, areaId, error) = _areaProtection.ClaimArea(playerName, x1, y1, z1, x2, y2, z2);
+                if (!success) return Task.FromResult(error ?? "Failed to claim area.");
+                return Task.FromResult($"Area #{areaId} claimed successfully.");
+            }, "protection"));
+
+        Register(new ChatCommand("unprotect", "Remove a protected area", Array.Empty<string>(),
+            (playerName, args) =>
+            {
+                if (_areaProtection == null) return Task.FromResult("Area protection is not available.");
+                if (args.Length == 0 || !int.TryParse(args[0], out var id))
+                    return Task.FromResult("Usage: /unprotect <id>");
+                var (success, error) = _areaProtection.RemoveArea(id, playerName);
+                if (!success) return Task.FromResult(error ?? "Failed to remove area.");
+                return Task.FromResult($"Area #{id} removed successfully.");
+            }, "protection"));
+
+        Register(new ChatCommand("areas", "List your protected areas", Array.Empty<string>(),
+            (playerName, _) =>
+            {
+                if (_areaProtection == null) return Task.FromResult("Area protection is not available.");
+                var areas = _areaProtection.GetAreasOwnedBy(playerName);
+                if (areas.Count == 0) return Task.FromResult("You have no protected areas.");
+                var lines = areas.Select(a =>
+                    $"#{a.Id}: ({a.MinX},{a.MinY},{a.MinZ}) to ({a.MaxX},{a.MaxY},{a.MaxZ}) vol={a.Volume}");
+                return Task.FromResult($"Your areas ({areas.Count}):\n{string.Join("\n", lines)}");
+            }));
+
+        Register(new ChatCommand("area_info", "Show protection info at position", new[] { "areainfo" },
+            (_, args) =>
+            {
+                if (_areaProtection == null) return Task.FromResult("Area protection is not available.");
+                if (args.Length < 3 || !int.TryParse(args[0], out var x) ||
+                    !int.TryParse(args[1], out var y) || !int.TryParse(args[2], out var z))
+                    return Task.FromResult("Usage: /area_info <x> <y> <z>");
+                var areas = _areaProtection.GetAreasAt(x, y, z);
+                if (areas.Count == 0) return Task.FromResult($"No protection at ({x},{y},{z}).");
+                var lines = areas.Select(a =>
+                    $"#{a.Id}: owner={a.OwnerName} ({a.MinX},{a.MinY},{a.MinZ}) to ({a.MaxX},{a.MaxY},{a.MaxZ})");
+                return Task.FromResult($"Protected areas at ({x},{y},{z}):\n{string.Join("\n", lines)}");
+            }));
     }
 
     public void Register(ChatCommand command)

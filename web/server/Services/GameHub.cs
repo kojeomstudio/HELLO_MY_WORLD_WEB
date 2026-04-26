@@ -9,6 +9,7 @@ using WebGameServer.Core.Entities;
 using WebGameServer.Core.Game;
 using WebGameServer.Core.Physics;
 using WebGameServer.Core.Player;
+using WebGameServer.Core.Protection;
 using WebGameServer.Core.Smelting;
 using WebGameServer.Core.World;
 using PlayerEnt = WebGameServer.Core.Player.Player;
@@ -67,6 +68,8 @@ public class GameHub : Hub<IGameClient>
     private readonly SmeltingSystem _smeltingSystem;
     private readonly IHubContext<GameHub, IGameClient> _hubContext;
     private readonly ServerConfig _config;
+    private readonly AreaProtectionSystem _areaProtection;
+    private readonly PlayerDatabase _playerDb;
 
     private static readonly Dictionary<string, int> DefaultStartItemCounts = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -89,7 +92,9 @@ public class GameHub : Hub<IGameClient>
         BlockDefinitionManager blockDefinitionManager,
         SmeltingSystem smeltingSystem,
         IHubContext<GameHub, IGameClient> hubContext,
-        ServerConfig config)
+        ServerConfig config,
+        AreaProtectionSystem areaProtection,
+        PlayerDatabase playerDb)
     {
         _gameServer = gameServer;
         _logger = logger;
@@ -101,6 +106,8 @@ public class GameHub : Hub<IGameClient>
         _smeltingSystem = smeltingSystem;
         _hubContext = hubContext;
         _config = config;
+        _areaProtection = areaProtection;
+        _playerDb = playerDb;
     }
 
     public override async Task OnConnectedAsync()
@@ -123,7 +130,7 @@ public class GameHub : Hub<IGameClient>
         await base.OnDisconnectedAsync(exception);
     }
 
-    public async Task Join(string playerName)
+    public async Task Join(string playerName, string? password = null)
     {
         var ipAddress = Context.GetHttpContext()?.Connection?.RemoteIpAddress?.ToString() ?? Context.ConnectionId;
         var currentAttempts = _joinAttempts.AddOrUpdate(ipAddress, 1, (_, old) => old + 1);
@@ -143,9 +150,9 @@ public class GameHub : Hub<IGameClient>
             _joinAttempts[ipAddress + "_time"] = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         }
 
-        var authResult = _authService.AuthenticatePlayer(
-            playerName, Context.ConnectionId,
-            _gameServer.OnlinePlayerCount, _gameServer.MaxPlayers, ipAddress);
+        var authResult = _authService.AuthenticateWithPassword(
+            playerName, password, Context.ConnectionId,
+            _gameServer.OnlinePlayerCount, _gameServer.MaxPlayers, ipAddress, _playerDb);
 
         if (authResult != AuthResult.Success)
         {
@@ -155,6 +162,8 @@ public class GameHub : Hub<IGameClient>
                 AuthResult.NameTaken => "Name already in use.",
                 AuthResult.Banned => "You are banned from this server.",
                 AuthResult.ServerFull => "Server is full.",
+                AuthResult.PasswordRequired => "This account requires a password.",
+                AuthResult.PasswordIncorrect => "Incorrect password.",
                 _ => "Failed to join."
             };
             await Clients.Caller.OnChatMessage("Server", msg);
@@ -185,6 +194,11 @@ public class GameHub : Hub<IGameClient>
                 var count = DefaultStartItemCounts.TryGetValue(itemName, out var c) ? c : 1;
                 player.Inventory.AddItem(new ItemStack(itemName, count));
             }
+        }
+
+        if (isNewPlayer && !string.IsNullOrEmpty(password))
+        {
+            _playerDb.SetPasswordHash(playerName, AuthenticationService.HashPassword(password));
         }
 
         await Clients.All.OnPlayerJoined(playerName);
@@ -264,6 +278,9 @@ public class GameHub : Hub<IGameClient>
         if (player == null) return;
 
         if (!_gameServer.Privileges.HasPrivilege(player.Name, "interact")) return;
+
+        if (!_areaProtection.CanInteract(player.Name, x, y, z)
+            && !_gameServer.Privileges.HasPrivilege(player.Name, "protection_bypass")) return;
 
         if (!_gameServer.Protection.CanInteract(player.Name, new Vector3s((short)x, (short)y, (short)z))
             && !_gameServer.Privileges.HasPrivilege(player.Name, "protection_bypass")) return;
@@ -357,6 +374,9 @@ public class GameHub : Hub<IGameClient>
         if (player == null) return;
 
         if (!_gameServer.Privileges.HasPrivilege(player.Name, "interact")) return;
+
+        if (!_areaProtection.CanInteract(player.Name, x, y, z)
+            && !_gameServer.Privileges.HasPrivilege(player.Name, "protection_bypass")) return;
 
         if (!_gameServer.Protection.CanInteract(player.Name, new Vector3s((short)x, (short)y, (short)z))
             && !_gameServer.Privileges.HasPrivilege(player.Name, "protection_bypass")) return;
@@ -749,6 +769,7 @@ public class GameHub : Hub<IGameClient>
         if (blockDef == null) return;
         if (blockDef.Climbable)
         {
+            await Clients.Caller.OnChatMessage("Server", "Climbing...");
         }
         if (blockDef.Interactive)
         {
@@ -998,6 +1019,21 @@ public class GameHub : Hub<IGameClient>
         if (player == null) return;
         var privs = _gameServer.Privileges.GetPlayerPrivileges(player.Name);
         await Clients.Caller.OnPrivilegeList(privs);
+    }
+
+    public async Task ToggleFlight()
+    {
+        var player = GetAuthenticatedPlayer();
+        if (player == null || player.IsDead) return;
+
+        if (player.Mode != GameMode.Creative && !_gameServer.Privileges.HasPrivilege(player.Name, "fly"))
+            return;
+
+        player.IsFlying = !player.IsFlying;
+        if (player.IsFlying)
+        {
+            player.Velocity = Vector3.Zero;
+        }
     }
 
     public async Task Craft(string recipeId)

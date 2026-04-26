@@ -111,9 +111,10 @@ See [server-api.md](server-api.md) for full method/event signatures.
 - **AgricultureSystem** (`World/AgricultureSystem.cs`) — Crop growth (wheat, carrot, potato)
 - **NodeTimerSystem** (`World/NodeTimerSystem.cs`) — Scheduled block actions (farmland dehydration, grass spread, ice melting)
 - **ActiveBlockModifierSystem** (`World/ActiveBlockModifier.cs`) — Sand/gravel falling
-- **ChatCommandManager** (`Chat/ChatCommandManager.cs`) — Commands: /time, /gamemode, /tp, /give, /kill, /clear, /kick, /ban, /spawn, /privs, /setborder
+- **ChatCommandManager** (`Chat/ChatCommandManager.cs`) — Commands: /time, /gamemode, /tp, /give, /kill, /clear, /kick, /ban, /spawn, /privs, /setborder, /protect, /unprotect, /areas, /area_info
 - **PrivilegeSystem** (`Auth/PrivilegeSystem.cs`) — Permission management (interact, shout, fly, etc.)
-- **AuthenticationService** (`Auth/AuthenticationService.cs`) — Name validation (regex + reserved names), ban checks, IP ban enforcement, server capacity
+- **AreaProtectionSystem** (`Protection/AreaProtection.cs`) — Advanced area protection with claim system, overlap detection, ownership transfer, bypass grants, JSON persistence
+- **AuthenticationService** (`Auth/AuthenticationService.cs`) — Name validation (regex + reserved names), ban checks, IP ban enforcement, server capacity, SHA256 password hashing with optional per-account password protection
 - **PhysicsEngine** (`Physics/PhysicsEngine.cs`) — Server-authoritative movement validation with position correction, NaN/Infinity checks, block type range validation, player AABB overlap checks on placement
 - **KnockbackSystem** (`Physics/KnockbackSystem.cs`) — Damage knockback calculation
 - **Security**: HTML/XML tag stripping in chat, security headers (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection), configurable CORS origins from `server_config.json`, enhanced rate limiting (join spam, punch, interact)
@@ -180,11 +181,12 @@ Creates `UIManager`, then `GameClient`, connects to server.
 - **InputManager** (`input/InputManager.ts`) — Keyboard/mouse state tracking
 - **AudioManager** (`audio/AudioManager.ts`) — Procedural audio via Web Audio API (8 sound types: block break, block place, footstep, hurt, pickup, death, note block, jukebox)
 - **Minimap** (`ui/Minimap.ts`) — 2D overhead minimap
-- **WeatherSystem** (`world/WeatherSystem.ts`) — Rain particle system
+- **WeatherSystem** (`world/WeatherSystem.ts`) — Rain and snow particle systems with cyclable weather modes
 - **ParticleSystem** (`world/ParticleSystem.ts`) — Block break/place/damage particles
 - **WieldItem** (`rendering/WieldItem.ts`) — First-person held item display
 - **SelectionBox** (`rendering/SelectionBox.ts`) — Block targeting highlight
 - **BlockRegistry** (`world/BlockRegistry.ts`) — Block definitions loaded from server, maps block types to texture atlas regions (101 block types with textures)
+- **ItemRegistry** (`world/ItemRegistry.ts`) — Item definitions loaded from server, texture URL resolution for inventory display
 - **SettingsPanel** (`ui/SettingsPanel.ts`) — Settings UI with persistence
 
 ## World System
@@ -349,7 +351,7 @@ The server performs authoritative movement validation to prevent cheating:
 ## Dependency Injection
 
 All server services registered as **Singleton** in `Program.cs`:
-`ServerConfig`, `BlockDefinitionManager`, `WorldGeneratorFactory`, `SmeltingSystem`, `PrivilegeSystem`, `ActiveBlockModifierSystem`, `KnockbackSystem`, `PlayerDatabase`, `BlockMetadataDatabase`, `GameServer`, `AuthenticationService`, `ChatCommandManager`, `CraftingSystem`, `EntityManager`, `GameLoopService` (hosted).
+`ServerConfig`, `BlockDefinitionManager`, `WorldGeneratorFactory`, `SmeltingSystem`, `PrivilegeSystem`, `ActiveBlockModifierSystem`, `KnockbackSystem`, `PlayerDatabase`, `BlockMetadataDatabase`, `GameServer`, `AuthenticationService`, `ChatCommandManager`, `CraftingSystem`, `EntityManager`, `AreaProtectionSystem`, `DetachedInventoryManager`, `ParticleSpawnerManager`, `GameLoopService` (hosted).
 
 ## Recent Improvements
 
@@ -401,6 +403,7 @@ All server services registered as **Singleton** in `Program.cs`:
 
 ### Authentication & Authorization
 - Player name validation: regex `^[a-zA-Z0-9_-]{1,20}$` + reserved name list (server, admin, system, console, root, moderator)
+- Optional password authentication with SHA256 hashing + salt
 - IP-based and name-based ban system (`AuthenticationService`)
 - 19 privilege system with per-player grant/revoke loaded from `privileges.json`
 - Server capacity enforcement (max players check)

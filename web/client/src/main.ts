@@ -75,6 +75,10 @@ class App {
             if (e.key === 'p' || e.key === 'P') {
                 this.uiManager.toggleArmorPanel();
             }
+            if (e.key === 'b' || e.key === 'B') {
+                const weatherType = this.gameClient.toggleWeather();
+                this.uiManager.showWeatherNotification(weatherType);
+            }
         });
 
         document.addEventListener('respawnRequest', () => {

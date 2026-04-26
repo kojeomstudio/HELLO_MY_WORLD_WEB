@@ -1065,4 +1065,24 @@ export class UIManager {
             overlay.parentNode.removeChild(overlay);
         }
     }
+
+    showWeatherNotification(weatherType: string): void {
+        const label = weatherType === 'none' ? 'Clear' :
+                      weatherType === 'rain' ? 'Rain' :
+                      weatherType === 'snow' ? 'Snow' : weatherType;
+
+        const notification = document.createElement('div');
+        notification.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:white;font-size:24px;text-shadow:2px 2px 4px black;pointer-events:none;z-index:200;opacity:1;transition:opacity 1s;';
+        notification.textContent = `Weather: ${label}`;
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+            notification.style.opacity = '0';
+        }, 1500);
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 2500);
+    }
 }
