@@ -151,9 +151,16 @@ cd web/client && npm install && npm run dev
 ```
 
 ### Access
-- Game: http://localhost:5173
+- Game (dev): http://localhost:5173
+- Game (prod): http://localhost:5266
 - Server API: http://localhost:5266
 - API Status: http://localhost:5266/api/status
+
+### Production mode (single server):
+```bash
+# Builds client, then serves both via the C# server
+start-prod.bat
+```
 
 ## Build
 
@@ -179,6 +186,27 @@ node test-protocol.mjs
 ```
 
 The test verifies: API status, SignalR connection, join/init protocol, position updates, chat, chunk requests, crafting recipes, and privilege system.
+
+## CLI Test Tool
+
+Comprehensive CLI-based feature testing with 20+ individual test suites:
+
+```bash
+# Run all tests (auto-starts server)
+cli-test.bat
+
+# Run specific suites
+cli-test.bat quick              # Quick smoke test
+cli-test.bat protocol           # Full protocol sequence
+cli-test.bat crafting smelting  # Specific suites
+
+# Manual - requires server already running
+node cli-test.mjs all           # All suites
+node cli-test.mjs list          # List available suites
+node cli-test.mjs multiplayer   # 2-player test
+```
+
+Available test suites: `api-status`, `connection`, `position`, `chat`, `chunk`, `block-ops`, `crafting`, `smelting`, `inventory`, `privileges`, `armor`, `fishing`, `entity`, `gamemode`, `teleport`, `give`, `worldborder`, `daynight`, `interact`, `bucket`, `multiplayer`, `full-protocol`, `privs`, `respawn`, `sign`
 
 ## Communication
 

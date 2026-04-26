@@ -66,6 +66,18 @@ public class GameHub : Hub<IGameClient>
     private readonly BlockDefinitionManager _blockDefinitionManager;
     private readonly SmeltingSystem _smeltingSystem;
     private readonly IHubContext<GameHub, IGameClient> _hubContext;
+    private readonly ServerConfig _config;
+
+    private static readonly Dictionary<string, int> DefaultStartItemCounts = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["torch"] = 16,
+        ["bread"] = 5,
+        ["coal"] = 8,
+        ["oak_planks"] = 16,
+        ["planks"] = 16,
+        ["stick"] = 8,
+        ["apple"] = 5
+    };
 
     public GameHub(
         GameServer gameServer,
@@ -76,7 +88,8 @@ public class GameHub : Hub<IGameClient>
         EntityManager entityManager,
         BlockDefinitionManager blockDefinitionManager,
         SmeltingSystem smeltingSystem,
-        IHubContext<GameHub, IGameClient> hubContext)
+        IHubContext<GameHub, IGameClient> hubContext,
+        ServerConfig config)
     {
         _gameServer = gameServer;
         _logger = logger;
@@ -87,6 +100,7 @@ public class GameHub : Hub<IGameClient>
         _blockDefinitionManager = blockDefinitionManager;
         _smeltingSystem = smeltingSystem;
         _hubContext = hubContext;
+        _config = config;
     }
 
     public override async Task OnConnectedAsync()
@@ -167,10 +181,11 @@ public class GameHub : Hub<IGameClient>
 
         if (isNewPlayer)
         {
-            player.Inventory.AddItem(new ItemStack("wooden_pickaxe", 1));
-            player.Inventory.AddItem(new ItemStack("wooden_sword", 1));
-            player.Inventory.AddItem(new ItemStack("torch", 16));
-            player.Inventory.AddItem(new ItemStack("bread", 5));
+            foreach (var itemName in _config.Player.StartItems)
+            {
+                var count = DefaultStartItemCounts.TryGetValue(itemName, out var c) ? c : 1;
+                player.Inventory.AddItem(new ItemStack(itemName, count));
+            }
         }
 
         await Clients.All.OnPlayerJoined(playerName);
@@ -566,6 +581,7 @@ public class GameHub : Hub<IGameClient>
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
         if (player.IsDead) return;
+        if (slotIndex < 0 || slotIndex >= player.Inventory.Size) return;
 
         var item = player.Inventory[slotIndex];
         if (item == null) return;
@@ -1186,6 +1202,8 @@ public class GameHub : Hub<IGameClient>
     {
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
+        if (slotIndex < 0 || slotIndex >= player.Inventory.Size) return;
+        if (count <= 0 || count > 64) return;
 
         var item = player.Inventory.RemoveItem(slotIndex, count);
         if (item != null)
@@ -1274,6 +1292,8 @@ public class GameHub : Hub<IGameClient>
     {
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
+        if (slotIndex < 0 || slotIndex >= player.Inventory.Size) return;
+        if (armorSlot < 0 || armorSlot >= player.ArmorSlots.Length) return;
         var item = player.Inventory[slotIndex];
         if (item == null) return;
         var itemId = item.ItemId.ToLowerInvariant();

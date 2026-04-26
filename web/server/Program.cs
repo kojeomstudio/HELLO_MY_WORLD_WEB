@@ -385,6 +385,16 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors();
+
+var clientDistPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "client", "dist");
+if (!Directory.Exists(clientDistPath))
+    clientDistPath = Path.Combine(Directory.GetCurrentDirectory(), "client", "dist");
+if (Directory.Exists(clientDistPath))
+{
+    var fileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(clientDistPath);
+    app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = fileProvider });
+    app.UseStaticFiles(new StaticFileOptions { FileProvider = fileProvider, ServeUnknownFileTypes = true });
+}
 app.Use(async (context, next) =>
 {
     context.Response.Headers["X-Content-Type-Options"] = "nosniff";
@@ -396,7 +406,7 @@ app.Use(async (context, next) =>
         "script-src 'self'; " +
         "style-src 'self' 'unsafe-inline'; " +
         "img-src 'self' data: blob:; " +
-        "connect-src 'self' ws: wss: http://localhost:5173 http://localhost:5266; " +
+        $"connect-src 'self' ws: wss: {string.Join(' ', serverConfig.CorsOrigins)}; " +
         "media-src 'self' blob:; " +
         "font-src 'self'; " +
         "object-src 'none'; " +
@@ -414,6 +424,15 @@ app.MapGet("/api/status", (GameServer server) => new
     maxPlayers = server.MaxPlayers,
     isRunning = server.IsRunning
 });
+
+if (Directory.Exists(clientDistPath))
+{
+    var fileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(clientDistPath);
+    app.MapFallbackToFile("index.html", new Microsoft.AspNetCore.Builder.StaticFileOptions
+    {
+        FileProvider = fileProvider
+    });
+}
 
 var gameServer = app.Services.GetRequiredService<GameServer>();
 var hubContext = app.Services.GetRequiredService<IHubContext<GameHub, IGameClient>>();
