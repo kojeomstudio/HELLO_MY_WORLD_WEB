@@ -33,7 +33,7 @@ const TEXTURE_NAMES: string[] = [
     'default_wool_light_blue', 'default_wool_magenta', 'default_wool_gray', 'default_wool_light_gray'
 ];
 
-const FALL_GRAVITY = 20.0;
+const FALL_GRAVITY = 9.81;
 
 class FallingBlockAnimation {
     mesh: THREE.Mesh;

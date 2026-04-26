@@ -163,6 +163,10 @@ public class ChatCommandManager
                     return Task.FromResult("Invalid coordinates. Usage: /tp <x> <y> <z>");
                 }
 
+                x = Math.Clamp(x, -5000f, 5000f);
+                y = Math.Clamp(y, -64f, 320f);
+                z = Math.Clamp(z, -5000f, 5000f);
+
                 _teleport(playerName, new Vector3(x, y, z));
                 return Task.FromResult($"Teleported {playerName} to ({x}, {y}, {z})");
             }, "teleport"));
@@ -181,6 +185,7 @@ public class ChatCommandManager
                     return Task.FromResult("Invalid count. Usage: /give <player> <item> [count]");
                 }
 
+                count = Math.Clamp(count, 1, 64);
                 _giveItem(playerName, targetPlayer, itemId, count);
                 return Task.FromResult($"Gave {count}x {itemId} to {targetPlayer}");
             }, "give"));

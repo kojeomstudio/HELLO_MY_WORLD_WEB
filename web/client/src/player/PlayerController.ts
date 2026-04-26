@@ -4,8 +4,8 @@ import { InputManager } from '../input/InputManager';
 import { WorldManager } from '../world/WorldManager';
 import { SelectionBox } from '../rendering/SelectionBox';
 
-const GRAVITY = 20.0;
-const WALK_SPEED = 5.0;
+const GRAVITY = 9.81;
+const WALK_SPEED = 4.0;
 const SPRINT_SPEED = 8.0;
 const FLY_SPEED = 12.0;
 
@@ -271,38 +271,79 @@ export class PlayerController {
     }
 
     private castRay(): { blockX: number; blockY: number; blockZ: number; placeX: number; placeY: number; placeZ: number } | null {
+        if (!this._worldManager) return null;
+
         const direction = new THREE.Vector3(0, 0, -1);
         direction.applyQuaternion(this._camera.quaternion);
 
-        const raycaster = new THREE.Raycaster(this._camera.position, direction, 0, 8);
-        const scene = this._camera.parent;
+        const origin = this._camera.position.clone();
+        const maxDist = 8;
 
-        if (!scene) return null;
+        let x = Math.floor(origin.x);
+        let y = Math.floor(origin.y);
+        let z = Math.floor(origin.z);
 
-        const meshes: THREE.Mesh[] = [];
-        scene.traverse((child) => {
-            if (child instanceof THREE.Mesh && child.name !== 'sky' && child.name !== 'sun' && !child.userData.entityId) {
-                meshes.push(child);
+        const stepX = direction.x >= 0 ? 1 : -1;
+        const stepY = direction.y >= 0 ? 1 : -1;
+        const stepZ = direction.z >= 0 ? 1 : -1;
+
+        const tDeltaX = direction.x !== 0 ? Math.abs(1 / direction.x) : Infinity;
+        const tDeltaY = direction.y !== 0 ? Math.abs(1 / direction.y) : Infinity;
+        const tDeltaZ = direction.z !== 0 ? Math.abs(1 / direction.z) : Infinity;
+
+        let tMaxX = direction.x !== 0
+            ? ((direction.x > 0 ? (x + 1 - origin.x) : (origin.x - x)) * tDeltaX)
+            : Infinity;
+        let tMaxY = direction.y !== 0
+            ? ((direction.y > 0 ? (y + 1 - origin.y) : (origin.y - y)) * tDeltaY)
+            : Infinity;
+        let tMaxZ = direction.z !== 0
+            ? ((direction.z > 0 ? (z + 1 - origin.z) : (origin.z - z)) * tDeltaZ)
+            : Infinity;
+
+        let prevX = x, prevY = y, prevZ = z;
+        const registry = this._worldManager.getBlockRegistry();
+
+        for (let i = 0; i < maxDist * 3; i++) {
+            const blockType = this._worldManager.getBlock(x, y, z);
+            if (blockType !== null && blockType !== undefined && blockType !== 0) {
+                const def = registry.get(blockType);
+                if (def && (def.solid || def.interactive || def.liquid || def.climbable)) {
+                    return {
+                        blockX: x, blockY: y, blockZ: z,
+                        placeX: prevX, placeY: prevY, placeZ: prevZ
+                    };
+                }
             }
-        });
 
-        const intersects = raycaster.intersectObjects(meshes, false);
-        if (intersects.length === 0) return null;
+            prevX = x;
+            prevY = y;
+            prevZ = z;
 
-        const hit = intersects[0];
-        const normal = hit.face?.normal;
+            if (tMaxX < tMaxY) {
+                if (tMaxX < tMaxZ) {
+                    if (tMaxX > maxDist) break;
+                    x += stepX;
+                    tMaxX += tDeltaX;
+                } else {
+                    if (tMaxZ > maxDist) break;
+                    z += stepZ;
+                    tMaxZ += tDeltaZ;
+                }
+            } else {
+                if (tMaxY < tMaxZ) {
+                    if (tMaxY > maxDist) break;
+                    y += stepY;
+                    tMaxY += tDeltaY;
+                } else {
+                    if (tMaxZ > maxDist) break;
+                    z += stepZ;
+                    tMaxZ += tDeltaZ;
+                }
+            }
+        }
 
-        if (!normal) return null;
-
-        const blockX = Math.floor(hit.point.x - normal.x * 0.5);
-        const blockY = Math.floor(hit.point.y - normal.y * 0.5);
-        const blockZ = Math.floor(hit.point.z - normal.z * 0.5);
-
-        const placeX = Math.floor(hit.point.x + normal.x * 0.5);
-        const placeY = Math.floor(hit.point.y + normal.y * 0.5);
-        const placeZ = Math.floor(hit.point.z + normal.z * 0.5);
-
-        return { blockX, blockY, blockZ, placeX, placeY, placeZ };
+        return null;
     }
 
     update(dt: number): void {

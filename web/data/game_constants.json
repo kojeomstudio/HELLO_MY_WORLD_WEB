@@ -4,7 +4,7 @@
   "map": {
     "blockSize": 16,
     "maxGenerationLimit": 31007,
-    "chunkSize": 5,
+    "mapGenChunkSize": 5,
     "waterLevel": 1
   },
   "node": {

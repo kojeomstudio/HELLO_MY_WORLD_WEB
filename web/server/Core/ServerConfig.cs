@@ -61,15 +61,15 @@ public class PlayerSettings
 
 public class PhysicsSettings
 {
-    public float Gravity { get; set; } = 20.0f;
-    public float JumpForce { get; set; } = 8.0f;
-    public float WalkSpeed { get; set; } = 5.0f;
+    public float Gravity { get; set; } = 9.81f;
+    public float JumpForce { get; set; } = 6.5f;
+    public float WalkSpeed { get; set; } = 4.0f;
     public float SprintSpeed { get; set; } = 8.0f;
     public float FlySpeed { get; set; } = 12.0f;
     public float TerminalVelocity { get; set; } = 50.0f;
     public float Drag { get; set; } = 0.1f;
     public float LiquidDrag { get; set; } = 0.8f;
-    public float ClimbSpeed { get; set; } = 2.0f;
+    public float ClimbSpeed { get; set; } = 3.0f;
     public float DigRange { get; set; } = 6.0f;
     public float PlaceRange { get; set; } = 6.0f;
     public float PunchRange { get; set; } = 4.0f;

@@ -126,8 +126,8 @@ public class GameHub : Hub<IGameClient>
     public async Task Join(string playerName)
     {
         var ipAddress = Context.GetHttpContext()?.Connection?.RemoteIpAddress?.ToString() ?? Context.ConnectionId;
-        _joinAttempts.TryGetValue(ipAddress, out var attempts);
-        if (attempts >= 5)
+        var currentAttempts = _joinAttempts.AddOrUpdate(ipAddress, 1, (_, old) => old + 1);
+        if (currentAttempts >= 5)
         {
             var oldestAttempt = _joinAttempts.TryGetValue(ipAddress + "_time", out var t) ? t : 0;
             if (DateTimeOffset.UtcNow.ToUnixTimeSeconds() - oldestAttempt < 60)
@@ -138,8 +138,7 @@ public class GameHub : Hub<IGameClient>
             _joinAttempts.TryRemove(ipAddress, out _);
             _joinAttempts.TryRemove(ipAddress + "_time", out _);
         }
-        _joinAttempts[ipAddress] = attempts + 1;
-        if (attempts == 0)
+        if (currentAttempts == 1)
         {
             _joinAttempts[ipAddress + "_time"] = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         }

@@ -119,6 +119,12 @@ public class GameServer
         _mobSpawner = new MobSpawner(entityManager);
         _mobSpawner.SetGameTimeProvider(() => GameTime);
 
+        _breedingSystem.SpawnMob = baby =>
+        {
+            _entityManager.Add(baby);
+            return baby;
+        };
+
         MaxPlayers = config.Server.MaxPlayers;
         TickRate = config.Server.TickRate;
         WorldBorderSize = config.World.WorldBorderSize;

@@ -33,4 +33,20 @@ public class Block
     {
         return (ushort)((byte)Type | (ushort)(Param1 << 8));
     }
+
+    public uint ToPacked()
+    {
+        return (uint)Type | ((uint)Param1 << 8) | ((uint)Param2 << 16) | ((uint)Light << 24);
+    }
+
+    public static Block FromPacked(uint packed)
+    {
+        return new Block
+        {
+            Type = (BlockType)(packed & 0xFF),
+            Param1 = (byte)((packed >> 8) & 0xFF),
+            Param2 = (byte)((packed >> 16) & 0xFF),
+            Light = (byte)((packed >> 24) & 0xFF)
+        };
+    }
 }

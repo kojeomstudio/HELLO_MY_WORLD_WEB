@@ -159,27 +159,41 @@ export class ParticleSystem {
     private updateGeometry(): void {
         const count = this.particles.length;
         if (count === 0) {
-            this.geometry.setAttribute('position', new THREE.Float32BufferAttribute([], 3));
-            this.geometry.setAttribute('color', new THREE.Float32BufferAttribute([], 3));
+            this.geometry.setDrawRange(0, 0);
             return;
         }
 
-        const positions = new Float32Array(count * 3);
-        const colors = new Float32Array(count * 3);
+        const posAttr = this.geometry.getAttribute('position') as THREE.BufferAttribute;
+        const colAttr = this.geometry.getAttribute('color') as THREE.BufferAttribute;
 
-        for (let i = 0; i < count; i++) {
-            const p = this.particles[i];
-            positions[i * 3] = p.position.x;
-            positions[i * 3 + 1] = p.position.y;
-            positions[i * 3 + 2] = p.position.z;
+        if (!posAttr || posAttr.count < count) {
+            const positions = new Float32Array(count * 3);
+            const colors = new Float32Array(count * 3);
 
-            colors[i * 3] = p.color.r * p.alpha;
-            colors[i * 3 + 1] = p.color.g * p.alpha;
-            colors[i * 3 + 2] = p.color.b * p.alpha;
+            for (let i = 0; i < count; i++) {
+                const p = this.particles[i];
+                positions[i * 3] = p.position.x;
+                positions[i * 3 + 1] = p.position.y;
+                positions[i * 3 + 2] = p.position.z;
+
+                colors[i * 3] = p.color.r * p.alpha;
+                colors[i * 3 + 1] = p.color.g * p.alpha;
+                colors[i * 3 + 2] = p.color.b * p.alpha;
+            }
+
+            this.geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            this.geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+        } else {
+            for (let i = 0; i < count; i++) {
+                const p = this.particles[i];
+                posAttr.setXYZ(i, p.position.x, p.position.y, p.position.z);
+                colAttr.setXYZ(i, p.color.r * p.alpha, p.color.g * p.alpha, p.color.b * p.alpha);
+            }
+            posAttr.needsUpdate = true;
+            colAttr.needsUpdate = true;
         }
 
-        this.geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-        this.geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+        this.geometry.setDrawRange(0, count);
     }
 
     destroy(): void {

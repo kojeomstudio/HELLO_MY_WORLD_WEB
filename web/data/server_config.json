@@ -32,15 +32,15 @@
         "startItems": ["wooden_pickaxe", "wooden_sword", "wooden_axe", "wooden_shovel", "torch", "bread", "bucket"]
     },
     "physics": {
-        "gravity": 20.0,
-        "jumpForce": 8.0,
-        "walkSpeed": 5.0,
+        "gravity": 9.81,
+        "jumpForce": 6.5,
+        "walkSpeed": 4.0,
         "sprintSpeed": 8.0,
         "flySpeed": 12.0,
         "terminalVelocity": 50.0,
         "drag": 0.1,
         "liquidDrag": 0.8,
-        "climbSpeed": 2.0
+        "climbSpeed": 3.0
     },
     "dayNight": {
         "cycleLength": 24000,

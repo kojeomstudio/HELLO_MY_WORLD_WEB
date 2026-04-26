@@ -272,7 +272,7 @@ This project is a web port of the Luanti (formerly Minetest) voxel game engine, 
 - **Tools**: Full tool tier system (wood/stone/iron/steel/diamond/mese) matching minetest groupcap system
 - **Tool Wear**: 65536-scale wear system matching minetest, tool repair via combining
 - **Crafting**: Shaped and shapeless recipes with group-based matching
-- **Physics**: AABB collision, gravity, liquid physics, knockback formula
+- **Physics**: AABB collision, gravity (9.81 m/s^2), liquid physics, knockback formula
 - **Privileges**: Complete privilege system matching minetest's builtin definitions
 - **Chat Commands**: Full command set matching minetest's builtin chat commands
 - **Entities**: Item entities with merge behavior and TTL, mob entities with full AI state machine
