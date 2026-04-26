@@ -349,7 +349,7 @@ public class World
                     for (int z = 0; z < Chunk.Size; z++)
                     {
                         var block = chunk.GetBlock(x, y, z);
-                        var blockData = block.ToUInt16();
+                        var blockData = (ushort)block.Type;
                         if (blockData == 0) continue;
 
                         var def = blockDefs.Get(blockData);
@@ -363,7 +363,7 @@ public class World
 
                         var belowPos = new Vector3s(worldX, (short)(worldY - 1), worldZ);
                         var belowBlock = GetBlock(belowPos);
-                        var belowData = belowBlock.ToUInt16();
+                        var belowData = (ushort)belowBlock.Type;
 
                         if (belowData == 0)
                         {

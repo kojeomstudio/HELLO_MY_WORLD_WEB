@@ -457,9 +457,11 @@ export class GameClient {
         switch (type) {
             case 'dig':
                 this.particleSystem.emitBlockParticles(x, y, z, color, 8);
+                this.wieldItem.swing();
                 break;
             case 'place':
                 this.particleSystem.emitPlaceParticles(x, y, z, color, 6);
+                this.wieldItem.swing();
                 break;
             case 'damage':
                 this.particleSystem.emitDamageParticles(

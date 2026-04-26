@@ -25,7 +25,7 @@ public interface IGameClient
     Task OnPlayerListUpdate(string[] players);
     Task OnPlayerPositionUpdate(string playerName, float x, float y, float z, float yaw, float pitch);
     Task OnChatMessage(string sender, string message);
-    Task OnBlockUpdate(int x, int y, int z, ushort blockData);
+    Task OnBlockUpdate(int x, int y, int z, uint blockData);
     Task OnHealthUpdate(float health, float maxHealth);
     Task OnInventoryUpdate(object[] items);
     Task OnTimeUpdate(long time, float speed, float skyBrightness);
@@ -322,7 +322,7 @@ public class GameHub : Hub<IGameClient>
                 return;
             }
             var plantedBlock = _gameServer.DefaultWorld.GetBlock(new Vector3s((short)x, (short)y, (short)z));
-            await Clients.All.OnBlockUpdate(x, y, z, plantedBlock.ToUInt16());
+            await Clients.All.OnBlockUpdate(x, y, z, plantedBlock.ToPacked());
             return;
         }
 
@@ -343,7 +343,7 @@ public class GameHub : Hub<IGameClient>
             {
                 var neighborPos = new Vector3s((short)(x + dx), (short)(y + dy), (short)(z + dz));
                 var neighborBlock = _gameServer.DefaultWorld.GetBlock(neighborPos);
-                var neighborDef = _blockDefinitionManager.Get(neighborBlock.ToUInt16());
+                var neighborDef = _blockDefinitionManager.Get((ushort)neighborBlock.Type);
                 if (neighborDef != null && neighborDef.Solid)
                 {
                     hasSolidNeighbor = true;
@@ -359,10 +359,10 @@ public class GameHub : Hub<IGameClient>
 
         var newBlock = new Block((BlockType)blockType);
         _gameServer.Rollback.RecordChange(x, y, z,
-            _gameServer.DefaultWorld.GetBlock(new Vector3s((short)x, (short)y, (short)z)).ToUInt16(),
-            newBlock.ToUInt16(), player.Name, "PLACE");
+            _gameServer.DefaultWorld.GetBlock(new Vector3s((short)x, (short)y, (short)z)).ToPacked(),
+            newBlock.ToPacked(), player.Name, "PLACE");
         _gameServer.DefaultWorld.SetBlock(new Vector3s((short)x, (short)y, (short)z), newBlock);
-        await Clients.All.OnBlockUpdate(x, y, z, newBlock.ToUInt16());
+        await Clients.All.OnBlockUpdate(x, y, z, newBlock.ToPacked());
     }
 
     public async Task DigBlock(int x, int y, int z)
@@ -387,7 +387,7 @@ public class GameHub : Hub<IGameClient>
 
         var blockPos = new Vector3s((short)x, (short)y, (short)z);
         var oldBlock = _gameServer.DefaultWorld.GetBlock(blockPos);
-        var blockData = oldBlock.ToUInt16();
+        var blockData = oldBlock.ToPacked();
 
         if (blockData == 0) return;
 
@@ -412,17 +412,17 @@ public class GameHub : Hub<IGameClient>
             }
         }
 
-        var blockDef = _blockDefinitionManager.Get(blockData);
+        var blockDef = _blockDefinitionManager.Get((ushort)oldBlock.Type);
         if (blockDef != null && !blockDef.Breakable)
         {
             return;
         }
 
-        _gameServer.Rollback.RecordChange(x, y, z, oldBlock.ToUInt16(), 0, player.Name, "DIG");
+        _gameServer.Rollback.RecordChange(x, y, z, oldBlock.ToPacked(), 0, player.Name, "DIG");
         _gameServer.DefaultWorld.SetBlock(blockPos, Block.Air);
         await Clients.All.OnBlockUpdate(x, y, z, 0);
 
-        var dropName = blockDef?.Drops ?? blockDef?.Name ?? ((BlockType)(blockData & 0xFF)).ToString().ToLowerInvariant();
+        var dropName = blockDef?.Drops ?? blockDef?.Name ?? oldBlock.Type.ToString().ToLowerInvariant();
         var itemEntity = new ItemEntity(dropName, 1, new Vector3(x + 0.5f, y + 0.5f, z + 0.5f));
         _entityManager.Add(itemEntity);
 
@@ -468,7 +468,7 @@ public class GameHub : Hub<IGameClient>
         if (player == null) return -1f;
         var blockPos = new Vector3s((short)x, (short)y, (short)z);
         var block = _gameServer.DefaultWorld.GetBlock(blockPos);
-        var blockData = block.ToUInt16();
+        var blockData = (ushort)block.Type;
         if (blockData == 0) return -1f;
         var blockDef = _blockDefinitionManager.Get(blockData);
         if (blockDef == null || !blockDef.Breakable) return -1f;
@@ -706,7 +706,7 @@ public class GameHub : Hub<IGameClient>
 
         var blockPos = new Vector3s((short)x, (short)y, (short)z);
         var block = _gameServer.DefaultWorld.GetBlock(blockPos);
-        var blockData = block.ToUInt16();
+        var blockData = (ushort)block.Type;
         if (blockData == 0) return;
 
         var blockDef = _blockDefinitionManager.Get(blockData);
@@ -745,7 +745,7 @@ public class GameHub : Hub<IGameClient>
 
         var blockPos = new Vector3s((short)x, (short)y, (short)z);
         var block = _gameServer.DefaultWorld.GetBlock(blockPos);
-        var blockDef = _blockDefinitionManager.Get(block.ToUInt16());
+        var blockDef = _blockDefinitionManager.Get((ushort)block.Type);
         if (blockDef == null || blockDef.Name != "sign") return;
 
         var blockCenter = new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
@@ -765,7 +765,7 @@ public class GameHub : Hub<IGameClient>
         if (player == null) return;
         var blockPos = new Vector3s((short)x, (short)y, (short)z);
         var block = _gameServer.DefaultWorld.GetBlock(blockPos);
-        var blockDef = _blockDefinitionManager.Get(block.ToUInt16());
+        var blockDef = _blockDefinitionManager.Get((ushort)block.Type);
         if (blockDef == null) return;
         if (blockDef.Climbable)
         {
@@ -812,7 +812,7 @@ public class GameHub : Hub<IGameClient>
                 var isOpen = (doorBlock.Param2 & 1) == 1;
                 var newBlock = new Block(doorBlock.Type, doorBlock.Param1, (byte)(isOpen ? 0 : 1), doorBlock.Light);
                 _gameServer.DefaultWorld.SetBlock(blockPos, newBlock);
-                await Clients.All.OnBlockUpdate(x, y, z, newBlock.ToUInt16());
+                await Clients.All.OnBlockUpdate(x, y, z, newBlock.ToPacked());
             }
             else if (blockName == "crafting_table")
             {

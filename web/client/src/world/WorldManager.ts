@@ -305,8 +305,10 @@ export class WorldManager {
             const localY = ((y % 16) + 16) % 16;
             const localZ = ((z % 16) + 16) % 16;
             const index = (localX * 16 * 16 + localY * 16 + localZ) * 4;
-            chunk.blocks[index] = (blockData >> 8) & 0xFF;
-            chunk.blocks[index + 1] = blockData & 0xFF;
+            chunk.blocks[index] = blockData & 0xFF;
+            chunk.blocks[index + 1] = (blockData >> 8) & 0xFF;
+            chunk.blocks[index + 2] = (blockData >> 16) & 0xFF;
+            chunk.blocks[index + 3] = (blockData >> 24) & 0xFF;
 
             this.rebuildChunkMesh(key);
 

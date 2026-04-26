@@ -6,7 +6,7 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 
 - **Voxel World**: Procedurally generated 3D world with noise-based terrain, caves, ores, schematic-based trees (oak, pine, jungle, birch, cactus), rivers, multi-room dungeons, and 10 biomes (grassland, forest, desert, snow, taiga, jungle, savanna, mountains, swamp, ocean) selected via heat/humidity noise
 - **161 Block Types**: Including stone variants, 9 ore types (diamond, gold, iron, coal, redstone, emerald, lapis, copper), wood types (oak, jungle, pine), stairs/slabs, fences, walls, glass panes, doors, decorative blocks, flowers, mushrooms, utility blocks, light sources, fire, cobweb, Nether/End blocks, redstone components, and all wood variants (spruce/birch/jungle/acacia/dark oak doors, fences, planks)
-- **226 Block Definitions**: Full block enum (IDs 0-227) with complete defaults in code and JSON data override
+- **226 Block Definitions**: Full block enum (IDs 0-227) with complete defaults in code and JSON data override. Fixed: duplicate ID 117 resolved (LitPumpkin=117, JackOLantern=212), Pumpking typo corrected to Pumpkin
 - **220+ Items**: Tools (wood/stone/iron/diamond/gold/steel/mese/titanium), special weapons (fire sword, ice sword, blood sword, heal sword, elemental sword, daggers), steel shears, alchemy ingredients, crafting materials, armor (leather/iron/gold/diamond), food, resources, utility items, and fishing/breeding drops
 - **Crafting System**: 166+ recipes including shaped crafting, tool creation, special weapon recipes, ore block storage, copper processing, decoration recipes, gold tool recipes, titanium recipes, armor, building blocks, food, and tool repair
 - **Fuel Registry**: Configurable fuel items with burn times loaded from `items.json` (coal, charcoal, wood, lava bucket, etc.)
@@ -285,7 +285,7 @@ This project is a web port of the Luanti (formerly Minetest) voxel game engine, 
 - **Chat Commands**: Full command set matching minetest's builtin chat commands
 - **Entities**: Item entities with merge behavior and TTL, mob entities with full AI state machine
 - **Mob AI**: 5-state machine (Idle/Wander/Chase/Attack/Flee) with hostile/passive distinction
-- **Pathfinding**: A* pathfinding matching minetest's pathfinder.cpp
+- **Pathfinding**: A* pathfinding matching minetest's pathfinder.cpp, wired to mob AI for intelligent navigation
 - **Dungeons**: Multi-room procedural dungeons with corridors matching minetest's dungeongen
 - **ABMs**: Falling nodes, grass spreading, farmland decay, ice melting, fire spread, crop growth
 - **Liquid Physics**: Water/lava flow with level system, lava-water interaction

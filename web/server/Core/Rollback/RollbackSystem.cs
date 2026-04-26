@@ -13,8 +13,8 @@ public readonly record struct BlockChangeRecord(
     int X,
     int Y,
     int Z,
-    ushort OldBlockType,
-    ushort NewBlockType,
+    uint OldBlockData,
+    uint NewBlockData,
     string PlayerName,
     DateTime Timestamp,
     ChangeType ChangeType
@@ -28,7 +28,7 @@ public class RollbackSystem
     private readonly object _rollbackLock = new();
     private int _count;
 
-    public void RecordChange(int x, int y, int z, ushort oldType, ushort newType, string playerName, string changeType)
+    public void RecordChange(int x, int y, int z, uint oldData, uint newData, string playerName, string changeType)
     {
         var type = changeType.ToUpperInvariant() switch
         {
@@ -38,7 +38,7 @@ public class RollbackSystem
             _ => ChangeType.Place
         };
 
-        var record = new BlockChangeRecord(x, y, z, oldType, newType, playerName, DateTime.UtcNow, type);
+        var record = new BlockChangeRecord(x, y, z, oldData, newData, playerName, DateTime.UtcNow, type);
         _changes.Enqueue(record);
         Interlocked.Increment(ref _count);
 

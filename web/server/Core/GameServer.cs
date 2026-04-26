@@ -5,6 +5,7 @@ using WebGameServer.Core.Auth;
 using WebGameServer.Core.Entities;
 using WebGameServer.Core.Game;
 using WebGameServer.Core.Physics;
+using WorldPathfinder = WebGameServer.Core.Pathfinding.Pathfinder;
 using WebGameServer.Core.Player;
 using WebGameServer.Core.Protection;
 using WebGameServer.Core.Rollback;
@@ -50,6 +51,7 @@ public class GameServer
     private readonly FishingSystem _fishingSystem;
     private readonly BreedingSystem _breedingSystem;
     private readonly MobSpawner _mobSpawner;
+    private readonly WorldPathfinder _pathfinder;
     private NodeTimerSystem _nodeTimerSystem;
     public AgricultureSystem? Agriculture { get; set; }
     public FishingSystem FishingSystem => _fishingSystem;
@@ -118,6 +120,7 @@ public class GameServer
         _breedingSystem = breedingSystem;
         _mobSpawner = new MobSpawner(entityManager);
         _mobSpawner.SetGameTimeProvider(() => GameTime);
+        _pathfinder = new WorldPathfinder(DefaultWorld, _blockDefinitionManager);
 
         _breedingSystem.SpawnMob = baby =>
         {
@@ -176,6 +179,8 @@ public class GameServer
             return nearest;
         };
         MobEntity.DamagePlayer = (player, damage) => { DamagePlayer(player, damage, "mob"); };
+
+        MobEntity.FindPath = (start, end) => _pathfinder.FindPath(start, end);
 
         MobEntity.MobDeathDrops = (mob) =>
         {
@@ -400,7 +405,7 @@ public class GameServer
             (short)Math.Floor(player.Position.Y),
             (short)Math.Floor(player.Position.Z));
         var standingBlock = DefaultWorld.GetBlock(playerBlockPos);
-        var standingDef = _blockDefinitionManager.Get(standingBlock.ToUInt16());
+        var standingDef = _blockDefinitionManager.Get((ushort)standingBlock.Type);
 
         if (standingBlock.Type is BlockType.Lava or BlockType.LavaFlowing)
         {
@@ -448,7 +453,7 @@ public class GameServer
             (short)Math.Floor(player.Position.Y + 0.6f),
             (short)Math.Floor(player.Position.Z));
         var headBlock = DefaultWorld.GetBlock(headBlockPos);
-        var headDef = _blockDefinitionManager.Get(headBlock.ToUInt16());
+        var headDef = _blockDefinitionManager.Get((ushort)headBlock.Type);
 
         if (headDef != null && headDef.Drowning)
         {
@@ -549,8 +554,8 @@ public class GameServer
         var feetBlock = DefaultWorld.GetBlock(new Vector3s(playerBlockX, playerBlockY, playerBlockZ));
         var headBlock = DefaultWorld.GetBlock(new Vector3s(playerBlockX, (short)(playerBlockY + 1), playerBlockZ));
 
-        var feetDef = _blockDefinitionManager.Get(feetBlock.ToUInt16());
-        var headDef = _blockDefinitionManager.Get(headBlock.ToUInt16());
+        var feetDef = _blockDefinitionManager.Get((ushort)feetBlock.Type);
+        var headDef = _blockDefinitionManager.Get((ushort)headBlock.Type);
 
         bool insideSolid = (feetDef != null && feetDef.Solid && !feetDef.Transparent && feetDef.Climbable != true) ||
                            (headDef != null && headDef.Solid && !headDef.Transparent && headDef.Climbable != true);
@@ -639,7 +644,7 @@ public class GameServer
             noclipBlock.Type != BlockType.LavaFlowing &&
             noclipBlock.Type != BlockType.Ladder)
         {
-            var noclipDef = _blockDefinitionManager.Get(noclipBlock.ToUInt16());
+            var noclipDef = _blockDefinitionManager.Get((ushort)noclipBlock.Type);
             if (noclipDef != null && noclipDef.Solid && !noclipDef.Transparent && noclipDef.Climbable != true)
             {
                 if (!player.IsFlying && player.Mode != GameMode.Creative && player.Mode != GameMode.Spectator)

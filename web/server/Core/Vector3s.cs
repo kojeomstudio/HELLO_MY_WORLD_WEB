@@ -18,6 +18,8 @@ public readonly struct Vector3s : IEquatable<Vector3s>
     public static Vector3s Zero => new(0, 0, 0);
     public static Vector3s One => new(1, 1, 1);
 
+    public Vector3 ToVector3() => new(X, Y, Z);
+
     public static Vector3s operator +(Vector3s a, Vector3s b) => new((short)(a.X + b.X), (short)(a.Y + b.Y), (short)(a.Z + b.Z));
     public static Vector3s operator -(Vector3s a, Vector3s b) => new((short)(a.X - b.X), (short)(a.Y - b.Y), (short)(a.Z - b.Z));
     public static bool operator ==(Vector3s a, Vector3s b) => a.X == b.X && a.Y == b.Y && a.Z == b.Z;

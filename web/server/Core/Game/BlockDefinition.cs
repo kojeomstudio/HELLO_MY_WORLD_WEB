@@ -113,7 +113,7 @@ public class BlockDefinitionManager
             [(ushort)BlockType.Obsidian] = new() { Id = 36, Name = "obsidian", Solid = true, Color = "#1A0A2E", Hardness = 50.0f, Groups = new() { ["cracky"] = 5, ["oddly_breakable_by_hand"] = 5 }, SoundGroup = "stone" },
             [(ushort)BlockType.Cactus] = new() { Id = 37, Name = "cactus", Solid = true, Color = "#0A5C0A", Hardness = 0.4f, Damage = 1, Groups = new() { ["choppy"] = 2 }, SoundGroup = "wood" },
             [(ushort)BlockType.SugarCane] = new() { Id = 38, Name = "sugar_cane", Solid = false, Transparent = true, Color = "#90EE90", Hardness = 0.2f, Groups = new() { ["dig_immediate"] = 3 }, SoundGroup = "grass" },
-            [(ushort)BlockType.Pumpking] = new() { Id = 39, Name = "pumpkin", Solid = true, Color = "#FF8C00", Hardness = 1.0f, Groups = new() { ["choppy"] = 2 }, SoundGroup = "wood" },
+            [(ushort)BlockType.Pumpkin] = new() { Id = 39, Name = "pumpkin", Solid = true, Color = "#FF8C00", Hardness = 1.0f, Groups = new() { ["choppy"] = 2 }, SoundGroup = "wood" },
             [(ushort)BlockType.Melon] = new() { Id = 40, Name = "melon", Solid = true, Color = "#5C8A1E", Hardness = 1.0f, Drops = "melon_slice", Groups = new() { ["choppy"] = 2 }, SoundGroup = "wood" },
             [(ushort)BlockType.Mycelium] = new() { Id = 41, Name = "mycelium", Solid = true, Color = "#6B5A8A", Hardness = 0.6f, Drops = "dirt", Groups = new() { ["crumbly"] = 3 }, SoundGroup = "dirt" },
             [(ushort)BlockType.Farmland] = new() { Id = 42, Name = "farmland", Solid = true, Color = "#6B4E2A", Hardness = 0.6f, Groups = new() { ["crumbly"] = 3 }, SoundGroup = "dirt" },
