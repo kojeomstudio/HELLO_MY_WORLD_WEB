@@ -2,7 +2,7 @@
 
 ## Block Types
 
-101→161 block types defined in `BlockType.cs` enum and `blocks.json` (IDs 0-160):
+226 block types defined in `BlockType.cs` enum and `blocks.json` (IDs 0-227):
 
 | ID | Type | ID | Type | ID | Type |
 |----|------|----|------|----|------|
@@ -47,13 +47,19 @@ Blocks have groups that determine tool effectiveness:
 
 ## Biome System
 
-4 biomes loaded from `biomes.json`, selected by heat/humidity noise in `NoiseWorldGenerator`:
+10 biomes loaded from `biomes.json`, selected by heat/humidity noise in `NoiseWorldGenerator`:
 
 | Biome | Description | Surface Block | Tree Types |
 |-------|-------------|---------------|------------|
 | Grassland | Default temperate biome | Grass | Oak, Birch |
+| Forest | Dense tree coverage | Grass | Oak, Birch, Pine |
 | Desert | Hot, dry biome | DesertSand | None (cactus) |
 | Snow | Cold biome | DirtWithSnow | Pine |
+| Taiga | Cold forest | DirtWithSnow | Pine |
+| Jungle | Hot, humid biome | JungleGrass | Jungle |
+| Savanna | Warm, dry grassland | Grass | None |
+| Mountains | High altitude | Stone | None |
+| Swamp | Wet lowland | Grass | Oak |
 | Ocean | Deep water biome | Sand (below water) | None |
 
 Biome selection uses two independent Perlin noise maps (heat and humidity), matching minetest's biome selection approach.
@@ -100,7 +106,7 @@ Biome selection uses two independent Perlin noise maps (heat and humidity), matc
 
 ## Crafting Recipes
 
-125+ recipes from `web/data/items.json`. Key categories:
+166+ recipes from `web/data/items.json`. Key categories:
 
 ### Tools
 | Result | Ingredients |
@@ -152,7 +158,7 @@ Biome selection uses two independent Perlin noise maps (heat and humidity), matc
 
 ## Smelting Recipes
 
-25 recipes from `web/data/smelting.json`. All cook in 10 seconds except wood (15s).
+20 recipes from `web/data/smelting.json`. All cook in 10 seconds except wood (15s).
 
 | Input | Output | XP |
 |-------|--------|-----|
@@ -183,6 +189,8 @@ Fuel: Coal or Charcoal (1 per operation).
 | Steel | 3 | 400 | 6.0 | 4 |
 | Diamond | 4 | 1562 | 8.0 | 4 |
 | Mese | 255 | 1337 | 10.0 | 100 |
+| Gold | 2 | 32 | 12.0 | 1 |
+| Titanium | 5 | 2200 | 12.0 | 5 |
 
 Tool types and their block groups:
 - **Pickaxe**: `cracky` blocks (stone, ores, bricks)

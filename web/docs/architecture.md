@@ -102,9 +102,9 @@ See [server-api.md](server-api.md) for full method/event signatures.
 
 ### Crafting & Smelting
 
-**CraftingSystem** (`Crafting/CraftingSystem.cs`) — Recipe matching from inventory contents. 85+ recipes loaded from `items.json`.
+**CraftingSystem** (`Crafting/CraftingSystem.cs`) — Recipe matching from inventory contents. 166+ recipes loaded from `items.json`.
 
-**SmeltingSystem** (`Smelting/SmeltingSystem.cs`) — Furnace operations with cook time and experience. 25 recipes from `smelting.json`. Fuel registry loaded from `fuels` section in `items.json` with configurable burn times.
+**SmeltingSystem** (`Smelting/SmeltingSystem.cs`) — Furnace operations with cook time and experience. 20 recipes from `smelting.json`. Fuel registry loaded from `fuels` section in `items.json` with configurable burn times.
 
 ### Other Systems
 
@@ -289,7 +289,7 @@ Client                          Server
 - Noise-based terrain generation (Perlin noise)
 - Ground base: Y=32, terrain variation: ±20 blocks
 - Water level: Y=28
-- Biomes: plains, desert, jungle, pine forest (from `biomes.json`)
+- Biomes: grassland, forest, desert, snow, taiga, jungle, savanna, mountains, swamp, ocean (from `biomes.json`)
 - Trees generated with trunk + canopy (oak, jungle, pine variants)
 
 ### Caves & Ores

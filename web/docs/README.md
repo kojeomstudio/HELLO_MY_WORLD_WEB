@@ -1,6 +1,6 @@
 # HelloMyWorld - Architecture Documentation
 
-Web-based Minecraft/Minetest-like voxel game with 161 block types, 210+ items, 125+ crafting recipes, and enhanced biome-based world generation.
+Web-based voxel game ported from Luanti/Minetest with 226 block types, 220+ items, 166+ crafting recipes, 10 biomes, 6 mob types, and full multiplayer support.
 
 ## Tech Stack
 
@@ -20,7 +20,25 @@ Web-based Minecraft/Minetest-like voxel game with 161 block types, 210+ items, 1
 
 | Document | Description |
 |----------|-------------|
+| [Architecture Overview](architecture.md) | Full system architecture, data flow, security model |
 | [Client Architecture](client-architecture.md) | TypeScript client structure, classes, rendering pipeline |
 | [Server Architecture](server-architecture.md) | C# server structure, DI, game loop, services |
 | [Communication Protocol](communication-protocol.md) | SignalR hub methods (client-to-server, server-to-client) |
 | [Game Systems](game-systems.md) | World generation, lighting, physics, crafting, mobs, agriculture |
+| [Build & Run](build-run.md) | Build, run, test instructions |
+| [Network Protocol](network-protocol.md) | Network protocol details |
+| [Server API](server-api.md) | REST/SignalR API reference |
+| [Data Models](data-models.md) | Data model documentation |
+| [Communication](communication.md) | Communication architecture |
+
+### Reference Documentation (`reference/`)
+
+| Document | Description |
+|----------|-------------|
+| [Client Architecture (Minetest)](reference/client-architecture.md) | Minetest client architecture analysis |
+| [Server Architecture (Minetest)](reference/server-architecture.md) | Minetest server architecture analysis |
+| [World & Map System](reference/world-map-system.md) | Minetest world/map system reference |
+| [Map Generation](reference/mapgen-system.md) | Minetest mapgen system reference |
+| [Network Protocol (Minetest)](reference/network-protocol.md) | Minetest network protocol reference |
+| [Game Content](reference/game-content.md) | Minetest game content and data reference |
+| [Scripting & Modding](reference/scripting-modding.md) | Minetest Lua scripting reference |

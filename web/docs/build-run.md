@@ -12,13 +12,23 @@
 
 ## Configuration Files
 
-- `web/data/server_config.json` — Server settings (players, tick rate, world gen, physics, day/night, networking, liquids)
-- `web/data/blocks.json` — Block type definitions (32 entries)
-- `web/data/items.json` — Item definitions, crafting recipes, food values, tool capabilities
-- `web/data/smelting.json` — Smelting recipes
-- `web/data/biomes.json` — Biome definitions
+- `web/data/server_config.json` — Server settings (players, tick rate, world gen, physics, day/night, networking, liquids, CORS)
+- `web/data/blocks.json` — Block type definitions (226 entries)
+- `web/data/items.json` — Item definitions, 166+ crafting recipes, food values, tool capabilities, fuel registry
+- `web/data/smelting.json` — 20 smelting recipes
+- `web/data/biomes.json` — 10 biome definitions with tree types and decorations
+- `web/data/mobs.json` — 6 mob definitions (Zombie, Skeleton, Spider, Cow, Pig, Chicken)
+- `web/data/tools.json` — 8 tool material definitions
 - `web/data/physics_constants.json` — Physics configuration
-- `web/data/privileges.json` — Default privilege definitions
+- `web/data/privileges.json` — 19 privilege definitions
+- `web/data/tree_schematics.json` — Tree schematic definitions
+- `web/data/decorations.json` — World decoration definitions
+- `web/data/ores.json` — Ore distribution definitions
+- `web/data/sky_params.json` — Sky rendering parameters
+- `web/data/day_night_ratio.json` — Day/night brightness curve
+- `web/data/sounds.json` — 15 sound group definitions
+- `web/data/protection.json` — Protection system config
+- `web/data/game_constants.json` — Game constants
 
 ## Server
 
@@ -83,7 +93,47 @@ Open `http://localhost:5173` in a browser.
 
 ## Batch Scripts
 
-No batch scripts are currently provided. Use the commands above.
+| Script | Description |
+|--------|-------------|
+| `start.bat` | Start both server + client dev servers (Windows) |
+| `start.sh` | Start both server + client dev servers (Linux/macOS) |
+| `start-prod.bat` | Build client, then serve both via C# server |
+| `build.bat` | Production build of both server and client |
+| `test-protocol.bat` | Build + start server + run protocol integration tests |
+| `cli-test.bat` | Build + start server + run comprehensive CLI test suites |
+
+### Start (Development)
+
+```bash
+# Windows - starts server + Vite dev server
+start.bat
+
+# Linux/macOS
+chmod +x start.sh && ./start.sh
+```
+
+### Start (Production)
+
+```bash
+# Builds client, then serves everything from C# server on port 5266
+start-prod.bat
+```
+
+### CLI Test Tool
+
+```bash
+# Run all tests (auto-starts server)
+cli-test.bat
+
+# Run specific test suites
+cli-test.bat quick              # Quick smoke test
+cli-test.bat protocol           # Full protocol sequence
+cli-test.bat crafting smelting  # Specific suites
+
+# Manual (requires server already running)
+node cli-test.mjs all
+node cli-test.mjs list          # List available suites
+```
 
 ## World Data
 
@@ -100,6 +150,4 @@ World data is persisted to `web/data/worlds/default/`:
 |---------|------|-----|
 | Server | 5266 | http://localhost:5266 |
 | Client (dev) | 5173 | http://localhost:5173 |
-| Client (proxy) | 5173 | http://localhost:5173/game → localhost:5000 |
-
-Note: The server listens on port 5266 by default but the Vite proxy targets port 5000. Update `web/client/vite.config.ts` if the server port changes.
+| Client (proxy) | 5173 | http://localhost:5173/game → localhost:5266 |
