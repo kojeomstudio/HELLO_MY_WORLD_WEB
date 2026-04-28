@@ -253,6 +253,10 @@ export class GameClient {
         this.connection.on('OnBlockSound', (blockType: string, _x: number, _y: number, _z: number) => {
             this.audioManager.playBlockSound(blockType);
         });
+
+        this.connection.on('OnPhysicsParams', (gravity: number, jumpForce: number, walkSpeed: number, sprintSpeed: number, flySpeed: number, climbSpeed: number, liquidDrag: number) => {
+            this.playerController.setPhysicsParams({ gravity, jumpForce, walkSpeed, sprintSpeed, flySpeed, climbSpeed, liquidDrag });
+        });
     }
 
     sendChat(message: string): void {
@@ -413,6 +417,7 @@ export class GameClient {
         }
 
         this.renderer.updateLavaEffect(this.checkNearLava(playerPos));
+        this.updateWaterEffect(playerPos);
 
         this.renderer.render();
         this.uiManager.updateDebugInfo(
@@ -499,5 +504,15 @@ export class GameClient {
             }
         }
         return false;
+    }
+
+    private updateWaterEffect(pos: THREE.Vector3): void {
+        const headY = Math.floor(pos.y + 1.7);
+        const headBlockId = this.worldManager.getBlock(Math.floor(pos.x), headY, Math.floor(pos.z));
+        const isUnderwater = this.worldManager.getBlockRegistry().isLiquid(headBlockId);
+        this.renderer.updateWaterEffect(isUnderwater);
+        if (!isUnderwater) {
+            this.renderer.clearWaterEffect();
+        }
     }
 }

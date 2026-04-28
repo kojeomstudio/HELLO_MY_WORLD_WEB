@@ -1,14 +1,14 @@
 # HelloMyWorld
 
 Web-based voxel game ported from the minetest_sub_project (Luanti engine v5.16.0-dev).
-Built with **TypeScript + Three.js** (client) and **C# ASP.NET Core 8.0 + SignalR** (server).
+Built with **TypeScript + Three.js** (client) and **C# ASP.NET Core 10.0 + SignalR** (server).
 
 ## Tech Stack
 
 | Component | Technology |
 |-----------|-----------|
 | Client | TypeScript 5.9, Three.js 0.160, Vite 5.0 |
-| Server | C# .NET 8.0, ASP.NET Core, SignalR |
+| Server | C# .NET 10.0, ASP.NET Core, SignalR |
 | Communication | WebSocket (SignalR) |
 | Data | JSON configuration files |
 | Textures | 89 PNG textures from Minetest devtest |
@@ -17,7 +17,7 @@ Built with **TypeScript + Three.js** (client) and **C# ASP.NET Core 8.0 + Signal
 ## Prerequisites
 
 - **Node.js** 18+
-- **.NET 8.0 SDK**
+- **.NET 10.0 SDK**
 
 ## Quick Start
 
@@ -87,7 +87,9 @@ Output is in `web/client/dist/`. Serve with any static file server.
 - Particle effects (dig, place, damage, smoke)
 
 ### Player
-- First-person camera with WASD + mouse controls
+- First-person/third-person camera (F5 to cycle) with WASD + mouse controls
+- Head bobbing during walk/sprint
+- Underwater effects (blue overlay, fog)
 - Gravity, jumping, collision detection with step height
 - Ladder climbing
 - Sprint (Shift) and fly (F) modes
@@ -103,6 +105,7 @@ Output is in `web/client/dist/`. Serve with any static file server.
 - Chat system with slash commands (`/gamemode`, `/tp`, `/give`, `/giveme`, `/me`, `/msg`, `/mods`, `/days`, `/help`, `/time`, `/tps`, `/setborder`, `/admin`)
 - PvP combat with weapon damage and Minetest knockback formula (max 4 block range)
 - Rate limiting on chat, dig, place, punch, interact, and join spam
+- Server-driven physics parameters (gravity, speed, jump, etc.)
 - Server-authoritative physics validation
 - Configurable CORS origins from `server_config.json`
 - Security headers (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection)
@@ -119,6 +122,7 @@ Output is in `web/client/dist/`. Serve with any static file server.
 - Item drop entities with gravity and 5-minute lifespan
 - Item pickup system (2-block range, auto-collect)
 - Mob entities with AI state machine (Idle → Chase → Attack)
+- Detailed multi-part mob models (Zombie, Skeleton, Spider, Cow, Pig, Chicken) with name tags
 - Hostile mobs (Zombie, Skeleton, Spider) spawn at night with attack damage
 - Passive mobs (Cow, Pig, Chicken) spawn on grass during day, flee when hit
 - Entity spawn/despawn/position broadcast
@@ -150,13 +154,14 @@ Output is in `web/client/dist/`. Serve with any static file server.
 | 1-8 | Select hotbar slot |
 | T | Open chat |
 | E | Open crafting |
+| F5 | Cycle camera mode (1st/3rd person) |
 | F3 | Debug info |
 
 ## Project Structure
 
 ```
 web/
-  server/                    # C# .NET 8.0 Backend
+  server/                    # C# .NET 10.0 Backend
     Core/
       GameServer.cs          # Main game server controller
       ServerConfig.cs        # Server configuration models

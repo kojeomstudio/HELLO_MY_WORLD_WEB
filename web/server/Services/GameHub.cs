@@ -52,6 +52,7 @@ public interface IGameClient
     Task OnPositionCorrection(float x, float y, float z);
     Task OnSignEditorOpened(int x, int y, int z, string text);
     Task OnBlockSound(string blockType, int x, int y, int z);
+    Task OnPhysicsParams(float gravity, float jumpForce, float walkSpeed, float sprintSpeed, float flySpeed, float climbSpeed, float liquidDrag);
 }
 
 public class GameHub : Hub<IGameClient>
@@ -210,6 +211,11 @@ public class GameHub : Hub<IGameClient>
         await SendTimeUpdate();
         await Clients.Caller.OnFoodUpdate(player.FoodLevel, 20f);
         await SendBlockDefinitions();
+        await Clients.Caller.OnPhysicsParams(
+            _config.Physics.Gravity, _config.Physics.JumpForce,
+            _config.Physics.WalkSpeed, _config.Physics.SprintSpeed,
+            _config.Physics.FlySpeed, _config.Physics.ClimbSpeed,
+            _config.Physics.LiquidDrag);
         await SendInitialChunks(player);
     }
 

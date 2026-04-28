@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Web-based voxel game (HelloMyWorld) with a **TypeScript/Three.js client** and **C# ASP.NET Core 8.0/SignalR server**.
+Web-based voxel game (HelloMyWorld) with a **TypeScript/Three.js client** and **C# ASP.NET Core 10.0/SignalR server**.
 
 ## Build & Run Commands
 

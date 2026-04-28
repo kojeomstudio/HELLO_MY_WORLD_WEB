@@ -4,15 +4,36 @@ import { InputManager } from '../input/InputManager';
 import { WorldManager } from '../world/WorldManager';
 import { SelectionBox } from '../rendering/SelectionBox';
 
-const GRAVITY = 9.81;
-const WALK_SPEED = 4.0;
-const SPRINT_SPEED = 8.0;
-const FLY_SPEED = 12.0;
-
 const PLAYER_HEIGHT = 1.7;
 const PLAYER_WIDTH = 0.6;
 const PLAYER_FULL_HEIGHT = 1.8;
 const STEP_HEIGHT = 0.6;
+
+enum CameraMode {
+    FirstPerson = 0,
+    ThirdPersonRear = 1,
+    ThirdPersonFront = 2
+}
+
+interface PhysicsParams {
+    gravity: number;
+    jumpForce: number;
+    walkSpeed: number;
+    sprintSpeed: number;
+    flySpeed: number;
+    climbSpeed: number;
+    liquidDrag: number;
+}
+
+const DEFAULT_PHYSICS: PhysicsParams = {
+    gravity: 9.81,
+    jumpForce: 6.5,
+    walkSpeed: 4.0,
+    sprintSpeed: 8.0,
+    flySpeed: 12.0,
+    climbSpeed: 3.0,
+    liquidDrag: 0.8
+};
 
 export class PlayerController {
     private _camera: THREE.PerspectiveCamera;
@@ -40,6 +61,12 @@ export class PlayerController {
     private isDigging: boolean = false;
     private mouseSensitivity: number = 0.002;
     private isLeftMouseDown: boolean = false;
+    private _cameraMode: CameraMode = CameraMode.FirstPerson;
+    private _cameraDistance: number = 4.0;
+    private _bobPhase: number = 0;
+    private _bobActive: boolean = false;
+    private _currentBobOffset: THREE.Vector3 = new THREE.Vector3();
+    private _physics: PhysicsParams = { ...DEFAULT_PHYSICS };
     health: number = 20;
     maxHealth: number = 20;
     inventory: any[] = [];
@@ -108,6 +135,9 @@ export class PlayerController {
                     break;
                 case 'KeyF':
                     this._isFlying = !this._isFlying;
+                    break;
+                case 'F5':
+                    this._cameraMode = (this._cameraMode + 1) % 3;
                     break;
                 case 'KeyE':
                     const event = new CustomEvent('openCrafting');
@@ -419,15 +449,15 @@ export class PlayerController {
         if (this._input.isKeyDown('KeyA')) moveDir.sub(right);
         if (this._input.isKeyDown('KeyD')) moveDir.add(right);
 
-        let speed = this._isFlying ? FLY_SPEED :
-            (this._input.isKeyDown('ShiftLeft') ? SPRINT_SPEED : WALK_SPEED);
+        let speed = this._isFlying ? this._physics.flySpeed :
+            (this._input.isKeyDown('ShiftLeft') ? this._physics.sprintSpeed : this._physics.walkSpeed);
 
         const inLiquid = this.isInLiquid();
         const onSlippery = this.isOnSlipperyBlock();
         const moveResistance = this.getMoveResistance();
 
         if (inLiquid) {
-            speed *= 0.4;
+            speed *= (1 - this._physics.liquidDrag);
         }
         if (moveResistance > 0) {
             speed *= (1 - moveResistance);
@@ -441,13 +471,13 @@ export class PlayerController {
             if (this._input.isKeyDown('Space')) this._velocity.y = speed;
             else if (this._input.isKeyDown('ShiftLeft')) this._velocity.y = -speed;
         } else if (this.isClimbing()) {
-            this._velocity.x = moveDir.x * WALK_SPEED * 0.5;
-            this._velocity.z = moveDir.z * WALK_SPEED * 0.5;
+            this._velocity.x = moveDir.x * this._physics.walkSpeed * 0.5;
+            this._velocity.z = moveDir.z * this._physics.walkSpeed * 0.5;
             this._velocity.y *= 0.9;
             if (this._input.isKeyDown('Space')) {
-                this._velocity.y = 2.0;
+                this._velocity.y = this._physics.climbSpeed;
             } else if (this._input.isKeyDown('ShiftLeft')) {
-                this._velocity.y = -2.0;
+                this._velocity.y = -this._physics.climbSpeed;
             } else {
                 this._velocity.y = 0;
             }
@@ -458,7 +488,7 @@ export class PlayerController {
             const lerpFactor = onSlippery ? 0.02 : 0.1;
             this._velocity.x += (targetVelX - this._velocity.x) * lerpFactor;
             this._velocity.z += (targetVelZ - this._velocity.z) * lerpFactor;
-            this._velocity.y -= GRAVITY * 0.2 * dt;
+            this._velocity.y -= this._physics.gravity * 0.2 * dt;
             this._velocity.y = Math.max(this._velocity.y, -2);
             if (this._input.isKeyDown('Space')) {
                 this._velocity.y = Math.max(this._velocity.y, 2.0);
@@ -479,7 +509,7 @@ export class PlayerController {
                 this._velocity.x = moveDir.x * speed;
                 this._velocity.z = moveDir.z * speed;
             }
-            this._velocity.y -= GRAVITY * dt;
+            this._velocity.y -= this._physics.gravity * dt;
         }
 
         this._velocity.y = Math.max(this._velocity.y, -50);
@@ -547,8 +577,12 @@ export class PlayerController {
                 this._footstepTimer = 0;
                 this._audioPlayer?.('footstep');
             }
+            const bobSpeed = this._input.isKeyDown('ShiftLeft') ? 12.0 : 8.0;
+            this._bobPhase += dt * bobSpeed;
+            this._bobActive = true;
         } else {
             this._footstepTimer = 0;
+            this._bobActive = false;
         }
 
         if (this._position.y < -20) {
@@ -596,11 +630,41 @@ export class PlayerController {
     }
 
     private updateCamera(): void {
-        this._camera.position.copy(this._position);
-        this._camera.position.y += PLAYER_HEIGHT;
+        const eyePos = this._position.clone();
+        eyePos.y += PLAYER_HEIGHT;
 
-        const euler = new THREE.Euler(this._pitch, this._yaw, 0, 'YXZ');
-        this._camera.quaternion.setFromEuler(euler);
+        if (this._cameraMode === CameraMode.FirstPerson) {
+            if (this._bobActive && this._onGround) {
+                this._currentBobOffset.set(
+                    Math.sin(this._bobPhase) * 0.03,
+                    Math.abs(Math.sin(this._bobPhase * 2)) * 0.03,
+                    0
+                );
+            } else {
+                this._currentBobOffset.lerp(new THREE.Vector3(), 0.1);
+            }
+            this._camera.position.copy(eyePos).add(this._currentBobOffset);
+            const euler = new THREE.Euler(this._pitch, this._yaw, 0, 'YXZ');
+            this._camera.quaternion.setFromEuler(euler);
+        } else {
+            const forward = new THREE.Vector3(
+                -Math.sin(this._yaw),
+                -Math.sin(this._pitch),
+                -Math.cos(this._yaw)
+            ).normalize();
+
+            if (this._cameraMode === CameraMode.ThirdPersonRear) {
+                const cameraPos = eyePos.clone().sub(forward.clone().multiplyScalar(this._cameraDistance));
+                cameraPos.y += 1.0;
+                this._camera.position.copy(cameraPos);
+                this._camera.lookAt(eyePos);
+            } else {
+                const cameraPos = eyePos.clone().add(forward.clone().multiplyScalar(this._cameraDistance));
+                cameraPos.y += 1.0;
+                this._camera.position.copy(cameraPos);
+                this._camera.lookAt(eyePos);
+            }
+        }
     }
 
     private updateSelectionBox(): void {
@@ -697,4 +761,6 @@ export class PlayerController {
     getSelectedBlockType(): number { return this._selectedBlockType; }
     setSelectedBlockType(blockType: number): void { this._selectedBlockType = blockType; }
     setMouseSensitivity(value: number): void { this.mouseSensitivity = value; }
+    setPhysicsParams(params: PhysicsParams): void { this._physics = { ...params }; }
+    getCameraMode(): number { return this._cameraMode; }
 }

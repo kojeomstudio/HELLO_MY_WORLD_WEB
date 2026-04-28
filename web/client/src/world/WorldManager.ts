@@ -470,49 +470,303 @@ export class WorldManager {
     }
 
     spawnEntity(entityId: string, entityType: string, x: number, y: number, z: number): void {
-        let geometry: THREE.BufferGeometry;
-        let color: number;
-        let yOffset = 0;
-
         if (entityType === 'Item') {
-            geometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
-            color = 0xFFAA00;
-        } else {
-            const mobConfig: Record<string, { color: number; width: number; height: number; yOffset: number }> = {
-                'Zombie': { color: 0x448844, width: 0.6, height: 1.8, yOffset: 0.9 },
-                'Skeleton': { color: 0xCCCCCC, width: 0.5, height: 1.8, yOffset: 0.9 },
-                'Spider': { color: 0x443344, width: 1.0, height: 0.5, yOffset: 0.25 },
-                'Cow': { color: 0x886644, width: 0.8, height: 1.2, yOffset: 0.6 },
-                'Pig': { color: 0xFFAAAA, width: 0.7, height: 0.8, yOffset: 0.4 },
-                'Chicken': { color: 0xFFFFFF, width: 0.4, height: 0.6, yOffset: 0.3 }
-            };
-
-            const config = mobConfig[entityType] || { color: 0xFF4444, width: 0.8, height: 1.6, yOffset: 0.8 };
-            geometry = new THREE.BoxGeometry(config.width, config.height, config.width);
-            color = config.color;
-            yOffset = config.yOffset;
+            const geometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+            const material = new THREE.MeshLambertMaterial({ color: 0xFFAA00 });
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.position.set(x, y + 0.15, z);
+            mesh.userData.entityId = entityId;
+            this.renderer.addToScene(mesh);
+            this.entityMeshes.set(entityId, mesh);
+            return;
         }
 
-        const material = new THREE.MeshLambertMaterial({ color });
-        const mesh = new THREE.Mesh(geometry, material);
-        mesh.position.set(x, y + yOffset, z);
-        mesh.userData.entityId = entityId;
-        this.renderer.addToScene(mesh);
-        this.entityMeshes.set(entityId, mesh);
+        const group = new THREE.Group();
+        group.userData.entityId = entityId;
+
+        switch (entityType) {
+            case 'Zombie': {
+                const body = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.6, 0.75, 0.3),
+                    new THREE.MeshLambertMaterial({ color: 0x3B7A3B })
+                );
+                body.position.y = 0.75;
+                group.add(body);
+                const head = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.5, 0.5, 0.5),
+                    new THREE.MeshLambertMaterial({ color: 0x448844 })
+                );
+                head.position.y = 1.25;
+                group.add(head);
+                const leftArm = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.25, 0.7, 0.25),
+                    new THREE.MeshLambertMaterial({ color: 0x3B7A3B })
+                );
+                leftArm.position.set(-0.425, 0.85, 0);
+                leftArm.rotation.x = -0.5;
+                group.add(leftArm);
+                const rightArm = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.25, 0.7, 0.25),
+                    new THREE.MeshLambertMaterial({ color: 0x3B7A3B })
+                );
+                rightArm.position.set(0.425, 0.85, 0);
+                rightArm.rotation.x = -0.5;
+                group.add(rightArm);
+                const leftLeg = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.25, 0.7, 0.25),
+                    new THREE.MeshLambertMaterial({ color: 0x2244AA })
+                );
+                leftLeg.position.set(-0.15, 0.1, 0);
+                group.add(leftLeg);
+                const rightLeg = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.25, 0.7, 0.25),
+                    new THREE.MeshLambertMaterial({ color: 0x2244AA })
+                );
+                rightLeg.position.set(0.15, 0.1, 0);
+                group.add(rightLeg);
+                group.add(this.createNameTag('Zombie'));
+                break;
+            }
+            case 'Skeleton': {
+                const body = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.5, 0.7, 0.2),
+                    new THREE.MeshLambertMaterial({ color: 0xBBBBBB })
+                );
+                body.position.y = 0.75;
+                group.add(body);
+                const head = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.5, 0.5, 0.5),
+                    new THREE.MeshLambertMaterial({ color: 0xDDDDDD })
+                );
+                head.position.y = 1.25;
+                group.add(head);
+                const leftArm = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.2, 0.7, 0.2),
+                    new THREE.MeshLambertMaterial({ color: 0xBBBBBB })
+                );
+                leftArm.position.set(-0.35, 0.85, 0);
+                group.add(leftArm);
+                const rightArm = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.2, 0.7, 0.2),
+                    new THREE.MeshLambertMaterial({ color: 0xBBBBBB })
+                );
+                rightArm.position.set(0.35, 0.85, 0);
+                group.add(rightArm);
+                const leftLeg = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.2, 0.7, 0.2),
+                    new THREE.MeshLambertMaterial({ color: 0xBBBBBB })
+                );
+                leftLeg.position.set(-0.12, 0.1, 0);
+                group.add(leftLeg);
+                const rightLeg = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.2, 0.7, 0.2),
+                    new THREE.MeshLambertMaterial({ color: 0xBBBBBB })
+                );
+                rightLeg.position.set(0.12, 0.1, 0);
+                group.add(rightLeg);
+                group.add(this.createNameTag('Skeleton'));
+                break;
+            }
+            case 'Spider': {
+                const body = new THREE.Mesh(
+                    new THREE.BoxGeometry(1.0, 0.4, 0.6),
+                    new THREE.MeshLambertMaterial({ color: 0x332233 })
+                );
+                body.position.y = 0.3;
+                group.add(body);
+                const head = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.4, 0.35, 0.4),
+                    new THREE.MeshLambertMaterial({ color: 0x443344 })
+                );
+                head.position.set(0, 0.35, -0.5);
+                group.add(head);
+                for (let i = 0; i < 4; i++) {
+                    const legL = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.1, 0.1, 0.6),
+                        new THREE.MeshLambertMaterial({ color: 0x332233 })
+                    );
+                    legL.position.set(-0.55, 0.25, -0.2 + i * 0.25);
+                    legL.rotation.y = 0.3;
+                    group.add(legL);
+                    const legR = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.1, 0.1, 0.6),
+                        new THREE.MeshLambertMaterial({ color: 0x332233 })
+                    );
+                    legR.position.set(0.55, 0.25, -0.2 + i * 0.25);
+                    legR.rotation.y = -0.3;
+                    group.add(legR);
+                }
+                group.add(this.createNameTag('Spider'));
+                break;
+            }
+            case 'Cow': {
+                const body = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.7, 0.6, 1.2),
+                    new THREE.MeshLambertMaterial({ color: 0x886644 })
+                );
+                body.position.y = 0.8;
+                group.add(body);
+                const head = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.45, 0.45, 0.45),
+                    new THREE.MeshLambertMaterial({ color: 0x886644 })
+                );
+                head.position.set(0, 1.0, -0.7);
+                group.add(head);
+                for (const [dx] of [[-0.25], [0.25]]) {
+                    const leg = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.2, 0.5, 0.2),
+                        new THREE.MeshLambertMaterial({ color: 0x664422 })
+                    );
+                    leg.position.set(dx, 0.25, -0.4);
+                    group.add(leg);
+                }
+                for (const [dx] of [[-0.25], [0.25]]) {
+                    const leg = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.2, 0.5, 0.2),
+                        new THREE.MeshLambertMaterial({ color: 0x664422 })
+                    );
+                    leg.position.set(dx, 0.25, 0.4);
+                    group.add(leg);
+                }
+                group.add(this.createNameTag('Cow'));
+                break;
+            }
+            case 'Pig': {
+                const body = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.55, 0.45, 0.8),
+                    new THREE.MeshLambertMaterial({ color: 0xFFAAAA })
+                );
+                body.position.y = 0.55;
+                group.add(body);
+                const head = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.4, 0.4, 0.4),
+                    new THREE.MeshLambertMaterial({ color: 0xFFAAAA })
+                );
+                head.position.set(0, 0.65, -0.5);
+                group.add(head);
+                const nose = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.25, 0.15, 0.1),
+                    new THREE.MeshLambertMaterial({ color: 0xFF8888 })
+                );
+                nose.position.set(0, 0.6, -0.75);
+                group.add(nose);
+                for (const [dx, dz] of [[-0.2, -0.25], [0.2, -0.25], [-0.2, 0.25], [0.2, 0.25]]) {
+                    const leg = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.15, 0.35, 0.15),
+                        new THREE.MeshLambertMaterial({ color: 0xFF9999 })
+                    );
+                    leg.position.set(dx, 0.175, dz);
+                    group.add(leg);
+                }
+                group.add(this.createNameTag('Pig'));
+                break;
+            }
+            case 'Chicken': {
+                const body = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.3, 0.3, 0.4),
+                    new THREE.MeshLambertMaterial({ color: 0xFFFFFF })
+                );
+                body.position.y = 0.4;
+                group.add(body);
+                const head = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.2, 0.2, 0.2),
+                    new THREE.MeshLambertMaterial({ color: 0xFFFFFF })
+                );
+                head.position.set(0, 0.6, -0.25);
+                group.add(head);
+                const beak = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.08, 0.05, 0.1),
+                    new THREE.MeshLambertMaterial({ color: 0xFFAA00 })
+                );
+                beak.position.set(0, 0.55, -0.4);
+                group.add(beak);
+                const comb = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.05, 0.1, 0.08),
+                    new THREE.MeshLambertMaterial({ color: 0xFF0000 })
+                );
+                comb.position.set(0, 0.72, -0.25);
+                group.add(comb);
+                const leftLeg = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.05, 0.25, 0.05),
+                    new THREE.MeshLambertMaterial({ color: 0xFFAA00 })
+                );
+                leftLeg.position.set(-0.08, 0.125, 0);
+                group.add(leftLeg);
+                const rightLeg = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.05, 0.25, 0.05),
+                    new THREE.MeshLambertMaterial({ color: 0xFFAA00 })
+                );
+                rightLeg.position.set(0.08, 0.125, 0);
+                group.add(rightLeg);
+                group.add(this.createNameTag('Chicken'));
+                break;
+            }
+            default: {
+                const mesh = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.8, 1.6, 0.8),
+                    new THREE.MeshLambertMaterial({ color: 0xFF4444 })
+                );
+                mesh.position.y = 0.8;
+                group.add(mesh);
+                group.add(this.createNameTag(entityType));
+                break;
+            }
+        }
+
+        group.position.set(x, y, z);
+        this.renderer.addToScene(group);
+        this.entityMeshes.set(entityId, group as unknown as THREE.Mesh);
+    }
+
+    private createNameTag(name: string): THREE.Sprite {
+        const canvas = document.createElement('canvas');
+        canvas.width = 128;
+        canvas.height = 32;
+        const ctx = canvas.getContext('2d')!;
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(0, 0, 128, 32);
+        ctx.fillStyle = 'white';
+        ctx.font = '16px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(name, 64, 22);
+        const texture = new THREE.CanvasTexture(canvas);
+        const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+        const sprite = new THREE.Sprite(material);
+        sprite.position.y = 2.0;
+        sprite.scale.set(1.5, 0.375, 1);
+        return sprite;
     }
 
     removeEntity(entityId: string): void {
         const mesh = this.entityMeshes.get(entityId);
         if (mesh) {
             this.renderer.removeFromScene(mesh);
+            if (mesh instanceof THREE.Group) {
+                mesh.traverse((child) => {
+                    if (child instanceof THREE.Mesh) {
+                        child.geometry.dispose();
+                        if (child.material instanceof THREE.Material) {
+                            child.material.dispose();
+                        }
+                    }
+                });
+            } else {
+                mesh.geometry.dispose();
+                if (mesh.material instanceof THREE.Material) {
+                    mesh.material.dispose();
+                }
+            }
             this.entityMeshes.delete(entityId);
         }
     }
 
     updateEntityPosition(entityId: string, x: number, y: number, z: number): void {
-        const mesh = this.entityMeshes.get(entityId);
-        if (mesh) {
-            mesh.position.set(x, y, z);
+        const obj = this.entityMeshes.get(entityId);
+        if (obj) {
+            obj.position.set(x, y, z);
+            if (entityId.startsWith('item_')) {
+                obj.position.y += 0.15;
+            }
         }
     }
 
@@ -569,9 +823,12 @@ export class WorldManager {
         this.entityAnimTime += dt;
 
         for (const [entityId, mesh] of this.entityMeshes) {
-            mesh.position.y += Math.sin(this.entityAnimTime * 3.0) * 0.002;
-            if (entityId.startsWith('mob_')) {
-                mesh.rotation.y += dt * 0.5;
+            if (entityId.startsWith('item_')) {
+                mesh.position.y += Math.sin(this.entityAnimTime * 3.0) * 0.002;
+                mesh.rotation.y += dt * 2.0;
+            } else if (entityId.startsWith('mob_')) {
+                const bob = Math.sin(this.entityAnimTime * 2.0) * 0.002;
+                mesh.position.y += bob;
             }
         }
 

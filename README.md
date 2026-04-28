@@ -1,6 +1,6 @@
 # HelloMyWorld Web Game
 
-A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest engine) to a modern TypeScript/Three.js client + C# ASP.NET Core 8.0/SignalR server architecture.
+A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest engine) to a modern TypeScript/Three.js client + C# ASP.NET Core 10.0/SignalR server architecture.
 
 ## Features
 
@@ -48,6 +48,11 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Block Geometry System**: Custom mesh generation for stairs, slabs, fences, walls, glass panes, doors, ladders, torches, plants, fire
 - **Particle Spawner**: Configurable particle spawner system with server-side spec management
 - **Settings**: Mouse sensitivity, render distance, FOV, volume controls, cloud/AO toggles
+- **Third Person Camera**: F5 cycles through first-person, third-person rear, and third-person front views
+- **Underwater Effects**: Blue overlay and fog when submerged in water
+- **Head Bobbing**: Subtle walking/sprinting head bob animation
+- **Server-Driven Physics**: Physics parameters (gravity, speed, jump, etc.) sent from server on join
+- **Detailed Mob Models**: Multi-part geometry for each mob type (Zombie, Skeleton, Spider, Cow, Pig, Chicken) with name tags
 
 ## Architecture
 
@@ -83,7 +88,7 @@ web/
 │           ├── blocks/              # 89+ block textures from minetest devtest
 │           └── ui/                  # 97 base UI textures
 │   └── package.json
-├── server/              # C# ASP.NET Core 8.0 backend
+├── server/              # C# ASP.NET Core 10.0 backend
 │   ├── Program.cs                # Entry point, DI setup
 │   ├── Core/
 │   │   ├── GameServer.cs         # Main game logic
@@ -129,7 +134,7 @@ web/
 ## Quick Start
 
 ### Prerequisites
-- .NET 8.0 SDK
+- .NET 10.0 SDK
 - Node.js 18+
 - npm
 
@@ -234,6 +239,7 @@ The Vite dev server proxies `/game` to the server.
 | P | Armor panel |
 | F3 | Debug info |
 | B | Toggle weather |
+| F5 | Cycle camera mode |
 | M | Minimap cycle |
 | Esc | Release mouse |
 

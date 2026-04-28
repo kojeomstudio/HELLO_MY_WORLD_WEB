@@ -14,6 +14,7 @@ export class Renderer {
     private damageFlashEl: HTMLElement;
     private vignetteEl: HTMLElement;
     private lavaOverlayEl: HTMLElement;
+    private waterOverlayEl: HTMLElement;
     private damageFlashIntensity: number = 0;
     private currentBrightness: number = 1;
     private isRaining: boolean = false;
@@ -22,6 +23,10 @@ export class Renderer {
     private normalFogFar: number = 160;
     private rainFogNear: number = 30;
     private rainFogFar: number = 80;
+    private underwaterFogNear: number = 5;
+    private underwaterFogFar: number = 40;
+
+    private isUnderwater: boolean = false;
 
     constructor(container: HTMLElement) {
         this.canvas = document.createElement('canvas');
@@ -69,6 +74,7 @@ export class Renderer {
         this.damageFlashEl = document.getElementById('damage-flash')!;
         this.vignetteEl = document.getElementById('cave-vignette')!;
         this.lavaOverlayEl = document.getElementById('lava-overlay')!;
+        this.waterOverlayEl = document.getElementById('water-overlay')!;
     }
 
     private addSkyDome(): void {
@@ -125,6 +131,17 @@ export class Renderer {
 
     updateSkyBrightness(brightness: number): void {
         this.currentBrightness = brightness;
+
+        if (this.isUnderwater) {
+            const waterColor = new THREE.Color(0x1a3a6a);
+            this.fog.near = this.underwaterFogNear;
+            this.fog.far = this.underwaterFogFar;
+            this.fog.color.copy(waterColor);
+            this.scene.background = waterColor;
+            this.skyLight.intensity = brightness * 0.4;
+            this.ambientLight.intensity = 0.3;
+            return;
+        }
 
         let r = 0.53 * brightness;
         let g = 0.81 * brightness;
@@ -186,6 +203,19 @@ export class Renderer {
 
     updateLavaEffect(nearLava: boolean): void {
         this.lavaOverlayEl.style.opacity = nearLava ? '0.3' : '0';
+    }
+
+    updateWaterEffect(underwater: boolean): void {
+        this.isUnderwater = underwater;
+        this.waterOverlayEl.style.opacity = underwater ? '0.35' : '0';
+    }
+
+    clearWaterEffect(): void {
+        if (this.isUnderwater) return;
+        this.fog.near = this.isRaining ? this.rainFogNear : this.normalFogNear;
+        this.fog.far = this.isRaining ? this.rainFogFar : this.normalFogFar;
+        this.fog.color.copy(this.skyColor);
+        this.scene.background = this.skyColor;
     }
 
     updateEffects(dt: number): void {

@@ -34,8 +34,7 @@ public class AuthenticationService
     public static string HashPassword(string password)
     {
         var salt = RandomNumberGenerator.GetBytes(SaltSize);
-        using var pbkdf2 = new Rfc2898DeriveBytes(password, salt, Pbkdf2Iterations, HashAlgorithmName.SHA256);
-        var hash = pbkdf2.GetBytes(HashSize);
+        var hash = Rfc2898DeriveBytes.Pbkdf2(password, salt, Pbkdf2Iterations, HashAlgorithmName.SHA256, HashSize);
         return $"{Pbkdf2Iterations}:{Convert.ToHexString(salt)}:{Convert.ToHexString(hash)}";
     }
 
@@ -51,8 +50,7 @@ public class AuthenticationService
         if (!int.TryParse(parts[0], out var iterations)) return false;
         var salt = Convert.FromHexString(parts[1]);
         var storedHashBytes = Convert.FromHexString(parts[2]);
-        using var pbkdf2 = new Rfc2898DeriveBytes(password, salt, iterations, HashAlgorithmName.SHA256);
-        var computedHash = pbkdf2.GetBytes(storedHashBytes.Length);
+        var computedHash = Rfc2898DeriveBytes.Pbkdf2(password, salt, iterations, HashAlgorithmName.SHA256, storedHashBytes.Length);
         return CryptographicOperations.FixedTimeEquals(computedHash, storedHashBytes);
     }
 
