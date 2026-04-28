@@ -383,6 +383,15 @@ builder.Services.AddSingleton<CraftingSystem>(sp =>
     crafting.LoadRecipes(dataPath);
     return crafting;
 });
+builder.Services.AddSingleton<GridCraftingSystem>(sp =>
+{
+    var gridCrafting = new GridCraftingSystem();
+    var gridDataPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "data", "items.json");
+    if (!File.Exists(gridDataPath))
+        gridDataPath = Path.Combine(Directory.GetCurrentDirectory(), "data", "items.json");
+    gridCrafting.LoadRecipes(gridDataPath);
+    return gridCrafting;
+});
 builder.Services.AddSingleton<EntityManager>();
 builder.Services.AddHostedService<GameLoopService>();
 builder.Services.AddControllers();

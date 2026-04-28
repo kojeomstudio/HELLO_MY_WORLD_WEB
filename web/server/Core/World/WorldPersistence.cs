@@ -26,10 +26,15 @@ public static class WorldPersistence
             var parts = name.Split('_');
             if (parts.Length != 3) continue;
 
-            var x = int.Parse(parts[0]);
-            var y = int.Parse(parts[1]);
-            var z = int.Parse(parts[2]);
-            var data = File.ReadAllBytes(file);
+            if (!int.TryParse(parts[0], out var x) ||
+                !int.TryParse(parts[1], out var y) ||
+                !int.TryParse(parts[2], out var z)) continue;
+
+            byte[] data;
+            try { data = File.ReadAllBytes(file); }
+            catch { continue; }
+
+            if (data.Length == 0) continue;
 
             var coord = new ChunkCoord(x, y, z);
             var chunk = world.GetChunk(coord);

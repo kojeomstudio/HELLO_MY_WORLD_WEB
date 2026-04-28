@@ -52,11 +52,68 @@ jobs:
       - name: Build client
         run: npm run build --prefix web/client
 
+  client-typecheck:
+    name: Client Type Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web/client/package-lock.json
+
+      - name: Install dependencies
+        run: npm install --prefix web/client
+
+      - name: Type check
+        run: npx tsc --noEmit --project web/client/tsconfig.json
+
+  data-integrity:
+    name: Data Integrity
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate JSON data files
+        run: |
+          ERRORS=0
+          for f in web/data/*.json; do
+            if ! python3 -c "import json; json.load(open('$f'))" 2>/dev/null; then
+              echo "::error::Invalid JSON: $f"
+              ERRORS=1
+            fi
+          done
+          if [ $ERRORS -ne 0 ]; then
+            echo "::error::Data integrity check failed"
+            exit 1
+          fi
+          echo "All JSON data files are valid"
+
+      - name: Check required data files exist
+        run: |
+          REQUIRED_FILES="blocks.json items.json mobs.json server_config.json tools.json smelting.json physics_constants.json privileges.json"
+          MISSING=0
+          for f in $REQUIRED_FILES; do
+            if [ ! -f "web/data/$f" ]; then
+              echo "::error::Missing required data file: web/data/$f"
+              MISSING=1
+            fi
+          done
+          if [ $MISSING -ne 0 ]; then
+            exit 1
+          fi
+          echo "All required data files present"
+
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [server-build, client-build]
+    needs: [server-build, client-build, client-typecheck, data-integrity]
     steps:
       - uses: actions/checkout@v4
 

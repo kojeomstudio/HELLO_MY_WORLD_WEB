@@ -452,7 +452,7 @@ public class ChatCommandManager
                 if (_setPassword == null) return Task.FromResult("Password command is not available.");
                 if (args.Length == 0) return Task.FromResult("Usage: /password <new_password>");
                 var newPassword = args[0];
-                if (newPassword.Length < 4) return Task.FromResult("Password must be at least 4 characters.");
+                if (newPassword.Length < 8) return Task.FromResult("Password must be at least 8 characters.");
                 if (newPassword.Length > 64) return Task.FromResult("Password must be at most 64 characters.");
                 var success = _setPassword(playerName, newPassword);
                 return Task.FromResult(success ? "Password set successfully." : "Failed to set password.");

@@ -59,12 +59,14 @@ public class GameHub : Hub<IGameClient>
 {
     private static readonly ConcurrentDictionary<string, DateTime> _lastActionTimes = new();
     private static readonly ConcurrentDictionary<string, int> _joinAttempts = new();
+    private static readonly ConcurrentDictionary<string, (int FailCount, DateTime LockoutEnd)> _accountFailures = new();
 
     private readonly GameServer _gameServer;
     private readonly ILogger<GameHub> _logger;
     private readonly ChatCommandManager _chatCommands;
     private readonly AuthenticationService _authService;
     private readonly CraftingSystem _craftingSystem;
+    private readonly GridCraftingSystem _gridCraftingSystem;
     private readonly EntityManager _entityManager;
     private readonly BlockDefinitionManager _blockDefinitionManager;
     private readonly SmeltingSystem _smeltingSystem;
@@ -90,6 +92,7 @@ public class GameHub : Hub<IGameClient>
         ChatCommandManager chatCommands,
         AuthenticationService authService,
         CraftingSystem craftingSystem,
+        GridCraftingSystem gridCraftingSystem,
         EntityManager entityManager,
         BlockDefinitionManager blockDefinitionManager,
         SmeltingSystem smeltingSystem,
@@ -103,6 +106,7 @@ public class GameHub : Hub<IGameClient>
         _chatCommands = chatCommands;
         _authService = authService;
         _craftingSystem = craftingSystem;
+        _gridCraftingSystem = gridCraftingSystem;
         _entityManager = entityManager;
         _blockDefinitionManager = blockDefinitionManager;
         _smeltingSystem = smeltingSystem;
@@ -135,6 +139,15 @@ public class GameHub : Hub<IGameClient>
     public async Task Join(string playerName, string? password = null)
     {
         var ipAddress = Context.GetHttpContext()?.Connection?.RemoteIpAddress?.ToString() ?? Context.ConnectionId;
+
+        var lockoutKey = playerName.ToLowerInvariant();
+        if (_accountFailures.TryGetValue(lockoutKey, out var failure) && failure.LockoutEnd > DateTime.UtcNow)
+        {
+            var remaining = (int)Math.Ceiling((failure.LockoutEnd - DateTime.UtcNow).TotalMinutes) + 1;
+            await Clients.Caller.OnChatMessage("Server", $"Account temporarily locked. Try again in {remaining} minutes.");
+            return;
+        }
+
         var currentAttempts = _joinAttempts.AddOrUpdate(ipAddress, 1, (_, old) => old + 1);
         if (currentAttempts >= 5)
         {
@@ -158,6 +171,20 @@ public class GameHub : Hub<IGameClient>
 
         if (authResult != AuthResult.Success)
         {
+            if (authResult == AuthResult.PasswordIncorrect || authResult == AuthResult.PasswordRequired)
+            {
+                var failKey = playerName.ToLowerInvariant();
+                _accountFailures.AddOrUpdate(failKey,
+                    (1, DateTime.UtcNow),
+                    (_, old) => (old.FailCount + 1, old.LockoutEnd));
+
+                var (_, lockoutEnd) = _accountFailures.TryGetValue(failKey, out var f) ? (true, f.LockoutEnd) : (true, DateTime.UtcNow);
+                if (f.FailCount >= 5)
+                {
+                    _accountFailures[failKey] = (f.FailCount, DateTime.UtcNow.AddMinutes(5));
+                }
+            }
+
             var msg = authResult switch
             {
                 AuthResult.NameInvalid => "Invalid name. Use 1-20 alphanumeric characters, underscores, or hyphens. Reserved names are not allowed.",
@@ -171,6 +198,8 @@ public class GameHub : Hub<IGameClient>
             await Clients.Caller.OnChatMessage("Server", msg);
             return;
         }
+
+        _accountFailures.TryRemove(playerName.ToLowerInvariant(), out _);
 
         var (joinSuccess, isNewPlayer) = _gameServer.PlayerJoin(Context.ConnectionId, playerName);
 
@@ -1155,8 +1184,20 @@ public class GameHub : Hub<IGameClient>
             result = r.ResultItemId,
             resultCount = r.ResultCount,
             ingredients = r.Ingredients.Select(ing => new object[] { ing.ItemId, ing.Count }).ToArray()
-        }).ToArray();
-        await Clients.Caller.OnCraftingRecipes(recipeDtos!);
+        }).ToList();
+
+        var gridRecipes = _gridCraftingSystem.GetAllRecipes();
+        foreach (var gr in gridRecipes)
+        {
+            recipeDtos.Add(new
+            {
+                result = gr.ResultItemId,
+                resultCount = gr.ResultCount,
+                ingredients = gr.Ingredients.Select(ing => new object[] { ing.ItemId, ing.Count }).ToArray()
+            });
+        }
+
+        await Clients.Caller.OnCraftingRecipes(recipeDtos.ToArray()!);
     }
 
     public async Task CraftRecipe(int recipeIndex)
@@ -1543,5 +1584,56 @@ public class GameHub : Hub<IGameClient>
         return x >= short.MinValue && x <= short.MaxValue &&
                y >= short.MinValue && y <= short.MaxValue &&
                z >= short.MinValue && z <= short.MaxValue;
+    }
+
+    public async Task GridCraft(string?[,] grid, int gridSize)
+    {
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
+
+        var recipe = _gridCraftingSystem.FindRecipe(grid, gridSize);
+        if (recipe == null)
+        {
+            await Clients.Caller.OnChatMessage("Server", "No matching recipe found.");
+            return;
+        }
+
+        var availableItems = player.Inventory.GetAll()
+            .Where(i => i != null)
+            .Select(i => (i!.ItemId, i.Count))
+            .ToList();
+
+        foreach (var (requiredId, requiredCount) in recipe.Ingredients)
+        {
+            var available = availableItems
+                .Where(i => _gridCraftingSystem.ItemMatchesGroup(requiredId, i.ItemId))
+                .Sum(i => i.Count);
+            if (available < requiredCount)
+            {
+                await Clients.Caller.OnChatMessage("Server", $"Missing ingredients for {recipe.ResultItemId}.");
+                return;
+            }
+        }
+
+        foreach (var (requiredId, requiredCount) in recipe.Ingredients)
+        {
+            int remaining = requiredCount;
+            for (int i = 0; i < player.Inventory.Size && remaining > 0; i++)
+            {
+                var slot = player.Inventory[i];
+                if (slot != null && _gridCraftingSystem.ItemMatchesGroup(requiredId, slot.ItemId))
+                {
+                    var take = Math.Min(remaining, slot.Count);
+                    player.Inventory.RemoveItem(i, take);
+                    remaining -= take;
+                }
+            }
+        }
+
+        player.Inventory.AddItem(new ItemStack(recipe.ResultItemId, recipe.ResultCount));
+        _gameServer.AwardExperience(player, 2);
+
+        await SendInventoryUpdate(player);
+        await Clients.Caller.OnCraftResult(recipe.ResultItemId, recipe.ResultCount);
     }
 }

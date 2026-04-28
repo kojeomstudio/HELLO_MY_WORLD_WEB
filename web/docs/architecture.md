@@ -1,13 +1,13 @@
 # Architecture Overview
 
-HelloMyWorld is a web-based voxel game with a **TypeScript/Three.js client** and **C# ASP.NET Core 8.0/SignalR server**.
+HelloMyWorld is a web-based voxel game with a **TypeScript/Three.js client** and **C# ASP.NET Core 10.0/SignalR server**.
 
 ## System Overview
 
 ```
 Browser (Client)                    Server
 +------------------+    WebSocket    +------------------+
-|  Vite Dev Server | -- /game -->    | ASP.NET Core 8.0 |
+|  Vite Dev Server | -- /game -->    | ASP.NET Core 10 |
 |  (localhost:5173)| -- proxy -->    | (localhost:5266) |
 +------------------+                +------------------+
        |                                   |
@@ -103,6 +103,8 @@ See [server-api.md](server-api.md) for full method/event signatures.
 ### Crafting & Smelting
 
 **CraftingSystem** (`Crafting/CraftingSystem.cs`) — Recipe matching from inventory contents. 166+ recipes loaded from `items.json`.
+
+**GridCraftingSystem** (`Crafting/GridCraftingSystem.cs`) — Grid-based crafting with pattern offset matching and group support. Loaded from `gridRecipes` section in `items.json`. Integrated into `GetCraftingRecipes` hub method alongside `CraftingSystem`.
 
 **SmeltingSystem** (`Smelting/SmeltingSystem.cs`) — Furnace operations with cook time and experience. 20 recipes from `smelting.json`. Fuel registry loaded from `fuels` section in `items.json` with configurable burn times.
 
@@ -353,7 +355,7 @@ The server performs authoritative movement validation to prevent cheating:
 ## Dependency Injection
 
 All server services registered as **Singleton** in `Program.cs`:
-`ServerConfig`, `BlockDefinitionManager`, `WorldGeneratorFactory`, `SmeltingSystem`, `PrivilegeSystem`, `ActiveBlockModifierSystem`, `KnockbackSystem`, `PlayerDatabase`, `BlockMetadataDatabase`, `GameServer`, `AuthenticationService`, `ChatCommandManager`, `CraftingSystem`, `EntityManager`, `AreaProtectionSystem`, `DetachedInventoryManager`, `ParticleSpawnerManager`, `GameLoopService` (hosted).
+`ServerConfig`, `BlockDefinitionManager`, `WorldGeneratorFactory`, `SmeltingSystem`, `PrivilegeSystem`, `ActiveBlockModifierSystem`, `KnockbackSystem`, `PlayerDatabase`, `BlockMetadataDatabase`, `GameServer`, `AuthenticationService`, `ChatCommandManager`, `CraftingSystem`, `GridCraftingSystem`, `EntityManager`, `AreaProtectionSystem`, `DetachedInventoryManager`, `ParticleSpawnerManager`, `GameLoopService` (hosted).
 
 ## Recent Improvements
 
@@ -414,6 +416,14 @@ All server services registered as **Singleton** in `Program.cs`:
 - **Window blur handling**: InputManager dispatches blur event; PlayerController releases pointer lock and zeroes velocity on focus loss
 - **Security hardening**: Removed legacy static salt from password verification, added self-revoke and server privilege revocation protection
 
+### Porting Improvements (Round 4)
+- **GridCraftingSystem**: Fully wired into DI and GameHub, providing grid-based crafting with pattern offset matching and item group support alongside the existing CraftingSystem
+- **Per-account brute-force protection**: 5 failed password attempts on the same account triggers a 5-minute lockout, preventing password guessing attacks even with IP rotation
+- **Password policy strengthening**: Minimum password length increased from 4 to 8 characters
+- **WorldPersistence crash fix**: Replaced `int.Parse` with `int.TryParse` in chunk file loading to prevent server crash on malformed files
+- **Player head mesh fix**: Removed duplicate head mesh in player avatar rendering (WorldManager.ts)
+- **Enhanced CI pipeline**: Added client typecheck job and data integrity validation (JSON parsing + required file checks)
+
 ## Security Model
 
 ### Authentication & Authorization
@@ -424,6 +434,7 @@ All server services registered as **Singleton** in `Program.cs`:
 - 19 privilege system with per-player grant/revoke loaded from `privileges.json`
 - Privilege escalation protection: cannot self-grant, cannot self-revoke, `server` privilege cannot be revoked via command
 - Server capacity enforcement (max players check)
+- Per-account brute-force lockout (5 failed attempts → 5-minute lockout)
 
 ### Input Validation
 - HTML/XML tag stripping in chat messages (XSS prevention)

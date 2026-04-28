@@ -371,7 +371,6 @@ export class WorldManager {
         const head = new THREE.Mesh(headGeo, headMat);
         head.position.y = 0.875;
         group.add(head);
-        group.add(head);
 
         const legGeo = new THREE.BoxGeometry(0.25, 0.75, 0.25);
         const legMat = new THREE.MeshLambertMaterial({ color: 0x112266 });
