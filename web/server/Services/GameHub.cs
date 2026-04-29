@@ -229,6 +229,12 @@ public class GameHub : Hub<IGameClient>
 
         if (isNewPlayer && !string.IsNullOrEmpty(password))
         {
+            if (password.Length < 4 || password.Length > 128)
+            {
+                await Clients.Caller.OnChatMessage("Server", "Password must be 4-128 characters.");
+                _gameServer.PlayerLeave(Context.ConnectionId);
+                return;
+            }
             _playerDb.SetPasswordHash(playerName, AuthenticationService.HashPassword(password));
         }
 
@@ -1510,7 +1516,15 @@ public class GameHub : Hub<IGameClient>
             if (c == '\r') continue;
             if (c == '\n') { sb.Append(' '); continue; }
             if (char.IsControl(c)) continue;
-            sb.Append(c);
+            switch (c)
+            {
+                case '<': sb.Append("&lt;"); break;
+                case '>': sb.Append("&gt;"); break;
+                case '&': sb.Append("&amp;"); break;
+                case '"': sb.Append("&quot;"); break;
+                case '\'': sb.Append("&#39;"); break;
+                default: sb.Append(c); break;
+            }
         }
         var result = sb.ToString();
         if (result.Length > 256) result = result[..256];

@@ -109,11 +109,29 @@ jobs:
           fi
           echo "All required data files present"
 
+  server-lint:
+    name: Server Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10.0
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore web/server/WebGameServer.csproj
+
+      - name: Check server warnings
+        run: dotnet build web/server/WebGameServer.csproj --no-restore --configuration Release -warnaserror
+
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [server-build, client-build, client-typecheck, data-integrity]
+    needs: [server-build, server-lint, client-build, client-typecheck, data-integrity]
     steps:
       - uses: actions/checkout@v4
 
