@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.AspNetCore.SignalR;
 using System.Text.Json;
 using WebGameServer.Core;
@@ -44,7 +45,10 @@ ToolConfig.LoadFromFile(toolsPath);
 
 builder.Services.AddSingleton(serverConfig);
 
-builder.Services.AddSignalR();
+builder.Services.AddSignalR(options =>
+{
+    options.MaximumReceiveMessageSize = 256 * 1024;
+});
 builder.Services.AddSingleton<BlockDefinitionManager>(sp =>
 {
     var manager = new BlockDefinitionManager();
@@ -424,8 +428,14 @@ if (!Directory.Exists(clientDistPath))
 if (Directory.Exists(clientDistPath))
 {
     var fileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(clientDistPath);
+    var contentTypeProvider = new FileExtensionContentTypeProvider();
+    contentTypeProvider.Mappings[".wasm"] = "application/wasm";
+    contentTypeProvider.Mappings[".json"] = "application/json";
+    contentTypeProvider.Mappings[".png"] = "image/png";
+    contentTypeProvider.Mappings[".jpg"] = "image/jpeg";
+    contentTypeProvider.Mappings[".svg"] = "image/svg+xml";
     app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = fileProvider });
-    app.UseStaticFiles(new StaticFileOptions { FileProvider = fileProvider, ServeUnknownFileTypes = true });
+    app.UseStaticFiles(new StaticFileOptions { FileProvider = fileProvider, ContentTypeProvider = contentTypeProvider });
 }
 app.Use(async (context, next) =>
 {

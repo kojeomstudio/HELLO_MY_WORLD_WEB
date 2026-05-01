@@ -137,7 +137,6 @@ export class BlockRegistry {
             { id: 95, name: 'end_stone', solid: true, transparent: false, color: '#E8E0B8', hardness: 3.0, groups: { cracky: 3 }, soundGroup: 'stone' },
             { id: 96, name: 'purpur_block', solid: true, transparent: false, color: '#A86FCF', hardness: 1.5, groups: { cracky: 2 }, soundGroup: 'stone' },
             { id: 97, name: 'purpur_pillar', solid: true, transparent: false, color: '#8B5CBF', hardness: 1.5, groups: { cracky: 2 }, soundGroup: 'stone' },
-            { id: 98, name: 'mycelium', solid: true, transparent: false, color: '#6B5A8A', hardness: 0.6, drops: 'dirt', groups: { crumbly: 3 }, soundGroup: 'dirt', textureName: 'default_mycelium_top' },
             { id: 99, name: 'podzol', solid: true, transparent: false, color: '#5C4827', hardness: 0.5, drops: 'dirt', groups: { crumbly: 3 }, soundGroup: 'dirt' },
             { id: 100, name: 'coarse_dirt', solid: true, transparent: false, color: '#6B5C48', hardness: 0.5, groups: { crumbly: 3 }, soundGroup: 'dirt' },
             { id: 101, name: 'desert_sand', solid: true, transparent: false, color: '#E8D5A3', hardness: 0.5, falling: true, textureName: 'default_sand', groups: { crumbly: 3 }, soundGroup: 'sand' },

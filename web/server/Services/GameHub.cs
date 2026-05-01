@@ -1193,6 +1193,8 @@ public class GameHub : Hub<IGameClient>
 
     public async Task GetCraftingRecipes()
     {
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
         var recipes = _craftingSystem.GetAllRecipes();
         var recipeDtos = recipes.Select(r => new
         {
@@ -1264,6 +1266,8 @@ public class GameHub : Hub<IGameClient>
 
     public async Task GetSmeltingRecipes()
     {
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
         var recipes = _smeltingSystem.GetAllRecipes();
         var recipeDtos = recipes.Select(r => new
         {

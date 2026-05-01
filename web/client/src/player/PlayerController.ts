@@ -181,6 +181,13 @@ export class PlayerController {
             document.exitPointerLock();
             this._velocity.set(0, 0, 0);
         });
+
+        this._input.setScrollCallback((delta: number) => {
+            if (this.isDead) return;
+            if (delta === 0) return;
+            this._selectedSlot = ((this._selectedSlot + delta) % 8 + 8) % 8;
+            this._connection?.invoke('SelectSlot', this._selectedSlot);
+        });
     }
 
     private async startDig(): Promise<void> {
@@ -424,6 +431,27 @@ export class PlayerController {
         return false;
     }
 
+    private checkSneakEdge(x: number, y: number, z: number, moveX: number, moveZ: number): boolean {
+        if (!this._isSneaking || !this._worldManager) return false;
+        const halfW = PLAYER_WIDTH / 2;
+        const feetY = Math.floor(y - 0.01);
+        const checkX = Math.floor(x + moveX);
+        const checkZ = Math.floor(z + moveZ);
+        for (let bx = -1; bx <= 1; bx++) {
+            for (let bz = -1; bz <= 1; bz++) {
+                const testX = checkX + bx;
+                const testZ = checkZ + bz;
+                if (Math.abs(testX - x) <= halfW + 0.01 && Math.abs(testZ - z) <= halfW + 0.01) {
+                    if (!this._worldManager.isSolid(testX, feetY, testZ) &&
+                        !this._worldManager.isSolid(testX, feetY - 1, testZ)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     private isOnSlipperyBlock(): boolean {
         if (!this._worldManager) return false;
         const px = Math.floor(this._position.x);
@@ -528,6 +556,8 @@ export class PlayerController {
         if (this._worldManager) {
             if (!this.checkCollision(newX, this._position.y, this._position.z)) {
                 this._position.x = newX;
+            } else if (this.checkSneakEdge(this._position.x, this._position.y, this._position.z, newX - this._position.x, 0)) {
+                this._velocity.x = 0;
             } else {
                 this._velocity.x = 0;
             }
@@ -538,7 +568,8 @@ export class PlayerController {
             } else {
                 if (this._velocity.y < 0) {
                     if (this._onGround && Math.abs(this._velocity.y) < 8) {
-                        if (!this.checkCollision(this._position.x, newY + STEP_HEIGHT, this._position.z)) {
+                        if (!this.checkCollision(this._position.x, newY + STEP_HEIGHT, this._position.z) &&
+                            !this.checkCollision(this._position.x, newY + STEP_HEIGHT + PLAYER_FULL_HEIGHT - 0.01, this._position.z)) {
                             this._position.y = newY + STEP_HEIGHT;
                             this._velocity.y = 0;
                         } else {
@@ -556,6 +587,8 @@ export class PlayerController {
 
             if (!this.checkCollision(this._position.x, this._position.y, newZ)) {
                 this._position.z = newZ;
+            } else if (this.checkSneakEdge(this._position.x, this._position.y, this._position.z, 0, newZ - this._position.z)) {
+                this._velocity.z = 0;
             } else {
                 if (this._onGround && Math.abs(this._velocity.z) > 0.1) {
                     if (!this.checkCollision(this._position.x, this._position.y + STEP_HEIGHT, newZ)) {
@@ -745,10 +778,15 @@ export class PlayerController {
 
     setInventory(items: any[]): void {
         this.inventory = items;
-        for (let i = 0; i < Math.min(8, items.length); i++) {
-            if (items[i] && items[i].blockId) {
-                this._selectedBlockType = items[i].blockId;
-                break;
+        const selectedItem = items[this._selectedSlot];
+        if (selectedItem && selectedItem.blockId) {
+            this._selectedBlockType = selectedItem.blockId;
+        } else {
+            for (let i = 0; i < items.length; i++) {
+                if (items[i] && items[i].blockId) {
+                    this._selectedBlockType = items[i].blockId;
+                    break;
+                }
             }
         }
     }

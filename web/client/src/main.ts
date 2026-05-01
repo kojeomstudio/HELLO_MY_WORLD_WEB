@@ -46,8 +46,11 @@ class App {
         });
 
         document.addEventListener('keydown', (e) => {
+            const activeTag = (document.activeElement?.tagName || '').toLowerCase();
+            const isInputFocused = activeTag === 'input' || activeTag === 'textarea';
+
             if (e.key === 't' || e.key === 'T') {
-                if (chatInput.style.display !== 'block') {
+                if (!isInputFocused && chatInput.style.display !== 'block') {
                     chatInput.style.display = 'block';
                     chatInput.focus();
                 }
@@ -91,6 +94,10 @@ class App {
             if (document.pointerLockElement) {
                 e.preventDefault();
             }
+        });
+
+        document.addEventListener('wheel', (e) => {
+            this.gameClient.getInputManager().handleWheel(e);
         });
     }
 }

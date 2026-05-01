@@ -48,6 +48,9 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Block Geometry System**: Custom mesh generation for stairs, slabs, fences, walls, glass panes, doors, ladders, torches, plants, fire
 - **Particle Spawner**: Configurable particle spawner system with server-side spec management
 - **Settings**: Mouse sensitivity, render distance, FOV, volume controls, cloud/AO toggles
+- **Mouse Wheel Hotbar**: Scroll to cycle through hotbar slots
+- **Sneak Edge Detection**: Prevents falling off edges while sneaking
+- **Step-up Collision**: Auto-step 0.6 blocks with ceiling clearance check
 - **Third Person Camera**: F5 cycles through first-person, third-person rear, and third-person front views
 - **Underwater Effects**: Blue overlay and fog when submerged in water
 - **Head Bobbing**: Subtle walking/sprinting head bob animation
@@ -228,6 +231,7 @@ The Vite dev server proxies `/game` to the server.
 | Mouse | Look |
 | Left Click | Dig block / Use bucket |
 | Right Click | Place block / Interact / Place liquid |
+| Scroll Wheel | Cycle hotbar slot |
 | Space | Jump |
 | Shift | Sprint |
 | Left Ctrl | Toggle sneak/crouch |
@@ -300,7 +304,7 @@ This project is a web port of the Luanti (formerly Minetest) voxel game engine, 
 - **Day/Night Cycle**: Matching minetest's 24000-tick cycle
 - **Textures**: 89+ block textures from minetest devtest with nearest-neighbor filtering
 - **World Generation**: 10 biomes (grassland, forest, desert, snow, taiga, jungle, savanna, mountains, swamp, ocean) with heat/humidity noise, schematic-based trees (oak, pine, jungle, birch, cactus), river generation, 9 ore types with realistic depth distribution, multi-room dungeons with corridors and loot chests, cave systems with large caverns
-- **Security**: XSS-safe rendering (textContent/DOM APIs, CSS color validation), CORS-restricted origins with scoped headers/methods, CSP headers (no unsafe-eval, no unsafe-inline scripts), HSTS, Cross-Origin-Opener-Policy, Cross-Origin-Resource-Policy, Referrer-Policy, Permissions-Policy, HTML entity encoding for chat, sign text sanitization, player name sanitization, IP-based rate limiting with join cooldown, per-account brute-force lockout (5 failed attempts → 5-minute lockout), PBKDF2 password hashing (100k iterations, SHA256, random salt), constant-time comparison, privilege escalation protection (no self-grant/self-revoke/server privilege revocation), thread-safe privilege persistence, tiered privilege escalation protection, area protection with ownership checks, chest/furnace proximity validation, rollback recording, persistent ban database, block coordinate range validation, server-authoritative physics with anti-cheat, CI security scanning with fail-on-detect, npm audit in CI, minimal `permissions: read` for CI workflows
+- **Security**: XSS-safe rendering (textContent/DOM APIs, CSS color validation), CORS-restricted origins with scoped headers/methods, CSP headers (no unsafe-eval, no unsafe-inline scripts), HSTS, Cross-Origin-Opener-Policy, Cross-Origin-Resource-Policy, Referrer-Policy, Permissions-Policy, HTML entity encoding for chat, sign text sanitization, player name sanitization, IP-based rate limiting with join cooldown, per-account brute-force lockout (5 failed attempts → 5-minute lockout), PBKDF2 password hashing (100k iterations, SHA256, random salt), constant-time comparison, privilege escalation protection (no self-grant/self-revoke/server privilege revocation), thread-safe privilege persistence, tiered privilege escalation protection, area protection with ownership checks, chest/furnace proximity validation, rollback recording, persistent ban database, block coordinate range validation, server-authoritative physics with anti-cheat, CI security scanning with fail-on-detect, npm audit in CI, minimal `permissions: read` for CI workflows, authenticated hub methods (crafting/smelting recipes require join), explicit content-type whitelist for static files (no ServeUnknownFileTypes), SignalR max receive message size (256KB), runtime data files excluded from git
 - **CI**: GitHub Actions pipeline with Ubuntu + Windows server builds, client typecheck+build, security scan, data integrity verification (JSON parsing + required file checks)
 
 ## License

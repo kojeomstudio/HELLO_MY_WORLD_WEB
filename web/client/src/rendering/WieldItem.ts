@@ -4,7 +4,7 @@ export class WieldItem {
     private scene: THREE.Scene;
     private camera: THREE.PerspectiveCamera;
     private pivot: THREE.Group;
-    private currentMesh: THREE.Mesh | null = null;
+    private currentMesh: THREE.Object3D | null = null;
     private currentItemId: string = '';
     private bobAngle: number = 0;
     private bobSpeed: number = 8;
@@ -25,10 +25,14 @@ export class WieldItem {
 
         if (this.currentMesh) {
             this.pivot.remove(this.currentMesh);
-            this.currentMesh.geometry.dispose();
-            if (this.currentMesh.material instanceof THREE.Material) {
-                this.currentMesh.material.dispose();
-            }
+            this.currentMesh.traverse((child) => {
+                if (child instanceof THREE.Mesh) {
+                    child.geometry.dispose();
+                    if (child.material instanceof THREE.Material) {
+                        child.material.dispose();
+                    }
+                }
+            });
             this.currentMesh = null;
         }
 
@@ -52,7 +56,7 @@ export class WieldItem {
         }
     }
 
-    private createBlockMesh(itemName: string): THREE.Mesh {
+    private createBlockMesh(itemName: string): THREE.Object3D {
         const geometry = new THREE.BoxGeometry(0.25, 0.25, 0.25);
         let color = 0x888888;
         if (itemName.includes('stone')) color = 0x808080;
@@ -79,7 +83,7 @@ export class WieldItem {
         return new THREE.Mesh(geometry, material);
     }
 
-    private createToolMesh(itemName: string): THREE.Mesh {
+    private createToolMesh(itemName: string): THREE.Object3D {
         let color = 0x8B4513;
         let handleColor = 0x5C3317;
 
@@ -97,7 +101,7 @@ export class WieldItem {
         else if (itemName.includes('elemental')) { color = 0xFF00FF; handleColor = 0x5C3317; }
 
         if (itemName.includes('dagger')) {
-            const group = new THREE.Group() as any;
+            const group = new THREE.Group();
             const handleGeo = new THREE.BoxGeometry(0.03, 0.12, 0.03);
             const handleMat = new THREE.MeshLambertMaterial({ color: handleColor });
             const handle = new THREE.Mesh(handleGeo, handleMat);
@@ -114,7 +118,7 @@ export class WieldItem {
         }
 
         if (itemName.includes('sword')) {
-            const group = new THREE.Group() as any;
+            const group = new THREE.Group();
             const handleGeo = new THREE.BoxGeometry(0.04, 0.2, 0.04);
             const handleMat = new THREE.MeshLambertMaterial({ color: handleColor });
             const handle = new THREE.Mesh(handleGeo, handleMat);
@@ -161,7 +165,7 @@ export class WieldItem {
         }
 
         if (itemName.includes('shears')) {
-            const group = new THREE.Group() as any;
+            const group = new THREE.Group();
             const bladeGeo = new THREE.BoxGeometry(0.04, 0.18, 0.02);
             const bladeMat = new THREE.MeshLambertMaterial({ color });
             const blade1 = new THREE.Mesh(bladeGeo, bladeMat);
@@ -179,7 +183,7 @@ export class WieldItem {
         }
 
         if (itemName.includes('pickaxe')) {
-            const group = new THREE.Group() as any;
+            const group = new THREE.Group();
             const handleGeo = new THREE.BoxGeometry(0.04, 0.3, 0.04);
             const handleMat = new THREE.MeshLambertMaterial({ color: handleColor });
             const handle = new THREE.Mesh(handleGeo, handleMat);
@@ -198,10 +202,12 @@ export class WieldItem {
 
         const geometry = new THREE.BoxGeometry(0.05, 0.3, 0.05);
         const material = new THREE.MeshLambertMaterial({ color });
-        return new THREE.Mesh(geometry, material);
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.rotation.z = 0.3;
+        return mesh;
     }
 
-    private createItemMesh(itemName: string): THREE.Mesh {
+    private createItemMesh(itemName: string): THREE.Object3D {
         const geometry = new THREE.BoxGeometry(0.12, 0.12, 0.12);
         let color = 0xCCAACC;
 
@@ -252,7 +258,14 @@ export class WieldItem {
 
     destroy(): void {
         if (this.currentMesh) {
-            this.currentMesh.geometry.dispose();
+            this.currentMesh.traverse((child) => {
+                if (child instanceof THREE.Mesh) {
+                    child.geometry.dispose();
+                    if (child.material instanceof THREE.Material) {
+                        child.material.dispose();
+                    }
+                }
+            });
         }
         this.pivot.removeFromParent();
     }

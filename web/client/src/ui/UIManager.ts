@@ -16,13 +16,17 @@ export class UIManager {
     private debugInfo: HTMLElement;
     private deathScreen: HTMLElement | null = null;
     private craftingUI: HTMLElement | null = null;
-    private breathBar: HTMLElement | null = null;
-    private hungerBar: HTMLElement | null = null;
+    private craftingOverlay: HTMLElement | null = null;
     private furnaceUI: HTMLElement | null = null;
+    private furnaceOverlay: HTMLElement | null = null;
     private chestUI: HTMLElement | null = null;
+    private chestOverlay: HTMLElement | null = null;
     private creativeInventoryUI: HTMLElement | null = null;
+    private creativeOverlay: HTMLElement | null = null;
     private chestPosition: { x: number; y: number; z: number } | null = null;
     private furnacePosition: { x: number; y: number; z: number } | null = null;
+    private breathBar: HTMLElement | null = null;
+    private hungerBar: HTMLElement | null = null;
     private creativePage: number = 0;
     private creativeFilter: string = '';
     private creativeEntries: CreativeInventoryEntry[] = [];
@@ -266,27 +270,27 @@ export class UIManager {
         body.style.cssText = 'font-size:13px;overflow-y:auto;flex:1;';
         body.textContent = 'Loading recipes...';
 
-        const overlay = document.createElement('div');
-        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:499;';
-        overlay.addEventListener('click', () => {
+        this.craftingOverlay = document.createElement('div');
+        this.craftingOverlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:499;';
+        this.craftingOverlay.addEventListener('click', () => {
             this.hideCraftingUI();
         });
 
         this.craftingUI.appendChild(closeBtn);
         this.craftingUI.appendChild(header);
         this.craftingUI.appendChild(body);
-        document.body.appendChild(overlay);
+        document.body.appendChild(this.craftingOverlay);
         document.body.appendChild(this.craftingUI);
     }
 
     hideCraftingUI(): void {
         if (this.craftingUI && this.craftingUI.parentNode) {
-            const overlay = this.craftingUI.previousElementSibling as HTMLElement | null;
-            if (overlay && overlay.style?.zIndex === '499') {
-                overlay.parentNode?.removeChild(overlay);
-            }
             this.craftingUI.parentNode.removeChild(this.craftingUI);
             this.craftingUI = null;
+        }
+        if (this.craftingOverlay && this.craftingOverlay.parentNode) {
+            this.craftingOverlay.parentNode.removeChild(this.craftingOverlay);
+            this.craftingOverlay = null;
         }
     }
 
@@ -416,9 +420,9 @@ export class UIManager {
         recipesList.style.cssText = 'font-size:12px;overflow-y:auto;flex:1;';
         recipesList.textContent = 'Loading recipes...';
 
-        const overlay = document.createElement('div');
-        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:499;';
-        overlay.addEventListener('click', () => {
+        this.furnaceOverlay = document.createElement('div');
+        this.furnaceOverlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:499;';
+        this.furnaceOverlay.addEventListener('click', () => {
             this.hideFurnaceUI();
         });
 
@@ -428,7 +432,7 @@ export class UIManager {
         this.furnaceUI.appendChild(progressBar);
         this.furnaceUI.appendChild(recipesHeader);
         this.furnaceUI.appendChild(recipesList);
-        document.body.appendChild(overlay);
+        document.body.appendChild(this.furnaceOverlay);
         document.body.appendChild(this.furnaceUI);
     }
 
@@ -436,6 +440,10 @@ export class UIManager {
         if (this.furnaceUI && this.furnaceUI.parentNode) {
             this.furnaceUI.parentNode.removeChild(this.furnaceUI);
             this.furnaceUI = null;
+        }
+        if (this.furnaceOverlay && this.furnaceOverlay.parentNode) {
+            this.furnaceOverlay.parentNode.removeChild(this.furnaceOverlay);
+            this.furnaceOverlay = null;
         }
         this.furnacePosition = null;
     }
@@ -587,9 +595,9 @@ export class UIManager {
             invGrid.appendChild(slot);
         }
 
-        const overlay = document.createElement('div');
-        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:499;';
-        overlay.addEventListener('click', () => {
+        this.chestOverlay = document.createElement('div');
+        this.chestOverlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:499;';
+        this.chestOverlay.addEventListener('click', () => {
             this.hideChestUI();
         });
 
@@ -599,7 +607,7 @@ export class UIManager {
         this.chestUI.appendChild(chestGrid);
         this.chestUI.appendChild(invLabel);
         this.chestUI.appendChild(invGrid);
-        document.body.appendChild(overlay);
+        document.body.appendChild(this.chestOverlay);
         document.body.appendChild(this.chestUI);
     }
 
@@ -607,6 +615,10 @@ export class UIManager {
         if (this.chestUI && this.chestUI.parentNode) {
             this.chestUI.parentNode.removeChild(this.chestUI);
             this.chestUI = null;
+        }
+        if (this.chestOverlay && this.chestOverlay.parentNode) {
+            this.chestOverlay.parentNode.removeChild(this.chestOverlay);
+            this.chestOverlay = null;
         }
         this.chestPosition = null;
     }
@@ -748,9 +760,9 @@ export class UIManager {
         pageControls.appendChild(pageInfo);
         pageControls.appendChild(nextBtn);
 
-        const overlay = document.createElement('div');
-        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:499;';
-        overlay.addEventListener('click', () => {
+        this.creativeOverlay = document.createElement('div');
+        this.creativeOverlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:499;';
+        this.creativeOverlay.addEventListener('click', () => {
             this.hideCreativeInventory();
         });
 
@@ -758,7 +770,7 @@ export class UIManager {
         this.creativeInventoryUI.appendChild(searchInput);
         this.creativeInventoryUI.appendChild(gridContainer);
         this.creativeInventoryUI.appendChild(pageControls);
-        document.body.appendChild(overlay);
+        document.body.appendChild(this.creativeOverlay);
         document.body.appendChild(this.creativeInventoryUI);
 
         this.renderCreativeGrid();
@@ -831,12 +843,12 @@ export class UIManager {
 
     hideCreativeInventory(): void {
         if (this.creativeInventoryUI && this.creativeInventoryUI.parentNode) {
-            const overlay = this.creativeInventoryUI.previousElementSibling as HTMLElement | null;
-            if (overlay && overlay.style?.zIndex === '499') {
-                overlay.parentNode?.removeChild(overlay);
-            }
             this.creativeInventoryUI.parentNode.removeChild(this.creativeInventoryUI);
             this.creativeInventoryUI = null;
+        }
+        if (this.creativeOverlay && this.creativeOverlay.parentNode) {
+            this.creativeOverlay.parentNode.removeChild(this.creativeOverlay);
+            this.creativeOverlay = null;
         }
     }
 

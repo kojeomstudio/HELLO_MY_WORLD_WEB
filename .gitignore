@@ -54,6 +54,9 @@ logs/
 
 # World data (generated at runtime)
 web/data/worlds/
+web/data/bans.json
+web/data/player_privileges.json
+web/data/protection/
 
 # NuGet
 *.nupkg

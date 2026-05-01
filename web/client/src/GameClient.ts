@@ -35,8 +35,6 @@ export class GameClient {
     private fpsTimer: number = 0;
     private chunkRequestTimer: number = 0;
     private chunkUnloadTimer: number = 0;
-    private weatherTimer: number = 0;
-    private skyBrightness: number = 1;
 
     constructor(uiManager: UIManager) {
         this.uiManager = uiManager;
@@ -73,6 +71,7 @@ export class GameClient {
     }
 
     get items() { return this.itemRegistry; }
+    getInputManager(): InputManager { return this.inputManager; }
 
     toggleWeather(): string {
         const weatherType = this.weatherSystem.toggleWeather();
@@ -108,6 +107,10 @@ export class GameClient {
             this.lastTime = performance.now();
             this.gameLoop();
         } catch (err) {
+            if (this.connection) {
+                this.connection.stop();
+                this.connection = null;
+            }
             this.uiManager.addChatMessage('Server', `Connection failed: ${err}`);
             this.showLoginScreen();
         }
@@ -157,7 +160,6 @@ export class GameClient {
         });
 
         this.connection.on('OnTimeUpdate', (_time: number, _speed: number, skyBrightness: number) => {
-            this.skyBrightness = skyBrightness;
             this.renderer.updateSkyBrightness(skyBrightness);
         });
 
@@ -401,13 +403,6 @@ export class GameClient {
         this.worldManager.update(dt);
         this.renderer.updateClouds(dt);
         this.renderer.updateEffects(dt);
-
-        this.weatherTimer += dt;
-        if (this.weatherTimer >= 5.0) {
-            this.weatherTimer = 0;
-            this.weatherSystem.setRaining(this.skyBrightness < 0.3 || Math.random() < 0.2);
-            this.renderer.setRaining(this.weatherSystem.getIsRaining());
-        }
 
         const playerPos = this.playerController.getPosition();
         this.renderer.updatePlayerLight(playerPos.x, playerPos.y, playerPos.z);

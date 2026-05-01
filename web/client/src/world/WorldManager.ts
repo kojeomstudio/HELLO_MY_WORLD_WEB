@@ -843,7 +843,6 @@ export class WorldManager {
                 this.renderer.removeFromScene(anim.mesh);
                 anim.mesh.geometry.dispose();
                 (anim.mesh.material as THREE.Material).dispose();
-                this.updateBlock(anim.toX, anim.toY, anim.toZ, anim.blockType);
                 this.fallingBlocks.splice(i, 1);
             }
         }
