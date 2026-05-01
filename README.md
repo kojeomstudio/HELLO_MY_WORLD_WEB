@@ -26,9 +26,12 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Mob System**: Hostile mobs (Zombie, Skeleton, Spider) and passive mobs (Cow, Pig, Chicken) with full AI state machine and pathfinding support
 - **Entity System**: Dropped items with merge behavior, mob entities with AI, physics and lifespan
 - **Dungeon Generation**: Multi-room procedural dungeons with corridors, mossy/stone brick walls, torch/lantern lighting, and loot chests
+- **CavesRandomWalk**: Random-walk tunnel generation with variable radius (small/large) for natural cave networks
+- **Expanded Ore Generation**: Scatter (noise-based), vein (random-walk blob), and sheet (horizontal layer) ore placement for 13 ore/mineral types
 - **World Border**: Configurable size with position clamping
 - **Interactive Blocks**: Sign text input, bed spawn point, note block/jukebox procedural audio, crafting table, chest, furnace, TNT explosion
 - **Day/Night Cycle**: Full 24000-tick day/night cycle with sky brightness transitions
+- **Sky Rendering**: Gradient sky dome with sunrise/sunset color transitions, sun positioning, moon, and star field
 - **Weather**: Rain and snow particle systems with day/night color transitions, cyclable weather modes
 - **Multiplayer**: Real-time multiplayer via SignalR WebSocket with chat, player list
 - **Chat Commands**: 32+ commands with privilege enforcement
@@ -45,12 +48,13 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Fishing System**: Cast, wait, bite, reel phases with catch probabilities; accessible via hub methods
 - **Breeding System**: Feed animals (cow/pig with wheat, chicken with seeds) to breed with baby mobs
 - **Texture Atlas**: 89+ block textures from minetest devtest with nearest-neighbor filtering
-- **Block Geometry System**: Custom mesh generation for stairs, slabs, fences, walls, glass panes, doors, ladders, torches, plants, fire
+- **Block Geometry System**: Custom mesh generation for stairs, slabs, fences, walls, glass panes, doors, ladders, torches, plants, fire, glasslike (internal face removal)
 - **Particle Spawner**: Configurable particle spawner system with server-side spec management
 - **Settings**: Mouse sensitivity, render distance, FOV, volume controls, cloud/AO toggles
 - **Mouse Wheel Hotbar**: Scroll to cycle through hotbar slots
 - **Sneak Edge Detection**: Prevents falling off edges while sneaking
 - **Step-up Collision**: Auto-step 0.6 blocks with ceiling clearance check
+- **Server Collision Engine**: Per-axis AABB collision resolution with step-height support and proper ground detection
 - **Third Person Camera**: F5 cycles through first-person, third-person rear, and third-person front views
 - **Underwater Effects**: Blue overlay and fog when submerged in water
 - **Head Bobbing**: Subtle walking/sprinting head bob animation
@@ -303,7 +307,7 @@ This project is a web port of the Luanti (formerly Minetest) voxel game engine, 
 - **Liquid Physics**: Water/lava flow with level system, lava-water interaction
 - **Day/Night Cycle**: Matching minetest's 24000-tick cycle
 - **Textures**: 89+ block textures from minetest devtest with nearest-neighbor filtering
-- **World Generation**: 10 biomes (grassland, forest, desert, snow, taiga, jungle, savanna, mountains, swamp, ocean) with heat/humidity noise, schematic-based trees (oak, pine, jungle, birch, cactus), river generation, 9 ore types with realistic depth distribution, multi-room dungeons with corridors and loot chests, cave systems with large caverns
+- **World Generation**: 10 biomes (grassland, forest, desert, snow, taiga, jungle, savanna, mountains, swamp, ocean) with heat/humidity noise, schematic-based trees (oak, pine, jungle, birch, cactus), river generation, 13 ore/mineral types with scatter, vein, and sheet placement, multi-room dungeons with corridors and loot chests, cave systems with large caverns, random-walk tunnel generation with variable radius
 - **Security**: XSS-safe rendering (textContent/DOM APIs, CSS color validation), CORS-restricted origins with scoped headers/methods, CSP headers (no unsafe-eval, no unsafe-inline scripts), HSTS, Cross-Origin-Opener-Policy, Cross-Origin-Resource-Policy, Referrer-Policy, Permissions-Policy, HTML entity encoding for chat, sign text sanitization, player name sanitization, IP-based rate limiting with join cooldown, per-account brute-force lockout (5 failed attempts → 5-minute lockout), PBKDF2 password hashing (100k iterations, SHA256, random salt), constant-time comparison, privilege escalation protection (no self-grant/self-revoke/server privilege revocation), thread-safe privilege persistence, tiered privilege escalation protection, area protection with ownership checks, chest/furnace proximity validation, rollback recording, persistent ban database, block coordinate range validation, server-authoritative physics with anti-cheat, CI security scanning with fail-on-detect, npm audit in CI, minimal `permissions: read` for CI workflows, authenticated hub methods (crafting/smelting recipes require join), explicit content-type whitelist for static files (no ServeUnknownFileTypes), SignalR max receive message size (256KB), runtime data files excluded from git
 - **CI**: GitHub Actions pipeline with Ubuntu + Windows server builds, client typecheck+build, security scan, data integrity verification (JSON parsing + required file checks)
 

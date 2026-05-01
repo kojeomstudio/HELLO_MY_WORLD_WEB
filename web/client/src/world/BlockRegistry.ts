@@ -276,12 +276,14 @@ export class BlockRegistry {
         if (name === 'fence') return 'fence';
         if (name.startsWith('door_')) return 'door';
         if (name === 'iron_bars') return 'glass_pane';
+        if (name === 'chain') return 'glass_pane';
         if (name.includes('slab') || name === 'snow_layer') return 'slab';
         if (name.includes('stairs')) return 'stair';
         if (name === 'fire') return 'firelike';
         if (name.includes('crop') || name.includes('flower') || name.includes('mushroom') ||
             name === 'dead_bush' || name === 'tall_grass' || name === 'junglegrass' ||
             name === 'sugar_cane' || name === 'sugar_cane_block') return 'plantlike';
+        if (name === 'glass' || name === 'obsidian_glass') return 'glasslike';
         return 'normal';
     }
 }

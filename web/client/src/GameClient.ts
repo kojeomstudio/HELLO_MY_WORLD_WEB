@@ -159,8 +159,8 @@ export class GameClient {
             this.playerController.setInventory(items);
         });
 
-        this.connection.on('OnTimeUpdate', (_time: number, _speed: number, skyBrightness: number) => {
-            this.renderer.updateSkyBrightness(skyBrightness);
+        this.connection.on('OnTimeUpdate', (time: number, _speed: number, skyBrightness: number) => {
+            this.renderer.updateSky(time, skyBrightness);
         });
 
         this.connection.on('OnEntitySpawned', (entityId: string, entityType: string, entityName: string, x: number, y: number, z: number, isBaby: boolean) => {

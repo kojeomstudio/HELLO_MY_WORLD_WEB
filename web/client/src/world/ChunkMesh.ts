@@ -301,6 +301,34 @@ function buildFirelike(ctx: BuildCtx, wx: number, wy: number, wz: number, color:
         [0, 0, 1], color, lm, 1.0);
 }
 
+function buildGlasslike(
+    ctx: BuildCtx, wx: number, wy: number, wz: number,
+    blockId: number, color: THREE.Color
+): void {
+    const faces = [
+        { dir: [0, 1, 0], corners: [[0, 1, 0], [1, 1, 0], [1, 1, 1], [0, 1, 1]], normal: [0, 1, 0] },
+        { dir: [0, -1, 0], corners: [[0, 0, 1], [1, 0, 1], [1, 0, 0], [0, 0, 0]], normal: [0, -1, 0] },
+        { dir: [1, 0, 0], corners: [[1, 0, 0], [1, 1, 0], [1, 1, 1], [1, 0, 1]], normal: [1, 0, 0] },
+        { dir: [-1, 0, 0], corners: [[0, 0, 1], [0, 1, 1], [0, 1, 0], [0, 0, 0]], normal: [-1, 0, 0] },
+        { dir: [0, 0, 1], corners: [[0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]], normal: [0, 0, 1] },
+        { dir: [0, 0, -1], corners: [[1, 0, 0], [0, 0, 0], [0, 1, 0], [1, 1, 0]], normal: [0, 0, -1] },
+    ];
+
+    for (const face of faces) {
+        const nx = wx + face.dir[0];
+        const ny = wy + face.dir[1];
+        const nz = wz + face.dir[2];
+        const neighborId = ctx.getNeighborBlock(nx, ny, nz);
+
+        if (neighborId === blockId) continue;
+
+        const lm = getBlockLight(ctx, wx, wy, wz);
+        pushQuad(ctx, wx, wy, wz,
+            face.corners[0], face.corners[1], face.corners[2], face.corners[3],
+            face.normal, color, lm, 1.0);
+    }
+}
+
 export class ChunkMesh {
     public mesh: THREE.Mesh | null = null;
     public transparentMesh: THREE.Mesh | null = null;
@@ -659,6 +687,9 @@ export class ChunkMesh {
                             break;
                         case 'firelike':
                             buildFirelike(ctx, worldX, worldY, worldZ, color);
+                            break;
+                        case 'glasslike':
+                            buildGlasslike(ctx, worldX, worldY, worldZ, blockId, color);
                             break;
                     }
                 }

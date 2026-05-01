@@ -1,6 +1,15 @@
 import * as THREE from 'three';
 import { CloudSystem } from './CloudSystem';
 
+const SKY_COLORS = {
+    day: new THREE.Color(0.412, 0.647, 0.863),
+    dayHorizon: new THREE.Color(0.843, 0.902, 1.0),
+    dawn: new THREE.Color(0.706, 0.471, 0.314),
+    dawnHorizon: new THREE.Color(1.0, 0.706, 0.471),
+    night: new THREE.Color(0.039, 0.039, 0.118),
+    nightHorizon: new THREE.Color(0.098, 0.098, 0.196)
+};
+
 export class Renderer {
     private scene: THREE.Scene;
     private camera: THREE.PerspectiveCamera;
@@ -25,8 +34,17 @@ export class Renderer {
     private rainFogFar: number = 80;
     private underwaterFogNear: number = 5;
     private underwaterFogFar: number = 40;
-
     private isUnderwater: boolean = false;
+    private gameTime: number = 6000;
+    private skyMesh: THREE.Mesh | null = null;
+    private sunMesh: THREE.Mesh | null = null;
+    private moonMesh: THREE.Mesh | null = null;
+    private starField: THREE.Points | null = null;
+    private targetSunColor: THREE.Color = new THREE.Color();
+    private targetMoonIntensity: number = 0;
+    private targetStarOpacity: number = 0;
+    private currentMoonIntensity: number = 0;
+    private currentStarOpacity: number = 0;
 
     constructor(container: HTMLElement) {
         this.canvas = document.createElement('canvas');
@@ -79,20 +97,97 @@ export class Renderer {
 
     private addSkyDome(): void {
         const skyGeometry = new THREE.SphereGeometry(400, 32, 32);
-        const skyMaterial = new THREE.MeshBasicMaterial({
-            color: 0x87CEEB,
+        const skyMaterial = new THREE.ShaderMaterial({
             side: THREE.BackSide,
+            uniforms: {
+                topColor: { value: SKY_COLORS.day.clone() },
+                bottomColor: { value: SKY_COLORS.dayHorizon.clone() },
+                offset: { value: 20 },
+                exponent: { value: 0.6 }
+            },
+            vertexShader: `
+                varying vec3 vWorldPosition;
+                void main() {
+                    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+                    vWorldPosition = worldPosition.xyz;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform vec3 topColor;
+                uniform vec3 bottomColor;
+                uniform float offset;
+                uniform float exponent;
+                varying vec3 vWorldPosition;
+                void main() {
+                    float h = normalize(vWorldPosition + offset).y;
+                    gl_FragColor = vec4(mix(bottomColor, topColor, max(pow(max(h, 0.0), exponent), 0.0)), 1.0);
+                }
+            `
         });
-        const skyMesh = new THREE.Mesh(skyGeometry, skyMaterial);
-        skyMesh.name = 'sky';
-        this.scene.add(skyMesh);
+        this.skyMesh = new THREE.Mesh(skyGeometry, skyMaterial);
+        this.skyMesh.name = 'sky';
+        this.scene.add(this.skyMesh);
 
         const sunGeometry = new THREE.SphereGeometry(15, 16, 16);
-        const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFF00 });
-        const sunMesh = new THREE.Mesh(sunGeometry, sunMaterial);
-        sunMesh.position.set(200, 150, -100);
-        sunMesh.name = 'sun';
-        this.scene.add(sunMesh);
+        const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFCC });
+        this.sunMesh = new THREE.Mesh(sunGeometry, sunMaterial);
+        this.sunMesh.name = 'sun';
+        this.scene.add(this.sunMesh);
+
+        const moonGeometry = new THREE.SphereGeometry(10, 16, 16);
+        const moonMaterial = new THREE.MeshBasicMaterial({
+            color: 0xCCCCEE,
+            transparent: true,
+            opacity: 0
+        });
+        this.moonMesh = new THREE.Mesh(moonGeometry, moonMaterial);
+        this.moonMesh.name = 'moon';
+        this.scene.add(this.moonMesh);
+
+        this.createStarField();
+    }
+
+    private createStarField(): void {
+        const starCount = 1000;
+        const positions = new Float32Array(starCount * 3);
+        const sizes = new Float32Array(starCount);
+        const rng = this.seededRandom(42);
+
+        for (let i = 0; i < starCount; i++) {
+            const theta = rng() * Math.PI * 2;
+            const phi = Math.acos(2 * rng() - 1);
+            const radius = 380;
+            positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+            positions[i * 3 + 1] = Math.abs(radius * Math.cos(phi));
+            positions[i * 3 + 2] = radius * Math.sin(phi) * Math.sin(theta);
+            sizes[i] = 0.5 + rng() * 1.5;
+        }
+
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+        const material = new THREE.PointsMaterial({
+            color: 0xFFFFC8,
+            size: 1.5,
+            transparent: true,
+            opacity: 0,
+            sizeAttenuation: false,
+            depthWrite: false
+        });
+
+        this.starField = new THREE.Points(geometry, material);
+        this.starField.name = 'stars';
+        this.scene.add(this.starField);
+    }
+
+    private seededRandom(seed: number): () => number {
+        let s = seed;
+        return () => {
+            s = (s * 16807) % 2147483647;
+            return (s - 1) / 2147483646;
+        };
     }
 
     private setupResizeHandler(): void {
@@ -129,7 +224,8 @@ export class Renderer {
         this.scene.remove(object);
     }
 
-    updateSkyBrightness(brightness: number): void {
+    updateSky(time: number, brightness: number): void {
+        this.gameTime = time;
         this.currentBrightness = brightness;
 
         if (this.isUnderwater) {
@@ -143,32 +239,107 @@ export class Renderer {
             return;
         }
 
-        let r = 0.53 * brightness;
-        let g = 0.81 * brightness;
-        let b = 0.92 * brightness;
+        const dayTime = time % 24000;
+        const dayFraction = dayTime / 24000;
+        const sunAngle = dayFraction * Math.PI * 2;
+
+        let topColor: THREE.Color;
+        let horizonColor: THREE.Color;
+        let sunColor: THREE.Color;
+        let sunIntensity: number;
+        let moonIntensity: number;
+        let starOpacity: number;
+
+        const dawnThreshold = 4500;
+        const sunriseEnd = 6000;
+        const sunsetStart = 18000;
+        const duskEnd = 19750;
+
+        if (dayTime >= sunriseEnd && dayTime <= sunsetStart) {
+            topColor = SKY_COLORS.day.clone();
+            horizonColor = SKY_COLORS.dayHorizon.clone();
+            sunColor = new THREE.Color(1.0, 1.0, 0.8);
+            sunIntensity = brightness;
+            moonIntensity = 0;
+            starOpacity = 0;
+        } else if (dayTime >= dawnThreshold && dayTime < sunriseEnd) {
+            const t = (dayTime - dawnThreshold) / (sunriseEnd - dawnThreshold);
+            const dawnT = Math.sin(t * Math.PI * 0.5);
+            topColor = SKY_COLORS.night.clone().lerp(SKY_COLORS.dawn, dawnT);
+            horizonColor = SKY_COLORS.nightHorizon.clone().lerp(SKY_COLORS.dawnHorizon, dawnT);
+            sunColor = new THREE.Color(1.0, 0.6 + dawnT * 0.3, 0.2 + dawnT * 0.4);
+            sunIntensity = dawnT * brightness;
+            moonIntensity = (1 - dawnT) * 0.4;
+            starOpacity = (1 - dawnT) * 0.8;
+        } else if (dayTime > sunsetStart && dayTime <= duskEnd) {
+            const t = (dayTime - sunsetStart) / (duskEnd - sunsetStart);
+            const duskT = Math.sin(t * Math.PI * 0.5);
+            topColor = SKY_COLORS.day.clone().lerp(SKY_COLORS.dawn, duskT * 0.7).lerp(SKY_COLORS.night, duskT * 0.5);
+            horizonColor = SKY_COLORS.dayHorizon.clone().lerp(SKY_COLORS.dawnHorizon, duskT);
+            sunColor = new THREE.Color(1.0, 0.8 - duskT * 0.3, 0.4 - duskT * 0.2);
+            sunIntensity = (1 - duskT) * brightness;
+            moonIntensity = duskT * 0.4;
+            starOpacity = duskT * 0.8;
+        } else {
+            topColor = SKY_COLORS.night.clone();
+            horizonColor = SKY_COLORS.nightHorizon.clone();
+            sunColor = new THREE.Color(0.4, 0.2, 0.1);
+            sunIntensity = 0;
+            moonIntensity = 0.4;
+            starOpacity = 0.8;
+        }
 
         if (this.isRaining) {
             const rainMix = 0.3;
-            r = r * (1 - rainMix) + 0.4 * rainMix;
-            g = g * (1 - rainMix) + 0.42 * rainMix;
-            b = b * (1 - rainMix) + 0.48 * rainMix;
+            const rainColor = new THREE.Color(0.4, 0.42, 0.48);
+            topColor.lerp(rainColor, rainMix);
+            horizonColor.lerp(rainColor, rainMix);
         }
 
-        this.skyColor.setRGB(r, g, b);
+        this.skyColor.copy(horizonColor);
+        this.fog.color.copy(horizonColor);
         this.scene.background = this.skyColor;
-        (this.scene.fog as THREE.Fog).color = this.skyColor;
 
         this.fog.near = this.isRaining ? this.rainFogNear : this.normalFogNear;
         this.fog.far = this.isRaining ? this.rainFogFar : this.normalFogFar;
 
-        this.skyLight.intensity = this.isRaining ? brightness * 0.6 : brightness;
+        this.skyLight.intensity = this.isRaining ? sunIntensity * 0.6 : sunIntensity;
+        this.skyLight.color.copy(sunColor);
         this.ambientLight.intensity = this.isRaining ? 0.3 + 0.3 * brightness : 0.2 + 0.6 * brightness;
 
-        const sky = this.scene.getObjectByName('sky');
-        if (sky) {
-            const mat = (sky as THREE.Mesh).material as THREE.MeshBasicMaterial;
-            mat.color.copy(this.skyColor);
+        if (this.skyMesh) {
+            const mat = this.skyMesh.material as THREE.ShaderMaterial;
+            mat.uniforms.topColor.value.copy(topColor);
+            mat.uniforms.bottomColor.value.copy(horizonColor);
         }
+
+        this.targetSunColor.copy(sunColor);
+        this.targetMoonIntensity = moonIntensity;
+        this.targetStarOpacity = starOpacity;
+
+        const sunX = Math.cos(sunAngle) * 200;
+        const sunY = Math.sin(sunAngle) * 200;
+        if (this.sunMesh) {
+            this.sunMesh.position.set(sunX, Math.max(sunY, -50), -100);
+            this.sunMesh.visible = sunIntensity > 0;
+        }
+
+        if (this.moonMesh) {
+            this.moonMesh.position.set(-sunX, -sunY + 100, -100);
+            const mat = this.moonMesh.material as THREE.MeshBasicMaterial;
+            this.currentMoonIntensity += (this.targetMoonIntensity - this.currentMoonIntensity) * 0.05;
+            mat.opacity = this.currentMoonIntensity;
+        }
+
+        if (this.starField) {
+            const mat = this.starField.material as THREE.PointsMaterial;
+            this.currentStarOpacity += (this.targetStarOpacity - this.currentStarOpacity) * 0.03;
+            mat.opacity = this.currentStarOpacity;
+        }
+    }
+
+    updateSkyBrightness(brightness: number): void {
+        this.updateSky(this.gameTime, brightness);
     }
 
     updateClouds(dt: number): void {

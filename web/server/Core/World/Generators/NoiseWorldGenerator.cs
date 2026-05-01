@@ -230,10 +230,100 @@ public class NoiseWorldGenerator : IWorldGenerator
                 }
             }
         }
+
+        GenerateRandomWalkCaves(blocks, baseX, baseY, baseZ);
+    }
+
+    private void GenerateRandomWalkCaves(ushort[,,] blocks, int baseX, int baseY, int baseZ)
+    {
+        var rng = new Random(_seed + baseX * 1664525 + baseZ * 1013904223 + baseY * 4567890);
+
+        var numWalks = 3;
+        for (int w = 0; w < numWalks; w++)
+        {
+            if (rng.NextDouble() > 0.35) continue;
+
+            var startX = rng.Next(2, Chunk.Size - 2);
+            var startZ = rng.Next(2, Chunk.Size - 2);
+            var startY = rng.Next(2, Chunk.Size - 4);
+            var worldStartY = baseY + startY;
+
+            if (worldStartY > GroundBase + TerrainHeight - 5 || worldStartY < 3) continue;
+
+            var isLarge = worldStartY < 20 && rng.NextDouble() < 0.2;
+            var tunnelRadius = isLarge ? rng.Next(2, 5) : rng.Next(1, 3);
+            var length = isLarge ? rng.Next(20, 60) : rng.Next(10, 40);
+
+            var cx = startX;
+            var cy = startY;
+            var cz = startZ;
+            var dx = rng.Next(-1, 2);
+            var dz = rng.Next(-1, 2);
+            var dy = 0;
+
+            for (int step = 0; step < length; step++)
+            {
+                CarveTunnelSphere(blocks, cx, cy, cz, tunnelRadius);
+
+                if (rng.NextDouble() < 0.25)
+                {
+                    dx = rng.Next(-1, 2);
+                    dz = rng.Next(-1, 2);
+                }
+
+                if (rng.NextDouble() < 0.15)
+                {
+                    dy = rng.Next(-1, 2);
+                }
+
+                cx += dx;
+                cy += dy;
+                cz += dz;
+
+                if (cx < tunnelRadius || cx >= Chunk.Size - tunnelRadius ||
+                    cz < tunnelRadius || cz >= Chunk.Size - tunnelRadius ||
+                    cy < tunnelRadius || cy >= Chunk.Size - tunnelRadius)
+                {
+                    break;
+                }
+
+                if (baseY + cy > GroundBase + TerrainHeight - 2) dy = -Math.Abs(dy) - 1;
+                if (baseY + cy < 2) dy = Math.Abs(dy) + 1;
+            }
+        }
+    }
+
+    private static void CarveTunnelSphere(ushort[,,] blocks, int cx, int cy, int cz, int radius)
+    {
+        for (int dx = -radius; dx <= radius; dx++)
+        {
+            for (int dy = -radius; dy <= radius; dy++)
+            {
+                for (int dz = -radius; dz <= radius; dz++)
+                {
+                    if (dx * dx + dy * dy + dz * dz > radius * radius) continue;
+
+                    var lx = cx + dx;
+                    var ly = cy + dy;
+                    var lz = cz + dz;
+
+                    if (lx < 0 || lx >= Chunk.Size || ly < 1 || ly >= Chunk.Size - 1 || lz < 0 || lz >= Chunk.Size) continue;
+
+                    if (blocks[lx, ly, lz] != (ushort)BlockType.Bedrock)
+                    {
+                        blocks[lx, ly, lz] = (ushort)BlockType.Air;
+                    }
+                }
+            }
+        }
     }
 
     private void GenerateOres(ushort[,,] blocks, int baseX, int baseY, int baseZ)
     {
+        var oreRng = new Random(unchecked((int)(_seed + baseX * 6364136223846793005L ^ baseZ * 6364136223846793005L)));
+
+        GenerateOreVeins(blocks, baseX, baseY, baseZ, oreRng);
+
         for (int x = 0; x < Chunk.Size; x++)
         {
             for (int z = 0; z < Chunk.Size; z++)
@@ -251,6 +341,107 @@ public class NoiseWorldGenerator : IWorldGenerator
                     if (oreType != (ushort)BlockType.Air)
                     {
                         blocks[x, y, z] = oreType;
+                    }
+                }
+            }
+        }
+    }
+
+    private void GenerateOreVeins(ushort[,,] blocks, int baseX, int baseY, int baseZ, Random rng)
+    {
+        var veinDefinitions = new (BlockType Type, int YMin, int YMax, float Chance, int MinSize, int MaxSize)[]
+        {
+            ((BlockType)BlockType.OreIron, 0, 64, 0.02f, 3, 8),
+            ((BlockType)BlockType.Coal, 0, 96, 0.025f, 4, 10),
+            ((BlockType)BlockType.GoldOre, 0, 32, 0.008f, 2, 5),
+            ((BlockType)BlockType.OreDiamond, 0, 16, 0.004f, 2, 4),
+            ((BlockType)BlockType.RedstoneOre, 0, 16, 0.006f, 2, 6),
+            ((BlockType)BlockType.LapisOre, 0, 32, 0.005f, 2, 5),
+            ((BlockType)BlockType.CopperOre, 0, 96, 0.012f, 3, 7),
+            ((BlockType)BlockType.EmeraldOre, 4, 32, 0.002f, 1, 1),
+            ((BlockType)BlockType.Dirt, 0, 80, 0.01f, 4, 12),
+            ((BlockType)BlockType.Gravel, 0, 80, 0.01f, 4, 12),
+            ((BlockType)BlockType.Granite, 0, 80, 0.008f, 3, 8),
+            ((BlockType)BlockType.Diorite, 0, 80, 0.008f, 3, 8),
+            ((BlockType)BlockType.Andesite, 0, 80, 0.008f, 3, 8)
+        };
+
+        foreach (var (oreType, yMin, yMax, chance, minSize, maxSize) in veinDefinitions)
+        {
+            var numVeins = (int)(Chunk.Size * Chunk.Size * Chunk.Size * chance);
+            for (int v = 0; v < numVeins; v++)
+            {
+                var vx = rng.Next(0, Chunk.Size);
+                var vy = rng.Next(0, Chunk.Size);
+                var vz = rng.Next(0, Chunk.Size);
+                var worldY = baseY + vy;
+
+                if (worldY < yMin || worldY > yMax) continue;
+                if (blocks[vx, vy, vz] != (ushort)BlockType.Stone &&
+                    blocks[vx, vy, vz] != (ushort)BlockType.DesertStone) continue;
+
+                var veinSize = rng.Next(minSize, maxSize + 1);
+                var cx = vx;
+                var cy = vy;
+                var cz = vz;
+
+                for (int i = 0; i < veinSize; i++)
+                {
+                    if (cx >= 0 && cx < Chunk.Size && cy >= 0 && cy < Chunk.Size && cz >= 0 && cz < Chunk.Size)
+                    {
+                        if (blocks[cx, cy, cz] == (ushort)BlockType.Stone ||
+                            blocks[cx, cy, cz] == (ushort)BlockType.DesertStone)
+                        {
+                            blocks[cx, cy, cz] = (ushort)oreType;
+                        }
+                    }
+
+                    var dir = rng.Next(6);
+                    cx += dir == 0 ? 1 : dir == 1 ? -1 : 0;
+                    cy += dir == 2 ? 1 : dir == 3 ? -1 : 0;
+                    cz += dir == 4 ? 1 : dir == 5 ? -1 : 0;
+                }
+            }
+        }
+
+        GenerateOreSheet(blocks, baseX, baseY, baseZ, rng);
+    }
+
+    private void GenerateOreSheet(ushort[,,] blocks, int baseX, int baseY, int baseZ, Random rng)
+    {
+        var sheetDefinitions = new (BlockType Type, int YMin, int YMax, float Chance, int MinThickness, int MaxThickness)[]
+        {
+            (BlockType.Sand, 0, 60, 0.003f, 1, 4),
+            (BlockType.Clay, 0, 40, 0.002f, 1, 3)
+        };
+
+        foreach (var (oreType, yMin, yMax, chance, minThickness, maxThickness) in sheetDefinitions)
+        {
+            if (rng.NextDouble() > chance * Chunk.Size * Chunk.Size) continue;
+
+            var sheetY = rng.Next(0, Chunk.Size);
+            var worldY = baseY + sheetY;
+            if (worldY < yMin || worldY > yMax) continue;
+
+            var thickness = rng.Next(minThickness, maxThickness + 1);
+            var centerZ = rng.Next(0, Chunk.Size);
+            var radius = rng.Next(2, Chunk.Size / 2);
+
+            for (int x = 0; x < Chunk.Size; x++)
+            {
+                for (int z = 0; z < Chunk.Size; z++)
+                {
+                    var dist = Math.Abs(z - centerZ);
+                    if (dist > radius) continue;
+
+                    for (int t = 0; t < thickness; t++)
+                    {
+                        var ly = sheetY + t;
+                        if (ly >= Chunk.Size) break;
+                        if (blocks[x, ly, z] == (ushort)BlockType.Stone)
+                        {
+                            blocks[x, ly, z] = (ushort)oreType;
+                        }
                     }
                 }
             }

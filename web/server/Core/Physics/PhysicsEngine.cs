@@ -18,6 +18,7 @@ public class PhysicsEngine
     public float Drag { get; set; } = 0.1f;
     public float LiquidDrag { get; set; } = 0.8f;
     public float TerminalVelocity { get; set; } = 50.0f;
+    public float StepHeight { get; set; } = 0.6f;
 
     public PhysicsState Simulate(PhysicsState state, PlayerInput input, WorldMap world, float dt)
     {
@@ -201,42 +202,125 @@ public class PhysicsEngine
     private Vector3 ResolveCollisions(Vector3 pos, PhysicsState state, WorldMap world)
     {
         var halfW = PlayerWidth / 2;
-        var minX = (short)Math.Floor(pos.X - halfW);
-        var maxX = (short)Math.Floor(pos.X + halfW);
-        var minY = (short)Math.Floor(pos.Y - PlayerHeight);
-        var maxY = (short)Math.Floor(pos.Y);
-        var minZ = (short)Math.Floor(pos.Z - halfW);
-        var maxZ = (short)Math.Floor(pos.Z + halfW);
 
-        for (int bx = minX; bx <= maxX; bx++)
+        var resultX = ResolveCollisionX(pos.X, state.Position.X, state.Position.Y, state.Position.Z, world, halfW);
+        var resultZ = ResolveCollisionZ(resultX, state.Position.Y, pos.Z, state.Position.Z, world, halfW);
+        var (resultY, onGround) = ResolveCollisionY(resultX, pos.Y, state.Position.Y, resultZ, world, halfW, state.IsOnGround);
+
+        return new Vector3(resultX, resultY, resultZ);
+    }
+
+    private float ResolveCollisionX(float desiredX, float origX, float currentY, float currentZ, WorldMap world, float halfW)
+    {
+        var startBX = (short)Math.Floor(desiredX - halfW);
+        var endBX = (short)Math.Floor(desiredX + halfW - 0.001f);
+        var startBZ = (short)Math.Floor(currentZ - halfW);
+        var endBZ = (short)Math.Floor(currentZ + halfW - 0.001f);
+        var startBY = (short)Math.Floor(currentY - PlayerHeight);
+        var endBY = (short)Math.Floor(currentY - 0.01f);
+
+        for (int bx = startBX; bx <= endBX; bx++)
         {
-            for (int by = minY; by <= maxY; by++)
+            for (int bz = startBZ; bz <= endBZ; bz++)
             {
-                for (int bz = minZ; bz <= maxZ; bz++)
+                for (int by = startBY; by <= endBY; by++)
                 {
-                    var block = world.GetBlock(new Vector3s((short)bx, (short)by, (short)bz));
-                    if (!IsSolid(block.Type)) continue;
+                    if (!IsSolid(world.GetBlock(new Vector3s((short)bx, (short)by, (short)bz)).Type)) continue;
+                    desiredX = desiredX < origX ? bx + 1 + halfW : bx - halfW;
+                }
+            }
+        }
 
-                    var closestX = Math.Clamp(pos.X, bx, bx + 1f);
-                    var closestY = Math.Clamp(pos.Y - PlayerHeight / 2, by, by + 1f);
-                    var closestZ = Math.Clamp(pos.Z, bz, bz + 1f);
+        return desiredX;
+    }
 
-                    var dx = pos.X - closestX;
-                    var dy = (pos.Y - PlayerHeight / 2) - closestY;
-                    var dz = pos.Z - closestZ;
-                    var dist = MathF.Sqrt(dx * dx + dy * dy + dz * dz);
+    private float ResolveCollisionZ(float currentX, float currentY, float desiredZ, float origZ, WorldMap world, float halfW)
+    {
+        var startBX = (short)Math.Floor(currentX - halfW);
+        var endBX = (short)Math.Floor(currentX + halfW - 0.001f);
+        var startBZ = (short)Math.Floor(desiredZ - halfW);
+        var endBZ = (short)Math.Floor(desiredZ + halfW - 0.001f);
+        var startBY = (short)Math.Floor(currentY - PlayerHeight);
+        var endBY = (short)Math.Floor(currentY - 0.01f);
 
-                    if (dist < halfW && dist > 0)
+        for (int bx = startBX; bx <= endBX; bx++)
+        {
+            for (int bz = startBZ; bz <= endBZ; bz++)
+            {
+                for (int by = startBY; by <= endBY; by++)
+                {
+                    if (!IsSolid(world.GetBlock(new Vector3s((short)bx, (short)by, (short)bz)).Type)) continue;
+                    desiredZ = desiredZ < origZ ? bz + 1 + halfW : bz - halfW;
+                }
+            }
+        }
+
+        return desiredZ;
+    }
+
+    private (float resultY, bool onGround) ResolveCollisionY(float x, float desiredY, float currentY, float z, WorldMap world, float halfW, bool wasOnGround)
+    {
+        var onGround = false;
+        var startBX = (short)Math.Floor(x - halfW);
+        var endBX = (short)Math.Floor(x + halfW - 0.001f);
+        var startBZ = (short)Math.Floor(z - halfW);
+        var endBZ = (short)Math.Floor(z + halfW - 0.001f);
+
+        var isFalling = desiredY < currentY;
+
+        for (int bx = startBX; bx <= endBX; bx++)
+        {
+            for (int bz = startBZ; bz <= endBZ; bz++)
+            {
+                var startBY = (short)Math.Floor(desiredY - PlayerHeight);
+                var endBY = (short)Math.Floor(desiredY - 0.01f);
+
+                for (int by = startBY; by <= endBY; by++)
+                {
+                    if (!IsSolid(world.GetBlock(new Vector3s((short)bx, (short)by, (short)bz)).Type)) continue;
+
+                    if (isFalling)
                     {
-                        var overlap = halfW - dist;
-                        var pushDir = new Vector3(dx, dy, dz).Normalized;
-                        pos = pos + pushDir * overlap;
+                        desiredY = by + 1 + PlayerHeight;
+                        onGround = true;
+                    }
+                    else
+                    {
+                        desiredY = by + 1;
                     }
                 }
             }
         }
 
-        return pos;
+        if (!onGround && wasOnGround && !isFalling)
+        {
+            var stepY = desiredY + StepHeight;
+            var canStep = true;
+
+            for (int bx = startBX; bx <= endBX && canStep; bx++)
+            {
+                for (int bz = startBZ; bz <= endBZ && canStep; bz++)
+                {
+                    var stepFeetBY = (short)Math.Floor(stepY - PlayerHeight);
+                    var stepHeadBY = (short)Math.Floor(stepY - 0.01f);
+
+                    for (int by = stepFeetBY; by <= stepHeadBY && canStep; by++)
+                    {
+                        if (IsSolid(world.GetBlock(new Vector3s((short)bx, (short)by, (short)bz)).Type))
+                        {
+                            canStep = false;
+                        }
+                    }
+                }
+            }
+
+            if (canStep)
+            {
+                desiredY = stepY;
+            }
+        }
+
+        return (desiredY, onGround);
     }
 
     private bool IsSolid(BlockType type)
