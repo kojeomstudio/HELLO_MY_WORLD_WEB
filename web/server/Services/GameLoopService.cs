@@ -159,12 +159,15 @@ public class GameLoopService : BackgroundService
                             {
                                 try
                                 {
+                                    var mobEntity = entity as MobEntity;
                                     await _hub.Clients.Client(player.ConnectionId).OnEntitySpawned(
                                         entity.Id,
                                         entity.Type.ToString().ToLowerInvariant(),
+                                        mobEntity?.MobType ?? "",
                                         entity.Position.X,
                                         entity.Position.Y,
-                                        entity.Position.Z);
+                                        entity.Position.Z,
+                                        mobEntity?.IsBaby ?? false);
                                 }
                                 catch (Exception ex)
                                 {

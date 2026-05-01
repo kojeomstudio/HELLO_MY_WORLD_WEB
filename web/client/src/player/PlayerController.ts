@@ -48,6 +48,7 @@ export class PlayerController {
     private _worldManager: WorldManager | null = null;
     private _onGround: boolean = false;
     private _knockbackVelocity: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
+    private _isSneaking: boolean = false;
     private _selectionBox: SelectionBox | null = null;
     private _particleEmitter: ((x: number, y: number, z: number, type: string) => void) | null = null;
     private _audioPlayer: ((soundName: string) => void) | null = null;
@@ -147,6 +148,11 @@ export class PlayerController {
                 case 'Digit5': case 'Digit6': case 'Digit7': case 'Digit8':
                     this._selectedSlot = parseInt(e.code.replace('Digit', '')) - 1;
                     this._connection?.invoke('SelectSlot', this._selectedSlot);
+                    break;
+                case 'ControlLeft':
+                    if (!this._isFlying && !this.isInLiquid()) {
+                        this._isSneaking = !this._isSneaking;
+                    }
                     break;
             }
         });
@@ -449,12 +455,13 @@ export class PlayerController {
         if (this._input.isKeyDown('KeyA')) moveDir.sub(right);
         if (this._input.isKeyDown('KeyD')) moveDir.add(right);
 
-        let speed = this._isFlying ? this._physics.flySpeed :
-            (this._input.isKeyDown('ShiftLeft') ? this._physics.sprintSpeed : this._physics.walkSpeed);
-
         const inLiquid = this.isInLiquid();
         const onSlippery = this.isOnSlipperyBlock();
         const moveResistance = this.getMoveResistance();
+
+        let speed = this._isFlying ? this._physics.flySpeed :
+            (this._isSneaking && !inLiquid ? this._physics.walkSpeed * 0.3 :
+            (this._input.isKeyDown('ShiftLeft') ? this._physics.sprintSpeed : this._physics.walkSpeed));
 
         if (inLiquid) {
             speed *= (1 - this._physics.liquidDrag);
@@ -630,8 +637,9 @@ export class PlayerController {
     }
 
     private updateCamera(): void {
+        const eyeHeight = this._isSneaking ? PLAYER_HEIGHT - 0.3 : PLAYER_HEIGHT;
         const eyePos = this._position.clone();
-        eyePos.y += PLAYER_HEIGHT;
+        eyePos.y += eyeHeight;
 
         if (this._cameraMode === CameraMode.FirstPerson) {
             if (this._bobActive && this._onGround) {
@@ -763,4 +771,6 @@ export class PlayerController {
     setMouseSensitivity(value: number): void { this.mouseSensitivity = value; }
     setPhysicsParams(params: PhysicsParams): void { this._physics = { ...params }; }
     getCameraMode(): number { return this._cameraMode; }
+    isSneaking(): boolean { return this._isSneaking; }
+    setSneaking(value: boolean): void { this._isSneaking = value; }
 }

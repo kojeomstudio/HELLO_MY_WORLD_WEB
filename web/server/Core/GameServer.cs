@@ -708,7 +708,7 @@ public class GameServer
     {
         if (_hubContext == null) return;
         _ = _hubContext.Clients.Client(player.ConnectionId)
-            .OnChatMessage("Server", message);
+            .OnChatMessage("Server", message, "system");
     }
 
     public bool GiveItem(string playerName, string itemId, int count)
@@ -1229,7 +1229,7 @@ public class GameServer
     {
         var targetConnId = GetConnectionId(toPlayer);
         if (targetConnId == null || _hubContext == null) return false;
-        _ = _hubContext.Clients.Client(targetConnId).OnChatMessage($"[PM] From {fromPlayer}", message);
+        _ = _hubContext.Clients.Client(targetConnId).OnChatMessage($"[PM] From {fromPlayer}", message, "private");
         return true;
     }
 

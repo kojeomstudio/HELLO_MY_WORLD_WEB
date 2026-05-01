@@ -1,6 +1,7 @@
 export class InputManager {
     private keys: Set<string> = new Set();
     private pointerLocked: boolean = false;
+    private _screenshotCallback: (() => void) | null = null;
 
     constructor() {
         this.setupListeners();
@@ -9,6 +10,10 @@ export class InputManager {
     private setupListeners(): void {
         document.addEventListener('keydown', (e) => {
             this.keys.add(e.code);
+            if (e.code === 'F12' && this._screenshotCallback) {
+                e.preventDefault();
+                this._screenshotCallback();
+            }
         });
 
         document.addEventListener('keyup', (e) => {
@@ -32,5 +37,9 @@ export class InputManager {
 
     setPointerLocked(locked: boolean): void {
         this.pointerLocked = locked;
+    }
+
+    setScreenshotCallback(cb: (() => void) | null): void {
+        this._screenshotCallback = cb;
     }
 }

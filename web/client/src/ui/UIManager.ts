@@ -85,7 +85,7 @@ export class UIManager {
         }
     }
 
-    addChatMessage(sender: string, message: string): void {
+    addChatMessage(sender: string, message: string, messageType: string = 'normal'): void {
         const msgEl = document.createElement('div');
         msgEl.className = 'chat-message';
         const senderSpan = document.createElement('span');
@@ -94,6 +94,26 @@ export class UIManager {
         const textNode = document.createTextNode(' ' + message);
         msgEl.appendChild(senderSpan);
         msgEl.appendChild(textNode);
+
+        switch (messageType) {
+            case 'system':
+                msgEl.style.color = '#ffaa00';
+                break;
+            case 'announcement':
+                msgEl.style.color = '#ff5555';
+                msgEl.style.fontWeight = 'bold';
+                break;
+            case 'private':
+                msgEl.style.color = '#55ffff';
+                msgEl.style.fontStyle = 'italic';
+                break;
+            case 'raw':
+                msgEl.style.color = '#aaaaaa';
+                break;
+            default:
+                break;
+        }
+
         this.chatMessages.appendChild(msgEl);
         this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
 

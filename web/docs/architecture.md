@@ -424,6 +424,16 @@ All server services registered as **Singleton** in `Program.cs`:
 - **Player head mesh fix**: Removed duplicate head mesh in player avatar rendering (WorldManager.ts)
 - **Enhanced CI pipeline**: Added client typecheck job and data integrity validation (JSON parsing + required file checks)
 
+### Porting Improvements (Round 5)
+- **Server-driven block sounds**: `SoundSpecManager.GetBlockSound()` now wired into `DigBlock`/`PlaceBlock` hub methods; `OnPlaySound` SignalR event sends positional sound data to all nearby players
+- **Crouch/sneak system**: Left Ctrl toggles sneaking (0.3x walk speed, lowered camera by 0.3 units); server tracks `IsSneaking` on Player, broadcasts via `OnPlayerPositionUpdate`; other players' avatars scale Y to 0.85 when sneaking
+- **Chat message types**: `OnChatMessage` now includes `messageType` parameter (`normal`, `system`, `announcement`, `private`, `raw`) with distinct CSS styling per type
+- **Server-to-client particle protocol**: `OnSpawnParticle` SignalR event enables server-triggered particle effects at arbitrary positions
+- **Baby mob rendering**: Entity spawn protocol now includes `entityName` (mob type) and `isBaby` flag; baby mobs render at 0.5x scale on client
+- **Mob type data in entity spawn**: `OnEntitySpawned` extended with `entityName` field for proper mob-specific model selection
+- **Screenshot system**: F12 key captures canvas to PNG and triggers download with timestamped filename
+- **Mob pathfinding integration**: Mob AI chase state calls A* pathfinder (`Pathfinding.Pathfinder`) with jump/drop limits for obstacle avoidance
+
 ## Security Model
 
 ### Authentication & Authorization

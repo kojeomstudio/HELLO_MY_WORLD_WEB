@@ -424,7 +424,7 @@ export class WorldManager {
         }
     }
 
-    updatePlayerPosition(name: string, x: number, y: number, z: number, yaw: number, pitch: number): void {
+    updatePlayerPosition(name: string, x: number, y: number, z: number, yaw: number, pitch: number, isSneaking?: boolean): void {
         if (!this.playerMeshes.has(name)) {
             this.addPlayer(name);
         }
@@ -433,6 +433,7 @@ export class WorldManager {
         playerInfo.mesh.position.set(x, y, z);
         playerInfo.mesh.rotation.y = yaw * Math.PI / 180;
         playerInfo.head.rotation.x = pitch * Math.PI / 180;
+        playerInfo.mesh.scale.y = isSneaking ? 0.85 : 1;
     }
 
     private playerAnimTime: number = 0;
@@ -468,7 +469,7 @@ export class WorldManager {
         }
     }
 
-    spawnEntity(entityId: string, entityType: string, x: number, y: number, z: number): void {
+    spawnEntity(entityId: string, entityType: string, x: number, y: number, z: number, isBaby: boolean = false, entityName: string = ''): void {
         if (entityType === 'Item') {
             const geometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
             const material = new THREE.MeshLambertMaterial({ color: 0xFFAA00 });
@@ -483,7 +484,7 @@ export class WorldManager {
         const group = new THREE.Group();
         group.userData.entityId = entityId;
 
-        switch (entityType) {
+        switch (entityName) {
             case 'Zombie': {
                 const body = new THREE.Mesh(
                     new THREE.BoxGeometry(0.6, 0.75, 0.3),
@@ -707,12 +708,15 @@ export class WorldManager {
                 );
                 mesh.position.y = 0.8;
                 group.add(mesh);
-                group.add(this.createNameTag(entityType));
+                group.add(this.createNameTag(entityName || entityType));
                 break;
             }
         }
 
         group.position.set(x, y, z);
+        if (isBaby) {
+            group.scale.setScalar(0.5);
+        }
         this.renderer.addToScene(group);
         this.entityMeshes.set(entityId, group as unknown as THREE.Mesh);
     }

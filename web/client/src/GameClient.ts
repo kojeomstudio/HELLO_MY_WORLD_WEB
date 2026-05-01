@@ -66,6 +66,10 @@ export class GameClient {
         this.uiManager.getSettingsPanel().setOnSettingsChanged((settings) => {
             this.applySettings(settings);
         });
+
+        this.inputManager.setScreenshotCallback(() => {
+            this.takeScreenshot();
+        });
     }
 
     get items() { return this.itemRegistry; }
@@ -129,12 +133,12 @@ export class GameClient {
             this.uiManager.updatePlayerList(players);
         });
 
-        this.connection.on('OnPlayerPositionUpdate', (name: string, x: number, y: number, z: number, yaw: number, pitch: number) => {
-            this.worldManager.updatePlayerPosition(name, x, y, z, yaw, pitch);
+        this.connection.on('OnPlayerPositionUpdate', (name: string, x: number, y: number, z: number, yaw: number, pitch: number, isSneaking: boolean) => {
+            this.worldManager.updatePlayerPosition(name, x, y, z, yaw, pitch, isSneaking);
         });
 
-        this.connection.on('OnChatMessage', (sender: string, message: string) => {
-            this.uiManager.addChatMessage(sender, message);
+        this.connection.on('OnChatMessage', (sender: string, message: string, messageType: string) => {
+            this.uiManager.addChatMessage(sender, message, messageType);
         });
 
         this.connection.on('OnBlockUpdate', (x: number, y: number, z: number, blockData: number) => {
@@ -157,8 +161,8 @@ export class GameClient {
             this.renderer.updateSkyBrightness(skyBrightness);
         });
 
-        this.connection.on('OnEntitySpawned', (entityId: string, entityType: string, x: number, y: number, z: number) => {
-            this.worldManager.spawnEntity(entityId, entityType, x, y, z);
+        this.connection.on('OnEntitySpawned', (entityId: string, entityType: string, entityName: string, x: number, y: number, z: number, isBaby: boolean) => {
+            this.worldManager.spawnEntity(entityId, entityType, x, y, z, isBaby, entityName);
         });
 
         this.connection.on('OnEntityDespawned', (entityId: string) => {
@@ -252,6 +256,14 @@ export class GameClient {
 
         this.connection.on('OnBlockSound', (blockType: string, _x: number, _y: number, _z: number) => {
             this.audioManager.playBlockSound(blockType);
+        });
+
+        this.connection.on('OnPlaySound', (_soundName: string, soundGroup: string, action: string, _x: number, _y: number, _z: number, _gain: number) => {
+            this.audioManager.playBlockSoundGroup(soundGroup, action);
+        });
+
+        this.connection.on('OnSpawnParticle', (particleType: string, x: number, y: number, z: number, _vx: number, _vy: number, _vz: number, _lifetime: number) => {
+            this.onParticleEvent(x, y, z, particleType);
         });
 
         this.connection.on('OnPhysicsParams', (gravity: number, jumpForce: number, walkSpeed: number, sprintSpeed: number, flySpeed: number, climbSpeed: number, liquidDrag: number) => {
@@ -442,7 +454,20 @@ export class GameClient {
         const yaw = this.playerController.getYaw();
         const pitch = this.playerController.getPitch();
 
-        this.connection.invoke('UpdatePosition', pos.x, pos.y, pos.z, vel.x, vel.y, vel.z, yaw, pitch);
+        this.connection.invoke('UpdatePosition', pos.x, pos.y, pos.z, vel.x, vel.y, vel.z, yaw, pitch, this.playerController.isSneaking);
+    }
+
+    private takeScreenshot(): void {
+        const canvas = this.renderer.getCanvas();
+        const dataUrl = canvas.toDataURL('image/png');
+        const now = new Date();
+        const pad = (n: number) => String(n).padStart(2, '0');
+        const filename = `screenshot_${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}.png`;
+        const link = document.createElement('a');
+        link.download = filename;
+        link.href = dataUrl;
+        link.click();
+        this.uiManager.addChatMessage('System', 'Screenshot saved!', 'system');
     }
 
     private showLoginScreen(): void {

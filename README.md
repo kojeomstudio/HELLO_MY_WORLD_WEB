@@ -230,6 +230,7 @@ The Vite dev server proxies `/game` to the server.
 | Right Click | Place block / Interact / Place liquid |
 | Space | Jump |
 | Shift | Sprint |
+| Left Ctrl | Toggle sneak/crouch |
 | F | Toggle fly |
 | 1-8 | Select hotbar slot |
 | T | Open chat |
@@ -240,6 +241,7 @@ The Vite dev server proxies `/game` to the server.
 | F3 | Debug info |
 | B | Toggle weather |
 | F5 | Cycle camera mode |
+| F12 | Screenshot |
 | M | Minimap cycle |
 | Esc | Release mouse |
 

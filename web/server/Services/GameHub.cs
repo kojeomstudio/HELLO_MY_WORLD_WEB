@@ -11,6 +11,7 @@ using WebGameServer.Core.Physics;
 using WebGameServer.Core.Player;
 using WebGameServer.Core.Protection;
 using WebGameServer.Core.Smelting;
+using WebGameServer.Core.Sound;
 using WebGameServer.Core.ToolWear;
 using WebGameServer.Core.World;
 using PlayerEnt = WebGameServer.Core.Player.Player;
@@ -24,13 +25,15 @@ public interface IGameClient
     Task OnPlayerJoined(string playerName);
     Task OnPlayerLeft(string playerName);
     Task OnPlayerListUpdate(string[] players);
-    Task OnPlayerPositionUpdate(string playerName, float x, float y, float z, float yaw, float pitch);
-    Task OnChatMessage(string sender, string message);
+    Task OnPlayerPositionUpdate(string playerName, float x, float y, float z, float yaw, float pitch, bool isSneaking);
+    Task OnChatMessage(string sender, string message, string messageType);
+    Task OnPlaySound(string soundName, string soundGroup, string action, float x, float y, float z, float gain);
+    Task OnSpawnParticle(string particleType, float x, float y, float z, float velocityX, float velocityY, float velocityZ, float lifetime);
     Task OnBlockUpdate(int x, int y, int z, uint blockData);
     Task OnHealthUpdate(float health, float maxHealth);
     Task OnInventoryUpdate(object[] items);
     Task OnTimeUpdate(long time, float speed, float skyBrightness);
-    Task OnEntitySpawned(Guid entityId, string entityType, float x, float y, float z);
+    Task OnEntitySpawned(Guid entityId, string entityType, string entityName, float x, float y, float z, bool isBaby);
     Task OnEntityDespawned(Guid entityId);
     Task OnEntityUpdate(Guid entityId, float x, float y, float z);
     Task OnCraftResult(string itemId, int count);
@@ -74,6 +77,7 @@ public class GameHub : Hub<IGameClient>
     private readonly ServerConfig _config;
     private readonly AreaProtectionSystem _areaProtection;
     private readonly PlayerDatabase _playerDb;
+    private readonly SoundSpecManager _soundSpecManager;
 
     private static readonly Dictionary<string, int> DefaultStartItemCounts = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -99,7 +103,8 @@ public class GameHub : Hub<IGameClient>
         IHubContext<GameHub, IGameClient> hubContext,
         ServerConfig config,
         AreaProtectionSystem areaProtection,
-        PlayerDatabase playerDb)
+        PlayerDatabase playerDb,
+        SoundSpecManager soundSpecManager)
     {
         _gameServer = gameServer;
         _logger = logger;
@@ -114,6 +119,7 @@ public class GameHub : Hub<IGameClient>
         _config = config;
         _areaProtection = areaProtection;
         _playerDb = playerDb;
+        _soundSpecManager = soundSpecManager;
     }
 
     public override async Task OnConnectedAsync()
@@ -144,7 +150,7 @@ public class GameHub : Hub<IGameClient>
         if (_accountFailures.TryGetValue(lockoutKey, out var failure) && failure.LockoutEnd > DateTime.UtcNow)
         {
             var remaining = (int)Math.Ceiling((failure.LockoutEnd - DateTime.UtcNow).TotalMinutes) + 1;
-            await Clients.Caller.OnChatMessage("Server", $"Account temporarily locked. Try again in {remaining} minutes.");
+            await Clients.Caller.OnChatMessage("Server", $"Account temporarily locked. Try again in {remaining} minutes.", "system");
             return;
         }
 
@@ -154,7 +160,7 @@ public class GameHub : Hub<IGameClient>
             var oldestAttempt = _joinAttempts.TryGetValue(ipAddress + "_time", out var t) ? t : 0;
             if (DateTimeOffset.UtcNow.ToUnixTimeSeconds() - oldestAttempt < 60)
             {
-                await Clients.Caller.OnChatMessage("Server", "Too many join attempts. Wait a minute.");
+                await Clients.Caller.OnChatMessage("Server", "Too many join attempts. Wait a minute.", "system");
                 return;
             }
             _joinAttempts.TryRemove(ipAddress, out _);
@@ -195,7 +201,7 @@ public class GameHub : Hub<IGameClient>
                 AuthResult.PasswordIncorrect => "Incorrect password.",
                 _ => "Failed to join."
             };
-            await Clients.Caller.OnChatMessage("Server", msg);
+            await Clients.Caller.OnChatMessage("Server", msg, "system");
             return;
         }
 
@@ -205,7 +211,7 @@ public class GameHub : Hub<IGameClient>
 
         if (!joinSuccess)
         {
-            await Clients.Caller.OnChatMessage("Server", "Failed to join. Name taken or server full.");
+            await Clients.Caller.OnChatMessage("Server", "Failed to join. Name taken or server full.", "system");
             return;
         }
 
@@ -231,7 +237,7 @@ public class GameHub : Hub<IGameClient>
         {
             if (password.Length < 4 || password.Length > 128)
             {
-                await Clients.Caller.OnChatMessage("Server", "Password must be 4-128 characters.");
+                await Clients.Caller.OnChatMessage("Server", "Password must be 4-128 characters.", "system");
                 _gameServer.PlayerLeave(Context.ConnectionId);
                 return;
             }
@@ -254,7 +260,7 @@ public class GameHub : Hub<IGameClient>
         await SendInitialChunks(player);
     }
 
-    public async Task UpdatePosition(float x, float y, float z, float vx, float vy, float vz, float yaw, float pitch)
+    public async Task UpdatePosition(float x, float y, float z, float vx, float vy, float vz, float yaw, float pitch, bool isSneaking = false)
     {
         if (!CheckRateLimit(Context.ConnectionId, "position", 50)) return;
 
@@ -273,6 +279,7 @@ public class GameHub : Hub<IGameClient>
         if (Math.Abs(x) > border || Math.Abs(z) > border) return;
 
         _gameServer.UpdatePlayerPosition(Context.ConnectionId, new Vector3(x, y, z), new Vector3(vx, vy, vz), yaw, pitch);
+        player.IsSneaking = isSneaking;
 
         var nearbyPlayers = _gameServer.GetPlayersInRange(player.Position, 64);
         foreach (var nearby in nearbyPlayers)
@@ -280,7 +287,7 @@ public class GameHub : Hub<IGameClient>
             if (nearby.ConnectionId != Context.ConnectionId)
             {
                 await Clients.Client(nearby.ConnectionId)
-                    .OnPlayerPositionUpdate(player.Name, x, y, z, yaw, pitch);
+                    .OnPlayerPositionUpdate(player.Name, x, y, z, yaw, pitch, isSneaking);
             }
         }
     }
@@ -301,14 +308,14 @@ public class GameHub : Hub<IGameClient>
             var result = await _chatCommands.TryExecute(player.Name, message);
             if (result != null)
             {
-                await Clients.Caller.OnChatMessage("Server", result);
+                await Clients.Caller.OnChatMessage("Server", result, "system");
             }
             return;
         }
 
         if (!_gameServer.Privileges.HasPrivilege(player.Name, "shout")) return;
 
-        await Clients.All.OnChatMessage(player.Name, message);
+        await Clients.All.OnChatMessage(player.Name, message, "normal");
     }
 
     public async Task PlaceBlock(int x, int y, int z, ushort blockType)
@@ -394,7 +401,7 @@ public class GameHub : Hub<IGameClient>
             }
             if (!hasSolidNeighbor)
             {
-                await Clients.Caller.OnChatMessage("Server", "Torch must be placed next to a solid block");
+                await Clients.Caller.OnChatMessage("Server", "Torch must be placed next to a solid block", "system");
                 return;
             }
         }
@@ -405,6 +412,7 @@ public class GameHub : Hub<IGameClient>
             newBlock.ToPacked(), player.Name, "PLACE");
         _gameServer.DefaultWorld.SetBlock(new Vector3s((short)x, (short)y, (short)z), newBlock);
         await Clients.All.OnBlockUpdate(x, y, z, newBlock.ToPacked());
+        _ = PlayBlockSound(blockType, "place", x + 0.5f, y + 0.5f, z + 0.5f);
     }
 
     public async Task DigBlock(int x, int y, int z)
@@ -463,6 +471,7 @@ public class GameHub : Hub<IGameClient>
         _gameServer.Rollback.RecordChange(x, y, z, oldBlock.ToPacked(), 0, player.Name, "DIG");
         _gameServer.DefaultWorld.SetBlock(blockPos, Block.Air);
         await Clients.All.OnBlockUpdate(x, y, z, 0);
+        _ = PlayBlockSound((ushort)oldBlock.Type, "dig", x + 0.5f, y + 0.5f, z + 0.5f);
 
         var dropName = blockDef?.Drops ?? blockDef?.Name ?? oldBlock.Type.ToString().ToLowerInvariant();
         var itemEntity = new ItemEntity(dropName, 1, new Vector3(x + 0.5f, y + 0.5f, z + 0.5f));
@@ -482,7 +491,7 @@ public class GameHub : Hub<IGameClient>
                 if (wornTool == null)
                 {
                     player.Inventory.RemoveItem(player.SelectedHotbarSlot, 1);
-                    await Clients.Caller.OnChatMessage("Server", $"Your {toolName} broke!");
+                    await Clients.Caller.OnChatMessage("Server", $"Your {toolName} broke!", "system");
                 }
                 else
                 {
@@ -758,7 +767,7 @@ public class GameHub : Hub<IGameClient>
         else if (blockName == "bed")
         {
             player.SpawnPoint = new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
-            await Clients.Caller.OnChatMessage("Server", "Spawn point set");
+            await Clients.Caller.OnChatMessage("Server", "Spawn point set", "system");
         }
         else if (blockName == "note_block" || blockName == "jukebox")
         {
@@ -804,7 +813,7 @@ public class GameHub : Hub<IGameClient>
         if (blockDef == null) return;
         if (blockDef.Climbable)
         {
-            await Clients.Caller.OnChatMessage("Server", "Climbing...");
+            await Clients.Caller.OnChatMessage("Server", "Climbing...", "system");
         }
         if (blockDef.Interactive)
         {
@@ -870,7 +879,7 @@ public class GameHub : Hub<IGameClient>
             {
                 player.SpawnPoint = new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
                 player.HasSpawnPoint = true;
-                await Clients.Caller.OnChatMessage("Server", "Spawn point set");
+                await Clients.Caller.OnChatMessage("Server", "Spawn point set", "system");
             }
             else if (blockName == "note_block" || blockName == "jukebox")
             {
@@ -924,7 +933,7 @@ public class GameHub : Hub<IGameClient>
                     }
                 }
 
-                await Clients.Caller.OnChatMessage("Server", "TNT exploded!");
+                await Clients.Caller.OnChatMessage("Server", "TNT exploded!", "system");
             }
         }
 
@@ -964,7 +973,7 @@ public class GameHub : Hub<IGameClient>
         var distance = Vector3.Distance(attacker.Position, target.Position);
         if (distance > _gameServer.Config.Physics.PunchRange)
         {
-            await Clients.Caller.OnChatMessage("Server", "Too far away");
+            await Clients.Caller.OnChatMessage("Server", "Too far away", "system");
             return;
         }
 
@@ -989,7 +998,7 @@ public class GameHub : Hub<IGameClient>
                 if (wornTool == null)
                 {
                     attacker.Inventory.RemoveItem(attacker.SelectedHotbarSlot, 1);
-                    await Clients.Caller.OnChatMessage("Server", $"Your {toolName} broke!");
+                    await Clients.Caller.OnChatMessage("Server", $"Your {toolName} broke!", "system");
                 }
                 else
                 {
@@ -1041,7 +1050,7 @@ public class GameHub : Hub<IGameClient>
         var started = fishingSystem.StartFishing(player.Name, player.Position, bobberPos, _gameServer.DefaultWorld);
         if (!started)
         {
-            await Clients.Caller.OnChatMessage("Server", "Cannot fish here. Need water nearby and be within range.");
+            await Clients.Caller.OnChatMessage("Server", "Cannot fish here. Need water nearby and be within range.", "system");
         }
     }
 
@@ -1059,7 +1068,7 @@ public class GameHub : Hub<IGameClient>
             player.Inventory.AddItem(new ItemStack(caught.ItemId, caught.Count));
             await SendInventoryUpdate(player);
             _gameServer.AwardExperience(player, 2);
-            await Clients.Caller.OnChatMessage("Server", $"Caught: {caught.ItemId} x{caught.Count}");
+            await Clients.Caller.OnChatMessage("Server", $"Caught: {caught.ItemId} x{caught.Count}", "system");
         }
     }
 
@@ -1114,7 +1123,7 @@ public class GameHub : Hub<IGameClient>
             if (baby != null)
             {
                 _entityManager.Add(baby);
-                await Clients.Caller.OnChatMessage("Server", "Animals bred successfully!");
+                await Clients.Caller.OnChatMessage("Server", "Animals bred successfully!", "system");
             }
         }
     }
@@ -1155,7 +1164,7 @@ public class GameHub : Hub<IGameClient>
         var recipe = _craftingSystem.FindRecipe(availableItems);
         if (recipe == null)
         {
-            await Clients.Caller.OnChatMessage("Server", "No matching crafting recipe.");
+            await Clients.Caller.OnChatMessage("Server", "No matching crafting recipe.", "system");
             return;
         }
 
@@ -1214,7 +1223,7 @@ public class GameHub : Hub<IGameClient>
         var recipes = _craftingSystem.GetAllRecipes();
         if (recipeIndex < 0 || recipeIndex >= recipes.Count)
         {
-            await Clients.Caller.OnChatMessage("Server", "Invalid recipe index.");
+            await Clients.Caller.OnChatMessage("Server", "Invalid recipe index.", "system");
             return;
         }
 
@@ -1226,7 +1235,7 @@ public class GameHub : Hub<IGameClient>
 
         if (!_craftingSystem.CanCraft(recipe, availableItems))
         {
-            await Clients.Caller.OnChatMessage("Server", $"Missing ingredients for {recipe.ResultItemId}.");
+            await Clients.Caller.OnChatMessage("Server", $"Missing ingredients for {recipe.ResultItemId}.", "system");
             return;
         }
 
@@ -1282,11 +1291,11 @@ public class GameHub : Hub<IGameClient>
         {
             await SendInventoryUpdate(player);
             await Clients.Caller.OnFurnaceUpdate(inputItemId, "coal", string.Empty, 0f);
-            await Clients.Caller.OnChatMessage("Server", $"Smelting {inputItemId}...");
+            await Clients.Caller.OnChatMessage("Server", $"Smelting {inputItemId}...", "system");
         }
         else
         {
-            await Clients.Caller.OnChatMessage("Server", "Cannot start smelting. Check you have the input item and fuel (coal/charcoal).");
+            await Clients.Caller.OnChatMessage("Server", "Cannot start smelting. Check you have the input item and fuel (coal/charcoal).", "system");
         }
     }
 
@@ -1503,6 +1512,17 @@ public class GameHub : Hub<IGameClient>
         }
     }
 
+    private async Task PlayBlockSound(ushort blockType, string action, float x, float y, float z)
+    {
+        var soundSpec = _soundSpecManager.GetBlockSound(blockType, action);
+        if (soundSpec != null)
+        {
+            var blockDef = _blockDefinitionManager.Get(blockType);
+            var soundGroup = blockDef?.SoundGroup ?? string.Empty;
+            await _hubContext.Clients.All.OnPlaySound(soundSpec.Value.Name, soundGroup, action, x, y, z, soundSpec.Value.Gain);
+        }
+    }
+
     private PlayerEnt? GetAuthenticatedPlayer()
     {
         return _gameServer.GetPlayerByConnection(Context.ConnectionId);
@@ -1608,7 +1628,7 @@ public class GameHub : Hub<IGameClient>
         var recipe = _gridCraftingSystem.FindRecipe(grid, gridSize);
         if (recipe == null)
         {
-            await Clients.Caller.OnChatMessage("Server", "No matching recipe found.");
+            await Clients.Caller.OnChatMessage("Server", "No matching recipe found.", "system");
             return;
         }
 
@@ -1624,7 +1644,7 @@ public class GameHub : Hub<IGameClient>
                 .Sum(i => i.Count);
             if (available < requiredCount)
             {
-                await Clients.Caller.OnChatMessage("Server", $"Missing ingredients for {recipe.ResultItemId}.");
+                await Clients.Caller.OnChatMessage("Server", $"Missing ingredients for {recipe.ResultItemId}.", "system");
                 return;
             }
         }
