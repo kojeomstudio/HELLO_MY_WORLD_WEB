@@ -146,7 +146,7 @@ public class GameHub : Hub<IGameClient>
     {
         var ipAddress = Context.GetHttpContext()?.Connection?.RemoteIpAddress?.ToString() ?? Context.ConnectionId;
 
-        var lockoutKey = playerName.ToLowerInvariant();
+        var lockoutKey = $"{ipAddress}:{playerName.ToLowerInvariant()}";
         if (_accountFailures.TryGetValue(lockoutKey, out var failure) && failure.LockoutEnd > DateTime.UtcNow)
         {
             var remaining = (int)Math.Ceiling((failure.LockoutEnd - DateTime.UtcNow).TotalMinutes) + 1;
@@ -179,7 +179,7 @@ public class GameHub : Hub<IGameClient>
         {
             if (authResult == AuthResult.PasswordIncorrect || authResult == AuthResult.PasswordRequired)
             {
-                var failKey = playerName.ToLowerInvariant();
+                var failKey = $"{ipAddress}:{playerName.ToLowerInvariant()}";
                 _accountFailures.AddOrUpdate(failKey,
                     (1, DateTime.UtcNow),
                     (_, old) => (old.FailCount + 1, old.LockoutEnd));
@@ -205,7 +205,7 @@ public class GameHub : Hub<IGameClient>
             return;
         }
 
-        _accountFailures.TryRemove(playerName.ToLowerInvariant(), out _);
+        _accountFailures.TryRemove($"{ipAddress}:{playerName.ToLowerInvariant()}", out _);
 
         var (joinSuccess, isNewPlayer) = _gameServer.PlayerJoin(Context.ConnectionId, playerName);
 
@@ -235,9 +235,9 @@ public class GameHub : Hub<IGameClient>
 
         if (isNewPlayer && !string.IsNullOrEmpty(password))
         {
-            if (password.Length < 4 || password.Length > 128)
+            if (password.Length < 8 || password.Length > 128)
             {
-                await Clients.Caller.OnChatMessage("Server", "Password must be 4-128 characters.", "system");
+                await Clients.Caller.OnChatMessage("Server", "Password must be 8-128 characters.", "system");
                 _gameServer.PlayerLeave(Context.ConnectionId);
                 return;
             }
@@ -277,6 +277,16 @@ public class GameHub : Hub<IGameClient>
 
         var border = _gameServer.WorldBorderSize;
         if (Math.Abs(x) > border || Math.Abs(z) > border) return;
+
+        var maxSpeed = player.IsFlying ? _config.Physics.FlySpeed : _config.Physics.SprintSpeed;
+        var positionUpdateInterval = (float)_config.Network.PositionUpdateInterval / 1000f;
+        var maxDistancePerTick = maxSpeed * positionUpdateInterval * 1.5f;
+        var distance = Vector3.Distance(player.Position, new Vector3(x, y, z));
+        if (distance > maxDistancePerTick && distance > 2.0f)
+        {
+            await Clients.Caller.OnPositionCorrection(player.Position.X, player.Position.Y, player.Position.Z);
+            return;
+        }
 
         _gameServer.UpdatePlayerPosition(Context.ConnectionId, new Vector3(x, y, z), new Vector3(vx, vy, vz), yaw, pitch);
         player.IsSneaking = isSneaking;
@@ -641,6 +651,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task UseItem(int slotIndex)
     {
+        if (!CheckRateLimit(Context.ConnectionId, "useitem", 250)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
         if (player.IsDead) return;
@@ -736,6 +747,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task SelectSlot(int slot)
     {
+        if (!CheckRateLimit(Context.ConnectionId, "slot", 50)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
         if (slot < 0 || slot >= player.Inventory.HotbarSize) return;
@@ -1074,6 +1086,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task CancelFishing()
     {
+        if (!CheckRateLimit(Context.ConnectionId, "fishing", 500)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
 
@@ -1130,6 +1143,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task GetPrivileges()
     {
+        if (!CheckRateLimit(Context.ConnectionId, "privs", 5000)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
         var privs = _gameServer.Privileges.GetPlayerPrivileges(player.Name);
@@ -1138,6 +1152,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task ToggleFlight()
     {
+        if (!CheckRateLimit(Context.ConnectionId, "flight", 500)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null || player.IsDead) return;
 
@@ -1153,6 +1168,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task Craft(string recipeId)
     {
+        if (!CheckRateLimit(Context.ConnectionId, "craft", 300)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
 
@@ -1161,7 +1177,17 @@ public class GameHub : Hub<IGameClient>
             .Select(i => (i!.ItemId, i.Count))
             .ToList();
 
-        var recipe = _craftingSystem.FindRecipe(availableItems);
+        CraftingRecipe? recipe = null;
+        if (!string.IsNullOrEmpty(recipeId) && int.TryParse(recipeId, out var index))
+        {
+            var recipes = _craftingSystem.GetAllRecipes();
+            if (index >= 0 && index < recipes.Count)
+            {
+                recipe = recipes[index];
+            }
+        }
+
+        recipe ??= _craftingSystem.FindRecipe(availableItems);
         if (recipe == null)
         {
             await Clients.Caller.OnChatMessage("Server", "No matching crafting recipe.", "system");
@@ -1374,6 +1400,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task RequestInventory()
     {
+        if (!CheckRateLimit(Context.ConnectionId, "inventory", 1000)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
         await SendInventoryUpdate(player);
@@ -1381,6 +1408,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task DropItem(int slotIndex, int count)
     {
+        if (!CheckRateLimit(Context.ConnectionId, "drop", 250)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
         if (slotIndex < 0 || slotIndex >= player.Inventory.Size) return;
@@ -1471,6 +1499,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task EquipArmor(int slotIndex, int armorSlot)
     {
+        if (!CheckRateLimit(Context.ConnectionId, "armor", 300)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
         if (slotIndex < 0 || slotIndex >= player.Inventory.Size) return;
@@ -1502,6 +1531,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task UnequipArmor(int armorSlot)
     {
+        if (!CheckRateLimit(Context.ConnectionId, "armor", 300)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
         if (armorSlot < 0 || armorSlot >= player.ArmorSlots.Length) return;

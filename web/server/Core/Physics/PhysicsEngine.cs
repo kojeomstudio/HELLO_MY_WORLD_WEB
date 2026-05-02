@@ -7,12 +7,12 @@ namespace WebGameServer.Core.Physics;
 
 public class PhysicsEngine
 {
-    public float Gravity { get; set; } = 9.8f;
-    public float JumpForce { get; set; } = 8.0f;
-    public float WalkSpeed { get; set; } = 4.317f;
+    public float Gravity { get; set; } = 9.81f;
+    public float JumpForce { get; set; } = 6.5f;
+    public float WalkSpeed { get; set; } = 4.0f;
     public float SprintSpeed { get; set; } = 8.0f;
     public float FlySpeed { get; set; } = 12.0f;
-    public float ClimbSpeed { get; set; } = 2.0f;
+    public float ClimbSpeed { get; set; } = 3.0f;
     public float PlayerWidth { get; set; } = 0.6f;
     public float PlayerHeight { get; set; } = 1.8f;
     public float Drag { get; set; } = 0.1f;

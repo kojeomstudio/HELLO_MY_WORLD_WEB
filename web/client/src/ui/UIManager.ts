@@ -925,12 +925,21 @@ export class UIManager {
         if (this.debugInfo.style.display === 'none') return;
 
         const pos = position as { x: number; y: number; z: number };
-        this.debugInfo.innerHTML = `
-            <div>FPS: ${fps}</div>
-            <div>XYZ: ${pos.x.toFixed(1)} / ${pos.y.toFixed(1)} / ${pos.z.toFixed(1)}</div>
-            <div>Chunks: ${chunkCount}</div>
-            <div>Memory: ${(() => { const memInfo = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory; return memInfo ? `${(memInfo.usedJSHeapSize / 1048576).toFixed(1)} MB` : 'N/A'; })()}</div>
-        `;
+        const memInfo = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
+        const memText = memInfo ? `${(memInfo.usedJSHeapSize / 1048576).toFixed(1)} MB` : 'N/A';
+
+        this.debugInfo.textContent = '';
+        const lines = [
+            `FPS: ${fps}`,
+            `XYZ: ${pos.x.toFixed(1)} / ${pos.y.toFixed(1)} / ${pos.z.toFixed(1)}`,
+            `Chunks: ${chunkCount}`,
+            `Memory: ${memText}`
+        ];
+        for (const line of lines) {
+            const div = document.createElement('div');
+            div.textContent = line;
+            this.debugInfo.appendChild(div);
+        }
     }
 
     private formatItemName(itemId: string): string {

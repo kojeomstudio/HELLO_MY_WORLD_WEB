@@ -48,6 +48,8 @@ public class ChatCommandManager
     private readonly Func<string, string, string, bool>? _sendPrivateMessage;
     private readonly AreaProtectionSystem? _areaProtection;
     private readonly Func<string, string, bool>? _setPassword;
+    private readonly Func<string, bool>? _isValidItemId;
+    private readonly Func<string, bool>? _isValidEntityType;
 
     public ChatCommandManager(
         Func<long> getGameTime,
@@ -72,7 +74,9 @@ public class ChatCommandManager
         Func<string, bool>? hasPrivilege = null,
         Func<string, string, string, bool>? sendPrivateMessage = null,
         AreaProtectionSystem? areaProtection = null,
-        Func<string, string, bool>? setPassword = null)
+        Func<string, string, bool>? setPassword = null,
+        Func<string, bool>? isValidItemId = null,
+        Func<string, bool>? isValidEntityType = null)
     {
         _getGameTime = getGameTime;
         _getTps = getTps;
@@ -97,6 +101,8 @@ public class ChatCommandManager
         _sendPrivateMessage = sendPrivateMessage;
         _areaProtection = areaProtection;
         _setPassword = setPassword;
+        _isValidItemId = isValidItemId;
+        _isValidEntityType = isValidEntityType;
         RegisterBuiltInCommands();
     }
 
@@ -185,11 +191,16 @@ public class ChatCommandManager
                 if (args.Length < 2) return Task.FromResult("Usage: /give <player> <item> [count]");
 
                 var targetPlayer = args[0];
-                var itemId = args[1];
+                var itemId = args[1].ToLowerInvariant();
                 var count = 1;
                 if (args.Length >= 3 && !int.TryParse(args[2], out count))
                 {
                     return Task.FromResult("Invalid count. Usage: /give <player> <item> [count]");
+                }
+
+                if (_isValidItemId != null && !_isValidItemId(itemId))
+                {
+                    return Task.FromResult($"Unknown item: {itemId}");
                 }
 
                 count = Math.Clamp(count, 1, 64);
@@ -322,6 +333,10 @@ public class ChatCommandManager
                     !float.TryParse(args[2], out var y) ||
                     !float.TryParse(args[3], out var z))
                     return Task.FromResult("Invalid coordinates. Usage: /spawn <entityType> <x> <y> <z>");
+                if (_isValidEntityType != null && !_isValidEntityType(args[0].ToLowerInvariant()))
+                {
+                    return Task.FromResult($"Unknown entity type: {args[0]}");
+                }
                 _spawnEntity(args[0], new Vector3(x, y, z));
                 return Task.FromResult($"Spawned {args[0]} at ({x}, {y}, {z})");
             }, "give"));

@@ -37,6 +37,10 @@ if (!Directory.Exists(dataPath))
     dataPath = Path.Combine(Directory.GetCurrentDirectory(), "data");
 serverConfig.Physics.LoadFromFile(dataPath);
 
+var abmConfigPath = Path.Combine(dataPath, "abm_config.json");
+using var abmConfigDoc = File.Exists(abmConfigPath) ? JsonDocument.Parse(File.ReadAllText(abmConfigPath)) : null;
+var abmModifiers = abmConfigDoc?.RootElement.GetProperty("modifiers");
+
 var mobsPath = Path.Combine(dataPath, "mobs.json");
 MobConfig.LoadFromFile(mobsPath);
 
@@ -81,11 +85,33 @@ builder.Services.AddSingleton<ActiveBlockModifierSystem>(sp =>
 {
     var system = new ActiveBlockModifierSystem();
 
+    static float GetAbmFloat(JsonElement? mods, string name, string prop, float defaultVal)
+    {
+        if (mods == null) return defaultVal;
+        foreach (var m in mods.Value.EnumerateArray())
+        {
+            if (m.GetProperty("name").GetString() == name && m.TryGetProperty(prop, out var p))
+                return (float)p.GetDouble();
+        }
+        return defaultVal;
+    }
+
+    static int GetAbmInt(JsonElement? mods, string name, string prop, int defaultVal)
+    {
+        if (mods == null) return defaultVal;
+        foreach (var m in mods.Value.EnumerateArray())
+        {
+            if (m.GetProperty("name").GetString() == name && m.TryGetProperty(prop, out var p))
+                return p.GetInt32();
+        }
+        return defaultVal;
+    }
+
     system.Register(new ActiveBlockModifier
     {
         Name = "sand_falling",
-        Interval = 2,
-        Chance = 1.0f,
+        Interval = GetAbmInt(abmModifiers, "sand_falling", "interval", 2),
+        Chance = GetAbmFloat(abmModifiers, "sand_falling", "chance", 1.0f),
         Action = (blockDef, pos, world) =>
         {
             var below = new Vector3s(pos.X, (short)(pos.Y - 1), pos.Z);
@@ -103,8 +129,8 @@ builder.Services.AddSingleton<ActiveBlockModifierSystem>(sp =>
     system.Register(new ActiveBlockModifier
     {
         Name = "gravel_falling",
-        Interval = 2,
-        Chance = 1.0f,
+        Interval = GetAbmInt(abmModifiers, "gravel_falling", "interval", 2),
+        Chance = GetAbmFloat(abmModifiers, "gravel_falling", "chance", 1.0f),
         Action = (blockDef, pos, world) =>
         {
             var below = new Vector3s(pos.X, (short)(pos.Y - 1), pos.Z);
@@ -122,8 +148,8 @@ builder.Services.AddSingleton<ActiveBlockModifierSystem>(sp =>
     system.Register(new ActiveBlockModifier
     {
         Name = "dirt_to_grass",
-        Interval = 20,
-        Chance = 0.1f,
+        Interval = GetAbmInt(abmModifiers, "dirt_to_grass", "interval", 20),
+        Chance = GetAbmFloat(abmModifiers, "dirt_to_grass", "chance", 0.1f),
         RequiredNeighbor = "air",
         Action = (blockDef, pos, world) =>
         {
@@ -138,8 +164,8 @@ builder.Services.AddSingleton<ActiveBlockModifierSystem>(sp =>
     system.Register(new ActiveBlockModifier
     {
         Name = "ice_melt",
-        Interval = 30,
-        Chance = 0.05f,
+        Interval = GetAbmInt(abmModifiers, "ice_melt", "interval", 30),
+        Chance = GetAbmFloat(abmModifiers, "ice_melt", "chance", 0.05f),
         Action = (blockDef, pos, world) =>
         {
             for (int dx = -2; dx <= 2; dx++)
@@ -162,8 +188,8 @@ builder.Services.AddSingleton<ActiveBlockModifierSystem>(sp =>
     system.Register(new ActiveBlockModifier
     {
         Name = "fire_spread",
-        Interval = 3,
-        Chance = 0.3f,
+        Interval = GetAbmInt(abmModifiers, "fire_spread", "interval", 3),
+        Chance = GetAbmFloat(abmModifiers, "fire_spread", "chance", 0.3f),
         Action = (blockDef, pos, world) =>
         {
             if (blockDef.Name != "fire") return false;
@@ -181,7 +207,7 @@ builder.Services.AddSingleton<ActiveBlockModifierSystem>(sp =>
                             or BlockType.JungleWood or BlockType.JungleLeaves
                             or BlockType.Planks or BlockType.JungleLeaves)
                         {
-                            if (Random.Shared.NextSingle() < 0.15f)
+                            if (Random.Shared.NextSingle() < GetAbmFloat(abmModifiers, "fire_spread", "spreadChance", 0.15f))
                             {
                                 world.SetBlock(nPos, new Block(BlockType.Fire));
                             }
@@ -190,7 +216,7 @@ builder.Services.AddSingleton<ActiveBlockModifierSystem>(sp =>
                 }
             }
 
-            if (Random.Shared.NextSingle() < 0.2f)
+            if (Random.Shared.NextSingle() < GetAbmFloat(abmModifiers, "fire_spread", "burnoutChance", 0.2f))
             {
                 world.SetBlock(pos, Block.Air);
             }
@@ -201,8 +227,8 @@ builder.Services.AddSingleton<ActiveBlockModifierSystem>(sp =>
     system.Register(new ActiveBlockModifier
     {
         Name = "cactus_growth",
-        Interval = 40,
-        Chance = 0.2f,
+        Interval = GetAbmInt(abmModifiers, "cactus_growth", "interval", 40),
+        Chance = GetAbmFloat(abmModifiers, "cactus_growth", "chance", 0.2f),
         Action = (blockDef, pos, world) =>
         {
             if (blockDef.Name != "cactus") return false;
@@ -219,7 +245,7 @@ builder.Services.AddSingleton<ActiveBlockModifierSystem>(sp =>
                     break;
             }
 
-            if (height < 3)
+            if (height < GetAbmInt(abmModifiers, "cactus_growth", "maxHeight", 3))
             {
                 world.SetBlock(above, new Block(BlockType.Cactus));
                 return true;
@@ -231,8 +257,8 @@ builder.Services.AddSingleton<ActiveBlockModifierSystem>(sp =>
     system.Register(new ActiveBlockModifier
     {
         Name = "sugarcane_growth",
-        Interval = 40,
-        Chance = 0.2f,
+        Interval = GetAbmInt(abmModifiers, "sugarcane_growth", "interval", 40),
+        Chance = GetAbmFloat(abmModifiers, "sugarcane_growth", "chance", 0.2f),
         Action = (blockDef, pos, world) =>
         {
             if (blockDef.Name != "sugar_cane") return false;
@@ -240,9 +266,10 @@ builder.Services.AddSingleton<ActiveBlockModifierSystem>(sp =>
             if (world.GetBlock(above).Type != BlockType.Air) return false;
 
             bool hasWater = false;
-            for (int dx = -4; dx <= 4 && !hasWater; dx++)
+            var waterRange = GetAbmInt(abmModifiers, "sugarcane_growth", "waterSearchRange", 4);
+            for (int dx = -waterRange; dx <= waterRange && !hasWater; dx++)
             {
-                for (int dz = -4; dz <= 4 && !hasWater; dz++)
+                for (int dz = -waterRange; dz <= waterRange && !hasWater; dz++)
                 {
                     var checkPos = new Vector3s((short)(pos.X + dx), pos.Y, (short)(pos.Z + dz));
                     if (world.GetBlock(checkPos).Type is BlockType.Water or BlockType.WaterFlowing)
@@ -262,7 +289,7 @@ builder.Services.AddSingleton<ActiveBlockModifierSystem>(sp =>
                     break;
             }
 
-            if (height < 3)
+            if (height < GetAbmInt(abmModifiers, "sugarcane_growth", "maxHeight", 3))
             {
                 world.SetBlock(above, new Block(BlockType.SugarCane));
                 return true;
@@ -274,8 +301,8 @@ builder.Services.AddSingleton<ActiveBlockModifierSystem>(sp =>
     system.Register(new ActiveBlockModifier
     {
         Name = "mushroom_spread",
-        Interval = 60,
-        Chance = 0.05f,
+        Interval = GetAbmInt(abmModifiers, "mushroom_spread", "interval", 60),
+        Chance = GetAbmFloat(abmModifiers, "mushroom_spread", "chance", 0.05f),
         Action = (blockDef, pos, world) =>
         {
             if (blockDef.Name is not ("mushroom_red_block" or "mushroom_brown_block")) return false;
@@ -376,7 +403,14 @@ builder.Services.AddSingleton<ChatCommandManager>(sp =>
                 return true;
             }
             catch { return false; }
-        });
+        },
+        (itemId) => {
+            var blockDefMgr = sp.GetRequiredService<BlockDefinitionManager>();
+            if (blockDefMgr.GetByName(itemId) != null) return true;
+            var crafting = sp.GetRequiredService<CraftingSystem>();
+            return crafting.GetAllRecipes().Any(r => r.ResultItemId.Equals(itemId, StringComparison.OrdinalIgnoreCase));
+        },
+        (entityType) => MobConfig.Definitions.ContainsKey(entityType));
 });
 builder.Services.AddSingleton<CraftingSystem>(sp =>
 {

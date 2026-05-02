@@ -1,0 +1,49 @@
+{
+    "modifiers": [
+        {
+            "name": "sand_falling",
+            "interval": 2,
+            "chance": 1.0
+        },
+        {
+            "name": "gravel_falling",
+            "interval": 2,
+            "chance": 1.0
+        },
+        {
+            "name": "dirt_to_grass",
+            "interval": 20,
+            "chance": 0.1
+        },
+        {
+            "name": "ice_melt",
+            "interval": 30,
+            "chance": 0.05
+        },
+        {
+            "name": "fire_spread",
+            "interval": 3,
+            "chance": 0.3,
+            "spreadChance": 0.15,
+            "burnoutChance": 0.2
+        },
+        {
+            "name": "cactus_growth",
+            "interval": 40,
+            "chance": 0.2,
+            "maxHeight": 3
+        },
+        {
+            "name": "sugarcane_growth",
+            "interval": 40,
+            "chance": 0.2,
+            "maxHeight": 3,
+            "waterSearchRange": 4
+        },
+        {
+            "name": "mushroom_spread",
+            "interval": 60,
+            "chance": 0.05
+        }
+    ]
+}
