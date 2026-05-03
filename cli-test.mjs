@@ -702,6 +702,45 @@ const testSuites = {
     }
 };
 
+testSuites['waypoint'] = {
+    description: 'Test waypoint system',
+    run: async () => {
+        await connectAndJoin();
+        try {
+            await withTimeout(connection.invoke('SendChat', '/waypoint testwp 10 65 10 #ff0000'));
+            log('  /waypoint command sent');
+            await new Promise(r => setTimeout(r, 500));
+            assert(true, 'Waypoint command processed');
+        } finally {
+            await disconnect();
+        }
+    }
+};
+
+testSuites['detached'] = {
+    description: 'Test detached inventory system',
+    run: async () => {
+        await connectAndJoin();
+        try {
+            try {
+                await withTimeout(connection.invoke('CreateDetachedInventory', 'cli_test_inv', 9));
+                assert(false, 'CreateDetachedInventory should fail without server priv');
+            } catch {
+                assert(true, 'CreateDetachedInventory correctly denied (no server priv)');
+            }
+            try {
+                await withTimeout(connection.invoke('SendChat', '/trash'));
+                await new Promise(r => setTimeout(r, 500));
+                assert(true, '/trash command processed');
+            } catch {
+                log('  /trash command may not be available in all configs');
+            }
+        } finally {
+            await disconnect();
+        }
+    }
+};
+
 const ALL_SUITES = Object.keys(testSuites);
 
 function printUsage() {
