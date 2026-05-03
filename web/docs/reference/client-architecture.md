@@ -395,3 +395,47 @@ SoundManager (OpenAL 기반)
 - 트리거 → 점프/특수
 - 버튼 매핑 지원
 - 진동( rumble) 지원
+
+## 16. Web Port Architecture (TypeScript/Three.js)
+
+### 16.1 웹 포트 클래스 계층
+
+```
+GameClient.ts (중앙 오케스트레이터)
+  ├── Renderer.ts (Scene, Camera, Lights, Sky, Clouds, Effects)
+  ├── PlayerController.ts (FPS 컨트롤러, 물리, 충돌, 광선 투사)
+  ├── WorldManager.ts (청크 로드/언로드, 블록 관리, 엔티티)
+  │    └── ChunkMesh.ts (그리디 메시 + AO + UV 매핑)
+  │    └── BlockRegistry.ts (블록 정의)
+  │    └── ParticleSystem.ts (파티클 스포너)
+  │    └── WeatherSystem.ts (비, 눈, 천둥)
+  │    └── ItemRegistry.ts (아이템 정의)
+  ├── InputManager.ts (키보드/마우스 입력)
+  ├── UIManager.ts (모든 UI 패널)
+  │    └── CraftingGridUI.ts (3x3 제작 그리드)
+  │    └── Minimap.ts (3모드 미니맵)
+  │    └── SettingsPanel.ts (설정)
+  └── AudioManager.ts (절차적 오디오)
+```
+
+### 16.2 SignalR 이벤트 핸들러 (setupServerHandlers)
+
+| 이벤트 | 목적 |
+|--------|------|
+| OnChunkReceived | 청크 데이터 로드 |
+| OnPlayerPositionUpdate | 다른 플레이어 위치 |
+| OnBlockUpdate | 블록 변경 |
+| OnInventoryUpdate | 인벤토리 동기화 |
+| OnWeatherUpdate | 날씨 변경 |
+| OnWaypoint | 웨이포인트 추가 |
+| OnFov | 서버 FOV 제어 |
+| OnLightingUpdate | 조명 파라미터 |
+| OnHudFlag | HUD 요소 토글 |
+| OnDetachedInventory | 분리 인벤토리 UI |
+
+### 16.3 Vite 빌드 최적화
+
+- **Manual Chunks**: Three.js, SignalR, Game, World, UI, Rendering 모듈 분리
+- **Tree Shaking**: TypeScript strict mode (`noUnusedLocals`, `noUnusedParameters`)
+- **Code Splitting**: 각 청크 파일이 필요시 로드됨
+- Three.js 청크: ~470KB, SignalR: ~55KB, Game: ~49KB, UI: ~49KB, World: ~53KB

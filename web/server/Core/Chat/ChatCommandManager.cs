@@ -673,6 +673,21 @@ public class ChatCommandManager
             }));
     }
 
+    public void RegisterExternalCommand(ChatCommand command)
+    {
+        Register(command);
+    }
+
+    public ChatCommand? GetCommand(string name)
+    {
+        return _commands.TryGetValue(name.ToLowerInvariant(), out var cmd) ? cmd : null;
+    }
+
+    public string[] GetCommandNames()
+    {
+        return _commands.Keys.OrderBy(k => k).ToArray();
+    }
+
     public void Register(ChatCommand command)
     {
         _commands[command.Name.ToLowerInvariant()] = command;
