@@ -662,10 +662,10 @@ public class GameServer
     private void ValidatePlayerPosition(PlayerEnt player, float dt)
     {
         var maxSpeed = player.IsFlying
-            ? _physicsEngine.FlySpeed
+            ? (player.OverrideFlySpeed ?? _physicsEngine.FlySpeed)
             : player.IsSprinting
-                ? _physicsEngine.SprintSpeed
-                : _physicsEngine.WalkSpeed;
+                ? (player.OverrideSprintSpeed ?? _physicsEngine.SprintSpeed)
+                : (player.OverrideWalkSpeed ?? _physicsEngine.WalkSpeed);
 
         var maxDistance = maxSpeed * dt * 1.5f;
         var distance = Vector3.Distance(player.Position, player.PreviousPosition);

@@ -265,8 +265,10 @@ public class GameHub : Hub<IGameClient>
         await SendBlockDefinitions();
         await Clients.Caller.OnPhysicsParams(
             _config.Physics.Gravity, _config.Physics.JumpForce,
-            _config.Physics.WalkSpeed, _config.Physics.SprintSpeed,
-            _config.Physics.FlySpeed, _config.Physics.ClimbSpeed,
+            player.OverrideWalkSpeed ?? _config.Physics.WalkSpeed,
+            player.OverrideSprintSpeed ?? _config.Physics.SprintSpeed,
+            player.OverrideFlySpeed ?? _config.Physics.FlySpeed,
+            _config.Physics.ClimbSpeed,
             _config.Physics.LiquidDrag);
         await SendInitialChunks(player);
     }
