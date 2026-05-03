@@ -125,6 +125,10 @@ export class UIManager {
     }
 
     addChatMessage(sender: string, message: string, messageType: string = 'normal'): void {
+        if (message === '__CLEAR__') {
+            this.chatMessages.innerHTML = '';
+            return;
+        }
         const msgEl = document.createElement('div');
         msgEl.className = 'chat-message';
         const senderSpan = document.createElement('span');

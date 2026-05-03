@@ -323,6 +323,7 @@ The Vite dev server proxies `/game` to the server.
 | /mods | List ported game features |
 | /whois <player> | Show player info (mode, HP) |
 | /ping | Check connection latency |
+| /clear | Clear chat history |
 | /set_lighting [shadow] [exposure_min] [exposure_max] [ambient] [bloom] | Set lighting params (/set_lighting reset) |
 | /hudflag <flag> [on|off] | Toggle HUD element (hotbar, healthbar, crosshair, breathbar, hungerbar, minimap, debug, chat) |
 

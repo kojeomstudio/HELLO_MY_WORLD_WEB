@@ -664,12 +664,13 @@ public class ChatCommandManager
         Register(new ChatCommand("ping", "Check your connection latency", Array.Empty<string>(),
             (playerName, _args) =>
             {
-                var players = _getOnlinePlayers?.Invoke();
-                if (players != null && players.Contains(playerName))
-                {
-                    return Task.FromResult("Pong!");
-                }
                 return Task.FromResult("Pong!");
+            }));
+
+        Register(new ChatCommand("clear", "Clear your chat history", Array.Empty<string>(),
+            (_playerName, _args) =>
+            {
+                return Task.FromResult("CLEAR_CHAT");
             }));
     }
 

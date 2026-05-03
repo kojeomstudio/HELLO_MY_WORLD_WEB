@@ -392,7 +392,14 @@ public class GameHub : Hub<IGameClient>
                 }
                 else
                 {
-                    await Clients.Caller.OnChatMessage("Server", result, "system");
+                    if (result == "CLEAR_CHAT")
+                    {
+                        await Clients.Caller.OnChatMessage("", "__CLEAR__", "clear");
+                    }
+                    else
+                    {
+                        await Clients.Caller.OnChatMessage("Server", result, "system");
+                    }
                 }
             }
             return;
