@@ -14,6 +14,7 @@ import { SelectionBox } from './rendering/SelectionBox';
 import { WeatherSystem } from './world/WeatherSystem';
 import { ItemRegistry } from './world/ItemRegistry';
 import { FormspecRenderer } from './ui/FormspecRenderer';
+import { setLeavesStyle as applyLeavesStyle, setTranslucentLiquids as applyTranslucentLiquids } from './world/ChunkMesh';
 
 export class GameClient {
     private connection: HubConnection.HubConnection | null = null;
@@ -83,6 +84,16 @@ export class GameClient {
         const weatherType = this.weatherSystem.toggleWeather();
         this.renderer.setRaining(weatherType === 'rain');
         return weatherType;
+    }
+
+    setLeavesStyle(style: 'fancy' | 'simple'): void {
+        applyLeavesStyle(style);
+        this.worldManager.rebuildAllChunks();
+    }
+
+    setTranslucentLiquids(enabled: boolean): void {
+        applyTranslucentLiquids(enabled);
+        this.worldManager.rebuildAllChunks();
     }
 
     private applySettings(settings: GameSettings): void {
@@ -335,6 +346,30 @@ export class GameClient {
                 this.connection?.invoke('FormspecResponse', name, fields);
             });
             this.formspecRenderer.show(formName, elementsJson);
+        });
+
+        this.connection.on('OnOverrideDayNightRatio', (ratio: number, enable: boolean) => {
+            if (enable) {
+                this.renderer.setSkyBrightnessOverride(ratio);
+            } else {
+                this.renderer.setSkyBrightnessOverride(null);
+            }
+        });
+
+        this.connection.on('OnHudAdd', (hudId: number, type: string, positionJson: string, name: string, text: string, number: number, item: string, direction: string, alignment: string, offset: number, worldPos: number) => {
+            this.uiManager.addHudElement(hudId, type, positionJson, name, text, number, item, direction, alignment, offset, worldPos);
+        });
+
+        this.connection.on('OnHudRemove', (hudId: number) => {
+            this.uiManager.removeHudElement(hudId);
+        });
+
+        this.connection.on('OnHudChange', (hudId: number, statField: string, value: string) => {
+            this.uiManager.changeHudElement(hudId, statField, value);
+        });
+
+        this.connection.on('OnHudClear', () => {
+            this.uiManager.clearHudElements();
         });
     }
 

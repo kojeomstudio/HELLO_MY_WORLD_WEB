@@ -96,12 +96,21 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Spectator Mode**: No collision, invulnerable, flying; toggle via `/gamemode sp`
 - **Player Statistics**: Track blocks mined/placed, distance walked, kills, deaths, crafting, damage (view via `/stats`)
 - **Positional Audio**: 3D sound with distance attenuation (16-block max) and stereo panning
-- **Security Hardening**: InteractBlock privilege/protection/range checks, UseBucket protection, teleport coordinate validation, inventory slot bounds, NaN validation
+- **Security Hardening**: InteractBlock privilege/protection/range checks, UseBucket protection, teleport coordinate validation, inventory slot bounds, NaN validation, ModStorage access control (server privilege for writes, interact+server for reads), FormspecRenderer XSS prevention (DOM-based hypertext rendering, CSS color validation, image URL sanitization)
 - **Raycast API**: Server-side DDA voxel traversal for interaction range validation
 - **Sky Parameters**: Server-driven sun/moon/stars/fog color via `/setsky` command
 - **World Backup**: Periodic auto-backup every 30 minutes, `/backup` and `/restore` commands
 - **Player Flags**: Invisible (hidden from other players), footstep sounds, zoom toggle per player
 - **Dungeon Loot Tables**: Tiered loot (common/uncommon/rare/special) with varied items
+- **Extended Drop Tables**: Per-block drop tables with rarity, tool group requirements, tool rating min/max, max drop items, inherit color support
+- **Cascade Falling Nodes**: Stack-based iterative falling with neighbor cascade propagation, attached node drop support
+- **VoxelArea**: Fast cuboid iteration utility with ZYX stride indexing
+- **Forceloading**: Persistent and transient chunk forceloading with reference counting and JSON persistence
+- **Entity Lifecycle Callbacks**: Static events for entity spawn/despawn/step and mob activate/damage/death
+- **Item Entity Improvements**: Collection radius, stuck-in-solid pushout, slippery block sliding
+- **Wear Bar Colors**: Per-material tool wear bar color definitions
+- **Server-Driven HUD**: Add/remove/change/clear HUD elements (text, image, statbar, waypoint, compass) via SignalR
+- **Death Screen**: Formspec-styled death screen with respawn button
 - **VoxelManipulator**: Bulk node read/write utility for mapgen and world manipulation (CopyFrom/CopyTo/Fill/Replace/Blit)
 - **Advanced Ore Generation**: 6 ore placement algorithms — Scatter (noise-based), Vein (random-walk), Sheet (horizontal layer), Blob (spherical radius), Puff (3D thickness noise), Stratum (noise-contoured horizontal layers)
 - **Entity Interpolation**: Smooth position transitions for mobs and items using hermite spline interpolation
@@ -402,6 +411,16 @@ The Vite dev server proxies `/game` to the server.
 | `/toggleflag <p> <flag>` | Toggle player flags (invisible, footstep, zoom) |
 | `/rollback <p> <secs>` | Rollback player block changes |
 | `/rollbacktell <area> <s>` | Rollback area block changes |
+| `/setpassword <player> <pw>` | Set another player's password (requires `password`) |
+| `/clearpassword <player>` | Clear a player's password |
+| `/remove_player <player>` | Remove a player's account data |
+| `/auth_reload` | Reload authentication data |
+| `/last-login <player>` | Show last login time for a player |
+| `/rollback_check <x> <y> <z> <r>` | Check rollback data at position |
+| `/emergeblocks <x1> <y1> <z1> <x2> <y2> <z2>` | Force-generate chunks in area |
+| `/deleteblocks <x1> <y1> <z1> <x2> <y2> <z2>` | Delete blocks in area |
+| `/fixlight <x1> <y1> <z1> <x2> <y2> <z2>` | Fix lighting in area |
+| `/pulverize` | Clear all entities |
 | `/gamemode [s/c/a/sp]` | Set game mode (sp=spectator) |
 
 ## Ported from minetest_sub_project

@@ -8,7 +8,10 @@ public class FormspecParser
     private static readonly string[] SupportedElements =
     [
         "size", "label", "button", "field", "list", "image", "box",
-        "dropdown", "textarea", "checkbox", "bgcolor", "container"
+        "dropdown", "textarea", "checkbox", "bgcolor", "container",
+        "pwdfield", "table", "tabheader", "scrollbar", "tooltip",
+        "background", "item_image", "hypertext", "animated_image",
+        "style", "listring", "vertlabel"
     ];
 
     public JsonArray Parse(string formspec)
@@ -286,6 +289,180 @@ public class FormspecParser
                 {
                     element["x"] = cX;
                     element["y"] = cY;
+                }
+                break;
+
+            case "pwdfield":
+                if (parameters.Length >= 5 &&
+                    float.TryParse(parameters[0], out var px) &&
+                    float.TryParse(parameters[1], out var py) &&
+                    float.TryParse(parameters[2], out var pw) &&
+                    float.TryParse(parameters[3], out var ph))
+                {
+                    element["x"] = px;
+                    element["y"] = py;
+                    element["width"] = pw;
+                    element["height"] = ph;
+                    element["name"] = parameters[4];
+                    if (parameters.Length >= 6)
+                        element["label"] = parameters[5];
+                }
+                break;
+
+            case "table":
+                if (parameters.Length >= 5 &&
+                    float.TryParse(parameters[0], out var tbX) &&
+                    float.TryParse(parameters[1], out var tbY) &&
+                    float.TryParse(parameters[2], out var tbW) &&
+                    float.TryParse(parameters[3], out var tbH))
+                {
+                    element["x"] = tbX;
+                    element["y"] = tbY;
+                    element["width"] = tbW;
+                    element["height"] = tbH;
+                    element["name"] = parameters[4];
+                    if (parameters.Length >= 6)
+                        element["columns"] = parameters[5];
+                    if (parameters.Length >= 7)
+                        element["rows"] = parameters[6];
+                }
+                break;
+
+            case "tabheader":
+                if (parameters.Length >= 4 &&
+                    float.TryParse(parameters[0], out var thX) &&
+                    float.TryParse(parameters[1], out var thY))
+                {
+                    element["x"] = thX;
+                    element["y"] = thY;
+                    element["name"] = parameters[2];
+                    element["tabs"] = parameters[3];
+                    if (parameters.Length >= 5 && int.TryParse(parameters[4], out var thSel))
+                        element["selected"] = thSel;
+                }
+                break;
+
+            case "scrollbar":
+                if (parameters.Length >= 7 &&
+                    float.TryParse(parameters[0], out var sbX) &&
+                    float.TryParse(parameters[1], out var sbY) &&
+                    float.TryParse(parameters[2], out var sbW) &&
+                    float.TryParse(parameters[3], out var sbH))
+                {
+                    element["x"] = sbX;
+                    element["y"] = sbY;
+                    element["width"] = sbW;
+                    element["height"] = sbH;
+                    element["name"] = parameters[4];
+                    element["value"] = parameters[5];
+                    element["min"] = parameters[6];
+                    if (parameters.Length >= 8)
+                        element["max"] = parameters[7];
+                    if (parameters.Length >= 9)
+                        element["orientation"] = parameters[8];
+                }
+                break;
+
+            case "tooltip":
+                if (parameters.Length >= 3 &&
+                    float.TryParse(parameters[0], out var ttX) &&
+                    float.TryParse(parameters[1], out var ttY))
+                {
+                    element["x"] = ttX;
+                    element["y"] = ttY;
+                    element["text"] = parameters[2];
+                }
+                break;
+
+            case "background":
+                if (parameters.Length >= 5 &&
+                    float.TryParse(parameters[0], out var bgX) &&
+                    float.TryParse(parameters[1], out var bgY) &&
+                    float.TryParse(parameters[2], out var bgW) &&
+                    float.TryParse(parameters[3], out var bgH))
+                {
+                    element["x"] = bgX;
+                    element["y"] = bgY;
+                    element["width"] = bgW;
+                    element["height"] = bgH;
+                    element["texture"] = parameters[4];
+                }
+                break;
+
+            case "item_image":
+                if (parameters.Length >= 5 &&
+                    float.TryParse(parameters[0], out var iiX) &&
+                    float.TryParse(parameters[1], out var iiY) &&
+                    float.TryParse(parameters[2], out var iiW) &&
+                    float.TryParse(parameters[3], out var iiH))
+                {
+                    element["x"] = iiX;
+                    element["y"] = iiY;
+                    element["width"] = iiW;
+                    element["height"] = iiH;
+                    element["itemName"] = parameters[4];
+                }
+                break;
+
+            case "hypertext":
+                if (parameters.Length >= 5 &&
+                    float.TryParse(parameters[0], out var htX) &&
+                    float.TryParse(parameters[1], out var htY) &&
+                    float.TryParse(parameters[2], out var htW) &&
+                    float.TryParse(parameters[3], out var htH))
+                {
+                    element["x"] = htX;
+                    element["y"] = htY;
+                    element["width"] = htW;
+                    element["height"] = htH;
+                    element["name"] = parameters[4];
+                    if (parameters.Length >= 6)
+                        element["content"] = parameters[5];
+                }
+                break;
+
+            case "animated_image":
+                if (parameters.Length >= 7 &&
+                    float.TryParse(parameters[0], out var aiX) &&
+                    float.TryParse(parameters[1], out var aiY) &&
+                    float.TryParse(parameters[2], out var aiW) &&
+                    float.TryParse(parameters[3], out var aiH) &&
+                    int.TryParse(parameters[5], out var aiFrames) &&
+                    int.TryParse(parameters[6], out var aiDuration))
+                {
+                    element["x"] = aiX;
+                    element["y"] = aiY;
+                    element["width"] = aiW;
+                    element["height"] = aiH;
+                    element["name"] = parameters[4];
+                    element["frameCount"] = aiFrames;
+                    element["frameDuration"] = aiDuration;
+                }
+                break;
+
+            case "style":
+                if (parameters.Length >= 2)
+                {
+                    element["name"] = parameters[0];
+                    element["properties"] = parameters[1];
+                }
+                break;
+
+            case "listring":
+                if (parameters.Length >= 1)
+                {
+                    element["name"] = parameters[0];
+                }
+                break;
+
+            case "vertlabel":
+                if (parameters.Length >= 3 &&
+                    float.TryParse(parameters[0], out var vlX) &&
+                    float.TryParse(parameters[1], out var vlY))
+                {
+                    element["x"] = vlX;
+                    element["y"] = vlY;
+                    element["text"] = parameters[2];
                 }
                 break;
         }

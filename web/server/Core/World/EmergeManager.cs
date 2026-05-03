@@ -211,4 +211,37 @@ public class EmergeManager
         foreach (var coord in _world.GetLoadedChunks())
             _queuedOrLoaded[coord] = true;
     }
+
+    public int EmergeArea(int x1, int y1, int z1, int x2, int y2, int z2)
+    {
+        var minX = Math.Min(x1, x2);
+        var maxX = Math.Max(x1, x2);
+        var minZ = Math.Min(z1, z2);
+        var maxZ = Math.Max(z1, z2);
+
+        var minCX = minX >> 4;
+        var maxCX = maxX >> 4;
+        var minCZ = minZ >> 4;
+        var maxCZ = maxZ >> 4;
+
+        var count = 0;
+        for (int cx = minCX; cx <= maxCX; cx++)
+        {
+            for (int cz = minCZ; cz <= maxCZ; cz++)
+            {
+                for (int cy = 0; cy <= 2; cy++)
+                {
+                    var coord = new ChunkCoord(cx, cy, cz);
+                    if (_world.GetChunkIfExists(coord) == null)
+                    {
+                        RequestChunk(coord, EmergePriority.High);
+                        count++;
+                    }
+                }
+            }
+        }
+
+        ProcessQueue(Math.Min(count, 16));
+        return count;
+    }
 }

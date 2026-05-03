@@ -1478,6 +1478,32 @@ public class GameServer
         if (connectionId == null || _hubContext == null) return;
         _ = _hubContext.Clients.Client(connectionId).OnWaypoint(x, y, z, name, color);
     }
+
+    public void DeleteBlocks(int x1, int y1, int z1, int x2, int y2, int z2)
+    {
+        var minX = Math.Min(x1, x2);
+        var maxX = Math.Max(x1, x2);
+        var minY = Math.Min(y1, y2);
+        var maxY = Math.Max(y1, y2);
+        var minZ = Math.Min(z1, z2);
+        var maxZ = Math.Max(z1, z2);
+
+        for (int x = minX; x <= maxX; x++)
+        {
+            for (int y = minY; y <= maxY; y++)
+            {
+                for (int z = minZ; z <= maxZ; z++)
+                {
+                    var pos = new Vector3s((short)x, (short)y, (short)z);
+                    var block = DefaultWorld.GetBlock(pos);
+                    if (block.Type != BlockType.Air)
+                    {
+                        DefaultWorld.SetBlock(pos, Block.Air);
+                    }
+                }
+            }
+        }
+    }
 }
 
 public record FurnaceOperation(

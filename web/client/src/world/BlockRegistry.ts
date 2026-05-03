@@ -36,6 +36,7 @@ export interface BlockDefinition {
     damageGroup?: string;
     healPerSecond?: number;
     connectsTo?: string[];
+    param2Type?: string;
 }
 
 export class BlockRegistry {
@@ -265,6 +266,7 @@ export class BlockRegistry {
             if (raw.liquidRenewable !== undefined) block.liquidRenewable = raw.liquidRenewable;
             if (raw.level !== undefined) block.level = raw.level;
             if (raw.maxLevel !== undefined) block.maxLevel = raw.maxLevel;
+            if (raw.param2Type !== undefined) block.param2Type = raw.param2Type;
 
             this.blocks.set(id, block);
             this.byName.set(block.name, block);

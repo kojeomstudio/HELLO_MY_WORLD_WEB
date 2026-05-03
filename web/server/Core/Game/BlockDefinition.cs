@@ -75,6 +75,28 @@ public class BlockDefinitionManager
             def.Waving = el.TryGetProperty("waving", out var wv) ? wv.GetInt32() : 0;
             def.DamageGroup = el.TryGetProperty("damageGroup", out var dg) ? dg.GetString() ?? "fleshy" : "fleshy";
 
+            if (el.TryGetProperty("dropTable", out var dropTableEl) && dropTableEl.ValueKind == JsonValueKind.Array)
+            {
+                def.DropTable = new List<DropTableEntry>();
+                foreach (var dropEl in dropTableEl.EnumerateArray())
+                {
+                    var entry = new DropTableEntry
+                    {
+                        Item = dropEl.GetProperty("item").GetString() ?? "",
+                        Count = dropEl.TryGetProperty("count", out var dc) ? dc.GetInt32() : 1,
+                        Rarity = dropEl.TryGetProperty("rarity", out var drt) ? (float)drt.GetDouble() : 1.0f,
+                        ToolGroup = dropEl.TryGetProperty("toolGroup", out var tg) ? tg.GetString() : null,
+                        ToolRatingMin = dropEl.TryGetProperty("toolRatingMin", out var trmin) ? trmin.GetInt32() : -1,
+                        ToolRatingMax = dropEl.TryGetProperty("toolRatingMax", out var trmax) ? trmax.GetInt32() : 99,
+                        InheritColor = dropEl.TryGetProperty("inheritColor", out var ic) && ic.GetBoolean()
+                    };
+                    def.DropTable.Add(entry);
+                }
+            }
+
+            if (el.TryGetProperty("maxDropItems", out var mdi))
+                def.MaxDropItems = mdi.GetInt32();
+
             _definitions[id] = def;
         }
     }
@@ -325,6 +347,17 @@ public class BlockDefinitionManager
     public IReadOnlyDictionary<ushort, BlockDefinition> GetAll() => _definitions;
 }
 
+public class DropTableEntry
+{
+    public string Item { get; set; } = "";
+    public int Count { get; set; } = 1;
+    public float Rarity { get; set; } = 1.0f;
+    public string? ToolGroup { get; set; }
+    public int ToolRatingMin { get; set; } = -1;
+    public int ToolRatingMax { get; set; } = 99;
+    public bool InheritColor { get; set; }
+}
+
 public class BlockDefinition
 {
     public ushort Id { get; set; }
@@ -341,6 +374,8 @@ public class BlockDefinition
     public string DrawType { get; set; } = "normal";
     public float Hardness { get; set; } = 1.0f;
     public string? Drops { get; set; }
+    public List<DropTableEntry>? DropTable { get; set; }
+    public int MaxDropItems { get; set; } = 99;
     public bool Climbable { get; set; }
     public bool Drowning { get; set; }
     public bool Falling { get; set; }
@@ -362,6 +397,74 @@ public class BlockDefinition
     public int FallDamageAddPercent { get; set; }
     public int Waving { get; set; }
     public string DamageGroup { get; set; } = "fleshy";
+
+    public (string itemId, int count)[] GetDrops(string? toolItemName = null)
+    {
+        if (DropTable != null && DropTable.Count > 0)
+        {
+            return ResolveDropTable(toolItemName);
+        }
+
+        if (!string.IsNullOrEmpty(Drops))
+        {
+            return [(Drops, 1)];
+        }
+
+        return [(Name, 1)];
+    }
+
+    private (string itemId, int count)[] ResolveDropTable(string? toolItemName)
+    {
+        var toolGroups = GetToolGroups(toolItemName);
+        var results = new List<(string itemId, int count)>();
+
+        foreach (var entry in DropTable!)
+        {
+            if (Random.Shared.NextSingle() > entry.Rarity)
+                continue;
+
+            if (!string.IsNullOrEmpty(entry.ToolGroup))
+            {
+                if (!toolGroups.TryGetValue(entry.ToolGroup, out var rating))
+                    continue;
+                if (rating < entry.ToolRatingMin || rating > entry.ToolRatingMax)
+                    continue;
+            }
+
+            results.Add((entry.Item, entry.Count));
+
+            if (results.Count >= MaxDropItems)
+                break;
+        }
+
+        return results.Count > 0 ? results.ToArray() : [(Name, 1)];
+    }
+
+    private static Dictionary<string, int> GetToolGroups(string? toolItemName)
+    {
+        if (string.IsNullOrEmpty(toolItemName))
+            return new();
+
+        var lower = toolItemName.ToLowerInvariant();
+        foreach (var (prefix, material) in ToolConfig.Materials)
+        {
+            if (lower.StartsWith(prefix + "_") || lower.Equals(prefix))
+            {
+                if (material.GroupCapabilities != null)
+                {
+                    var result = new Dictionary<string, int>();
+                    foreach (var (group, value) in material.GroupCapabilities)
+                    {
+                        result[group] = (int)value;
+                    }
+                    return result;
+                }
+                return new();
+            }
+        }
+
+        return new();
+    }
 
     public string? TextureName => Name switch
     {

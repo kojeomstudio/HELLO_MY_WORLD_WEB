@@ -140,6 +140,12 @@ export class WorldManager {
         }
     }
 
+    rebuildAllChunks(): void {
+        for (const [key] of this.chunks) {
+            this.rebuildChunkMesh(key);
+        }
+    }
+
     private loadTextureAtlas(): void {
         const loadedImages: Map<string, HTMLImageElement> = new Map();
         const loadPromises = TEXTURE_NAMES.map(name => {

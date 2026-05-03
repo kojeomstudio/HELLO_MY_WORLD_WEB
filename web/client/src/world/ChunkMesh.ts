@@ -4,6 +4,17 @@ const CHUNK_SIZE = 16;
 const BYTES_PER_BLOCK = 4;
 const LIGHT_OFFSETS: [number, number][] = [[-1, -1], [-1, 0], [0, -1], [0, 0]];
 
+let leavesStyle: 'fancy' | 'simple' = 'fancy';
+let translucentLiquids: boolean = true;
+
+export function setLeavesStyle(style: 'fancy' | 'simple'): void {
+    leavesStyle = style;
+}
+
+export function setTranslucentLiquids(enabled: boolean): void {
+    translucentLiquids = enabled;
+}
+
 let _blockRegistryCache: ((id: number) => any) | null = null;
 
 function blockIdToDef(blockId: number): any {
@@ -512,6 +523,43 @@ function buildLeveled(ctx: BuildCtx, wx: number, wy: number, wz: number, param2:
     }
 }
 
+function buildAllfaces(ctx: BuildCtx, wx: number, wy: number, wz: number, color: THREE.Color): void {
+    const lm = getBlockLight(ctx, wx, wy, wz);
+    pushBox(ctx, wx, wy, wz, 0, 0, 0, 1, 1, 1, color, lm);
+}
+
+function buildTorchlike(ctx: BuildCtx, wx: number, wy: number, wz: number, param2: number, color: THREE.Color): void {
+    buildTorch(ctx, wx, wy, wz, param2, color);
+}
+
+function buildPlantlikeRooted(ctx: BuildCtx, wx: number, wy: number, wz: number, color: THREE.Color): void {
+    const lm = getBlockLight(ctx, wx, wy, wz);
+    pushBox(ctx, wx, wy, wz, 0.3, 0, 0.3, 0.7, 0.3, 0.7, color, lm);
+    pushQuad(ctx, wx, wy, wz,
+        [0.15, 0.3, 0.15], [0.85, 0.3, 0.85],
+        [0.85, 1, 0.85], [0.15, 1, 0.15],
+        [0, 0, 1], color, lm, 1.0);
+    pushQuad(ctx, wx, wy, wz,
+        [0.85, 0.3, 0.85], [0.15, 0.3, 0.15],
+        [0.15, 1, 0.15], [0.85, 1, 0.85],
+        [0, 0, -1], color, lm, 1.0);
+    pushQuad(ctx, wx, wy, wz,
+        [0.85, 0.3, 0.15], [0.15, 0.3, 0.85],
+        [0.15, 1, 0.85], [0.85, 1, 0.15],
+        [0, 0, 1], color, lm, 1.0);
+    pushQuad(ctx, wx, wy, wz,
+        [0.15, 0.3, 0.85], [0.85, 0.3, 0.15],
+        [0.85, 1, 0.15], [0.15, 1, 0.85],
+        [0, 0, -1], color, lm, 1.0);
+}
+
+function buildGlasslikeFramedOptional(
+    ctx: BuildCtx, wx: number, wy: number, wz: number,
+    blockId: number, color: THREE.Color
+): void {
+    buildGlasslikeFramed(ctx, wx, wy, wz, blockId, color, new THREE.Color('#8B8B8B'));
+}
+
 export class ChunkMesh {
     public mesh: THREE.Mesh | null = null;
     public transparentMesh: THREE.Mesh | null = null;
@@ -609,9 +657,9 @@ export class ChunkMesh {
                     const drawType: string = blockRegistry.getDrawType
                         ? blockRegistry.getDrawType(blockId)
                         : 'normal';
-                    if (drawType !== 'normal') continue;
+                    if (drawType !== 'normal' && !(drawType === 'allfaces' && leavesStyle === 'simple')) continue;
 
-                    const isTransparent = blockDef.transparent === true;
+                    const isTransparent = blockDef.transparent === true && !(blockDef.liquid === true && !translucentLiquids);
                     const isLiquid = blockDef.liquid === true;
                     const isLightSourceBlock = blockRegistry.isLightSource(blockId);
 
@@ -820,7 +868,7 @@ export class ChunkMesh {
                     const drawType: string = blockRegistry.getDrawType
                         ? blockRegistry.getDrawType(blockId)
                         : 'normal';
-                    if (drawType === 'normal') continue;
+                    if (drawType === 'normal' || (drawType === 'allfaces' && leavesStyle === 'simple')) continue;
 
                     const worldX = this.chunkX * CHUNK_SIZE + x;
                     const worldY = this.chunkY * CHUNK_SIZE + y;
@@ -828,7 +876,7 @@ export class ChunkMesh {
                     const param2 = this.getParam2(x, y, z);
                     const color = new THREE.Color(blockDef.color);
                     const isLight = blockRegistry.isLightSource(blockId);
-                    const isTransparent = blockDef.transparent === true;
+                    const isTransparent = blockDef.transparent === true && !(blockDef.liquid === true && !translucentLiquids);
 
                     const positions = isTransparent ? transPositions : solidPositions;
                     const normals = isTransparent ? transNormals : solidNormals;
@@ -849,6 +897,8 @@ export class ChunkMesh {
                         blockUV, useWhite, isLight,
                         getNeighborBlock, getNeighborLight
                     };
+
+                    const startVC = ctx.vc.count;
 
                     switch (drawType) {
                         case 'stair':
@@ -905,6 +955,36 @@ export class ChunkMesh {
                         case 'leveled':
                             buildLeveled(ctx, worldX, worldY, worldZ, param2, color);
                             break;
+                        case 'allfaces':
+                            buildAllfaces(ctx, worldX, worldY, worldZ, color);
+                            break;
+                        case 'torchlike':
+                            buildTorchlike(ctx, worldX, worldY, worldZ, param2, color);
+                            break;
+                        case 'plantlike_rooted':
+                            buildPlantlikeRooted(ctx, worldX, worldY, worldZ, color);
+                            break;
+                        case 'glasslike_framed_optional':
+                            buildGlasslikeFramedOptional(ctx, worldX, worldY, worldZ, blockId, color);
+                            break;
+                    }
+
+                    if (blockDef.param2Type === 'degrotate') {
+                        const angle = (param2 % 240) * 1.5 * Math.PI / 180;
+                        const cosA = Math.cos(angle);
+                        const sinA = Math.sin(angle);
+                        const endVC = ctx.vc.count;
+                        for (let vi = startVC; vi < endVC; vi++) {
+                            const idx = vi * 3;
+                            const px = ctx.positions[idx] - (worldX + 0.5);
+                            const pz = ctx.positions[idx + 2] - (worldZ + 0.5);
+                            ctx.positions[idx] = px * cosA - pz * sinA + (worldX + 0.5);
+                            ctx.positions[idx + 2] = px * sinA + pz * cosA + (worldZ + 0.5);
+                            const nx = ctx.normals[idx];
+                            const nz = ctx.normals[idx + 2];
+                            ctx.normals[idx] = nx * cosA - nz * sinA;
+                            ctx.normals[idx + 2] = nx * sinA + nz * cosA;
+                        }
                     }
                 }
             }

@@ -51,6 +51,20 @@ export class UIManager {
         debug: true,
         chat: true
     };
+    private hudElements: Map<number, {
+        type: string;
+        element: HTMLElement;
+        position: { x: number; y: number };
+        name: string;
+        text: string;
+        number: number;
+        item: string;
+        direction: string;
+        alignment: string;
+        offset: number;
+        worldPos: number;
+    }> = new Map();
+    private hudContainer: HTMLElement | null = null;
 
     constructor() {
         this.chatMessages = document.getElementById('chat-messages')!;
@@ -261,28 +275,40 @@ export class UIManager {
 
         this.deathScreen = document.createElement('div');
         this.deathScreen.id = 'death-screen';
-        this.deathScreen.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(150,0,0,0.5);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1000;';
+        this.deathScreen.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(80,0,0,0.7);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1000;';
+
+        const formContainer = document.createElement('div');
+        formContainer.style.cssText = 'background:rgba(40,20,20,0.9);border:2px solid #882222;border-radius:8px;padding:32px 48px;display:flex;flex-direction:column;align-items:center;gap:16px;min-width:320px;';
 
         const title = document.createElement('div');
-        title.style.cssText = 'font-size:48px;color:#ff4444;font-weight:bold;margin-bottom:16px;text-shadow:2px 2px 4px black;';
+        title.style.cssText = 'font-size:42px;color:#ff4444;font-weight:bold;text-shadow:2px 2px 6px rgba(0,0,0,0.8);letter-spacing:2px;';
         title.textContent = 'You Died!';
 
         const msg = document.createElement('div');
-        msg.style.cssText = 'font-size:20px;color:#ffaaaa;margin-bottom:24px;';
+        msg.style.cssText = 'font-size:16px;color:#ffaaaa;max-width:280px;text-align:center;';
         msg.textContent = message;
 
         const respawnBtn = document.createElement('button');
         respawnBtn.id = 'respawn-button';
-        respawnBtn.style.cssText = 'padding:12px 32px;font-size:18px;cursor:pointer;background:#cc2222;color:white;border:2px solid #ff4444;border-radius:4px;';
+        respawnBtn.style.cssText = 'padding:12px 48px;font-size:18px;cursor:pointer;background:linear-gradient(180deg,#cc2222,#991111);color:white;border:2px solid #ff4444;border-radius:4px;text-shadow:1px 1px 2px rgba(0,0,0,0.5);transition:background 0.2s;';
         respawnBtn.textContent = 'Respawn';
+        respawnBtn.addEventListener('mouseenter', () => {
+            respawnBtn.style.background = 'linear-gradient(180deg,#ee3333,#bb2222)';
+        });
+        respawnBtn.addEventListener('mouseleave', () => {
+            respawnBtn.style.background = 'linear-gradient(180deg,#cc2222,#991111)';
+        });
         respawnBtn.addEventListener('click', () => {
+            this._connection?.invoke('FormspecResponse', 'death', { respawn: '' });
+            this.hideDeathScreen();
             const event = new CustomEvent('respawnRequest');
             document.dispatchEvent(event);
         });
 
-        this.deathScreen.appendChild(title);
-        this.deathScreen.appendChild(msg);
-        this.deathScreen.appendChild(respawnBtn);
+        formContainer.appendChild(title);
+        formContainer.appendChild(msg);
+        formContainer.appendChild(respawnBtn);
+        this.deathScreen.appendChild(formContainer);
         document.body.appendChild(this.deathScreen);
 
         document.exitPointerLock();
@@ -1485,5 +1511,197 @@ export class UIManager {
         });
         container.appendChild(input);
         return input;
+    }
+
+    private ensureHudContainer(): HTMLElement {
+        if (!this.hudContainer) {
+            this.hudContainer = document.createElement('div');
+            this.hudContainer.id = 'hud-elements-container';
+            this.hudContainer.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:50;overflow:hidden;';
+            document.body.appendChild(this.hudContainer);
+        }
+        return this.hudContainer;
+    }
+
+    private parseHudPosition(positionJson: string): { x: number; y: number } {
+        try {
+            const pos = JSON.parse(positionJson);
+            return {
+                x: typeof pos.x === 'number' ? pos.x : 0.5,
+                y: typeof pos.y === 'number' ? pos.y : 0.5
+            };
+        } catch {
+            return { x: 0.5, y: 0.5 };
+        }
+    }
+
+    private createHudElement(type: string): HTMLElement {
+        const el = document.createElement('div');
+        el.style.position = 'absolute';
+        el.style.pointerEvents = 'none';
+
+        switch (type) {
+            case 'text': {
+                el.style.cssText += 'color:white;font-size:16px;text-shadow:1px 1px 2px black;white-space:nowrap;';
+                break;
+            }
+            case 'image': {
+                el.style.cssText += 'width:32px;height:32px;background-size:contain;background-repeat:no-repeat;';
+                break;
+            }
+            case 'statbar': {
+                el.style.cssText += 'display:flex;gap:1px;';
+                break;
+            }
+            case 'waypoint': {
+                el.style.cssText += 'color:#00ff00;font-size:14px;text-shadow:1px 1px 2px black;white-space:nowrap;text-align:center;';
+                break;
+            }
+            case 'compass': {
+                el.style.cssText += 'color:white;font-size:20px;text-shadow:1px 1px 2px black;text-align:center;';
+                break;
+            }
+            default: {
+                el.style.cssText += 'color:white;font-size:14px;text-shadow:1px 1px 2px black;';
+                break;
+            }
+        }
+
+        return el;
+    }
+
+    private updateHudElementContent(entry: typeof this.hudElements extends Map<number, infer V> ? V : never): void {
+        const el = entry.element;
+        switch (entry.type) {
+            case 'text': {
+                el.textContent = entry.text;
+                break;
+            }
+            case 'image': {
+                el.style.backgroundImage = `url(${entry.text})`;
+                break;
+            }
+            case 'statbar': {
+                el.innerHTML = '';
+                const count = Math.abs(entry.number);
+                const isEmpty = entry.number < 0;
+                for (let i = 0; i < count; i++) {
+                    const bar = document.createElement('div');
+                    bar.style.cssText = `width:12px;height:12px;background:${isEmpty ? '#333' : '#cc2222'};border:1px solid ${isEmpty ? '#555' : '#ff4444'};`;
+                    if (entry.direction === 'vertical') {
+                        el.style.flexDirection = 'column';
+                    }
+                    el.appendChild(bar);
+                }
+                break;
+            }
+            case 'waypoint': {
+                el.textContent = entry.name;
+                el.style.color = entry.text || '#00ff00';
+                break;
+            }
+            case 'compass': {
+                const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+                const idx = Math.round(entry.number) % 8;
+                el.textContent = dirs[idx < 0 ? idx + 8 : idx];
+                break;
+            }
+        }
+    }
+
+    addHudElement(hudId: number, type: string, positionJson: string, name: string, text: string, number: number, item: string, direction: string, alignment: string, offset: number, worldPos: number): void {
+        if (this.hudElements.has(hudId)) {
+            this.removeHudElement(hudId);
+        }
+
+        const container = this.ensureHudContainer();
+        const el = this.createHudElement(type);
+        const pos = this.parseHudPosition(positionJson);
+
+        const alignX = alignment.includes('right') ? 'right' : alignment.includes('left') ? 'left' : 'center';
+        const alignY = alignment.includes('bottom') ? 'bottom' : alignment.includes('top') ? 'top' : 'center';
+
+        if (alignX === 'right') {
+            el.style.right = `${(1 - pos.x) * 100}%`;
+        } else if (alignX === 'left') {
+            el.style.left = `${pos.x * 100}%`;
+        } else {
+            el.style.left = `${pos.x * 100}%`;
+            el.style.transform += 'translateX(-50%)';
+        }
+
+        if (alignY === 'bottom') {
+            el.style.bottom = `${(1 - pos.y) * 100}%`;
+        } else if (alignY === 'top') {
+            el.style.top = `${pos.y * 100}%`;
+        } else {
+            el.style.top = `${pos.y * 100}%`;
+            el.style.transform += 'translateY(-50%)';
+        }
+
+        if (offset !== 0) {
+            el.style.marginTop = `${offset}px`;
+        }
+
+        const entry = {
+            type,
+            element: el,
+            position: pos,
+            name,
+            text,
+            number,
+            item,
+            direction,
+            alignment,
+            offset,
+            worldPos
+        };
+
+        this.updateHudElementContent(entry as typeof this.hudElements extends Map<number, infer V> ? V : never);
+        container.appendChild(el);
+        this.hudElements.set(hudId, entry as any);
+    }
+
+    removeHudElement(hudId: number): void {
+        const entry = this.hudElements.get(hudId);
+        if (entry) {
+            if (entry.element.parentNode) {
+                entry.element.parentNode.removeChild(entry.element);
+            }
+            this.hudElements.delete(hudId);
+        }
+    }
+
+    changeHudElement(hudId: number, statField: string, value: string): void {
+        const entry = this.hudElements.get(hudId);
+        if (!entry) return;
+
+        switch (statField) {
+            case 'text':
+                entry.text = value;
+                break;
+            case 'number':
+                entry.number = parseInt(value, 10) || 0;
+                break;
+            case 'item':
+                entry.item = value;
+                break;
+            case 'direction':
+                entry.direction = value;
+                break;
+            case 'name':
+                entry.name = value;
+                break;
+            default:
+                return;
+        }
+
+        this.updateHudElementContent(entry as typeof this.hudElements extends Map<number, infer V> ? V : never);
+    }
+
+    clearHudElements(): void {
+        for (const [id] of this.hudElements) {
+            this.removeHudElement(id);
+        }
     }
 }

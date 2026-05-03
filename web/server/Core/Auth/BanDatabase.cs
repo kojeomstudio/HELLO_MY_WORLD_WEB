@@ -11,10 +11,10 @@ public class BanDatabase
     public BanDatabase(string filePath)
     {
         _filePath = filePath;
-        Load();
+        LoadInternal();
     }
 
-    private void Load()
+    private void LoadInternal()
     {
         try
         {
@@ -87,4 +87,11 @@ public class BanDatabase
 
     public bool IsNameBanned(string name) => _bannedNames.Contains(name);
     public bool IsIpBanned(string ip) => _bannedIps.Contains(ip);
+
+    public void Load()
+    {
+        _bannedNames.Clear();
+        _bannedIps.Clear();
+        LoadInternal();
+    }
 }

@@ -8,11 +8,12 @@
         "port": 5266
     },
     "world": {
+        "worldGenerator": "v7",
         "defaultGenerator": "noise",
         "chunkSize": 16,
         "renderDistance": 4,
         "worldSeed": 12345,
-        "generators": ["noise", "flat"],
+        "generators": ["noise", "flat", "v5", "v7", "fractal", "singlenode"],
         "generateTrees": true,
         "generateCaves": true,
         "generateOres": true,
@@ -20,6 +21,21 @@
         "caveDensity": 0.5,
         "oreDensity": 0.3,
         "worldBorderSize": 1000
+    },
+    "mapgenV5": {
+        "fillerDepthNoise": { "seed": 0, "octaves": 3, "persistence": 0.5, "spread": { "x": 150, "y": 150, "z": 150 } },
+        "factorNoise": { "seed": 0, "octaves": 2, "persistence": 0.5, "spread": { "x": 150, "y": 150, "z": 150 } },
+        "groundNoise3D": { "seed": 0, "octaves": 3, "persistence": 0.5, "spread": { "x": 80, "y": 80, "z": 80 } }
+    },
+    "mapgenFractal": {
+        "fractal": 1,
+        "iterations": 256,
+        "scale": 40.0,
+        "offsetX": 0.0,
+        "offsetY": 0.0
+    },
+    "mapgenSinglenode": {
+        "blockName": "air"
     },
     "player": {
         "defaultHealth": 20,
@@ -59,5 +75,7 @@
         "waterFlowInterval": 3,
         "lavaFlowInterval": 5
     },
-    "corsOrigins": ["http://localhost:5173", "http://localhost:3000"]
+    "corsOrigins": ["http://localhost:5173", "http://localhost:3000"],
+    "chatMessageLimitPer10Sec": 8,
+    "itemEntityTTLSeconds": 900
 }

@@ -1,6 +1,7 @@
 using BlockType = WebGameServer.Core.World.BlockType;
 using WorldMap = WebGameServer.Core.World.World;
 using PlayerEnt = WebGameServer.Core.Player.Player;
+using BlockDefMgr = WebGameServer.Core.Game.BlockDefinitionManager;
 
 namespace WebGameServer.Core.Entities;
 
@@ -16,6 +17,11 @@ public enum EntityType
 public class Entity
 {
     public static WorldMap? WorldReference { get; set; }
+    public static BlockDefMgr? BlockDefinitions { get; set; }
+
+    public static Action<Entity>? OnEntitySpawn { get; set; }
+    public static Action<Entity>? OnEntityDespawn { get; set; }
+    public static Action<Entity>? OnEntityStep { get; set; }
 
     public Guid Id { get; } = Guid.NewGuid();
     public EntityType Type { get; }
@@ -39,6 +45,7 @@ public class Entity
     public Entity(EntityType type)
     {
         Type = type;
+        OnEntitySpawn?.Invoke(this);
     }
 
     public void AttachTo(Guid parentId, Vector3 offset, Vector3 rotation)
@@ -71,6 +78,7 @@ public class Entity
     public virtual void Update(float dt)
     {
         LastUpdate = DateTime.UtcNow;
+        OnEntityStep?.Invoke(this);
     }
 }
 
@@ -80,9 +88,11 @@ public class ItemEntity : Entity
     public int Count { get; set; } = 1;
     public string? Metadata { get; set; }
     public DateTime SpawnTime { get; set; } = DateTime.UtcNow;
-    public TimeSpan Lifespan { get; set; } = TimeSpan.FromMinutes(5);
+    public TimeSpan Lifespan { get; set; } = TimeSpan.FromSeconds(DefaultTTLSeconds);
     public const float MergeRadius = 1.0f;
+    public const float CollectionRadius = 1.5f;
     public const int MaxStackSize = 64;
+    public static int DefaultTTLSeconds { get; set; } = 900;
 
     public ItemEntity(string itemId, int count, Vector3 position)
         : base(EntityType.Item)
@@ -137,6 +147,7 @@ public class ItemEntity : Entity
         if (DateTime.UtcNow - SpawnTime > Lifespan)
         {
             Health = 0;
+            OnEntityDespawn?.Invoke(this);
             return;
         }
 
@@ -165,6 +176,64 @@ public class ItemEntity : Entity
             }
         }
 
+        if (WorldReference != null)
+        {
+            var blockX = (short)Math.Floor(newPos.X);
+            var blockY = (short)Math.Floor(newPos.Y);
+            var blockZ = (short)Math.Floor(newPos.Z);
+            var currentBlock = WorldReference.GetBlock(new Vector3s(blockX, blockY, blockZ));
+
+            if (currentBlock != null
+                && currentBlock.Type != BlockType.Air
+                && currentBlock.Type != BlockType.Water
+                && currentBlock.Type != BlockType.Lava)
+            {
+                var bestPos = newPos;
+                var bestDist = float.MaxValue;
+                var offsets = new (short Dx, short Dy, short Dz)[]
+                {
+                    (1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1),
+                    (1, 1, 0), (-1, 1, 0), (0, 1, 1), (0, 1, -1),
+                    (1, -1, 0), (-1, -1, 0), (0, -1, 1), (0, -1, -1),
+                    (1, 0, 1), (-1, 0, 1), (1, 0, -1), (-1, 0, -1)
+                };
+
+                foreach (var (dx, dy, dz) in offsets)
+                {
+                    var checkPos = new Vector3s((short)(blockX + dx), (short)(blockY + dy), (short)(blockZ + dz));
+                    var checkBlock = WorldReference.GetBlock(checkPos);
+                    if (checkBlock != null
+                        && (checkBlock.Type == BlockType.Air
+                        || checkBlock.Type == BlockType.Water
+                        || checkBlock.Type == BlockType.Lava))
+                    {
+                        var candidate = new Vector3(checkPos.X + 0.5f, checkPos.Y + 0.5f, checkPos.Z + 0.5f);
+                        var dist = Vector3.Distance(newPos, candidate);
+                        if (dist < bestDist)
+                        {
+                            bestDist = dist;
+                            bestPos = candidate;
+                        }
+                    }
+                }
+
+                newPos = bestPos;
+                Velocity = Vector3.Zero;
+            }
+
+            var groundY = (short)Math.Floor(newPos.Y - 0.1);
+            var groundBlockDef = BlockDefinitions?.Get((ushort)WorldReference.GetBlock(new Vector3s(
+                (short)Math.Floor(newPos.X), groundY, (short)Math.Floor(newPos.Z))).Type);
+            if (groundBlockDef != null && groundBlockDef.Slippery)
+            {
+                var slipFactor = 0.02f;
+                Velocity = new Vector3(
+                    Velocity.X + (Random.Shared.NextSingle() - 0.5f) * slipFactor,
+                    Velocity.Y,
+                    Velocity.Z + (Random.Shared.NextSingle() - 0.5f) * slipFactor);
+            }
+        }
+
         Position = newPos;
     }
 }
@@ -184,6 +253,10 @@ public class MobEntity : Entity
     public static Action<PlayerEnt, float>? DamagePlayer { get; set; }
     public static Action<MobEntity>? MobDeathDrops { get; set; }
     public static Func<Vector3, Vector3, List<Vector3>?>? FindPath { get; set; }
+
+    public static Action<MobEntity>? OnMobActivate { get; set; }
+    public static Action<MobEntity>? OnMobDeath { get; set; }
+    public static Action<MobEntity>? OnMobDamage { get; set; }
 
     public string MobType { get; set; } = "";
     public float Speed { get; set; } = 2.0f;
@@ -242,6 +315,8 @@ public class MobEntity : Entity
             Nametag = def.Nametag;
             NametagColor = def.NametagColor;
         }
+
+        OnMobActivate?.Invoke(this);
     }
 
     public void Heal(float amount)
@@ -277,6 +352,7 @@ public class MobEntity : Entity
         Health -= Math.Abs(actualDamage);
         _lastHurtTime = DateTime.UtcNow;
         IsHurt = true;
+        OnMobDamage?.Invoke(this);
 
         if (!IsHostile)
         {
@@ -305,6 +381,7 @@ public class MobEntity : Entity
 
         if (Health <= 0)
         {
+            OnMobDeath?.Invoke(this);
             MobDeathDrops?.Invoke(this);
             return;
         }

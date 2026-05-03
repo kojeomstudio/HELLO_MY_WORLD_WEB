@@ -128,6 +128,41 @@ export class FormspecRenderer {
             case 'container':
                 this.renderContainer(element);
                 break;
+            case 'pwdfield':
+                this.renderPwdfield(element);
+                break;
+            case 'table':
+                this.renderTable(element);
+                break;
+            case 'tabheader':
+                this.renderTabheader(element);
+                break;
+            case 'scrollbar':
+                this.renderScrollbar(element);
+                break;
+            case 'tooltip':
+                this.renderTooltip(element);
+                break;
+            case 'background':
+                this.renderBackground(element);
+                break;
+            case 'item_image':
+                this.renderItemImage(element);
+                break;
+            case 'hypertext':
+                this.renderHypertext(element);
+                break;
+            case 'animated_image':
+                this.renderAnimatedImage(element);
+                break;
+            case 'style':
+                this.applyStyle(element);
+                break;
+            case 'listring':
+                break;
+            case 'vertlabel':
+                this.renderVertlabel(element);
+                break;
         }
     }
 
@@ -148,7 +183,10 @@ export class FormspecRenderer {
         const w = Number(element.width || 1) * this.unitSize;
         const h = Number(element.height || 1) * this.unitSize;
         const color = String(element.color || '#333333');
-        div.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px;background:${color};pointer-events:none;`;
+        div.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px;pointer-events:none;`;
+        if (this.isValidCssColor(color)) {
+            div.style.background = color;
+        }
         this.container!.appendChild(div);
     }
 
@@ -363,11 +401,8 @@ export class FormspecRenderer {
 
         img.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px;background:rgba(60,60,60,0.5);border:1px solid rgba(255,255,255,0.1);pointer-events:none;overflow:hidden;`;
 
-        if (texture && !texture.endsWith('.png')) {
-            try {
-                img.style.background = texture;
-            } catch {
-            }
+        if (texture && this.isValidCssColor(texture)) {
+            img.style.background = texture;
         }
 
         this.container!.appendChild(img);
@@ -376,6 +411,372 @@ export class FormspecRenderer {
     private renderContainer(element: FormspecElement): void {
         this.containerOffsetX += Number(element.x || 0) * this.unitSize;
         this.containerOffsetY += Number(element.y || 0) * this.unitSize;
+    }
+
+    private renderPwdfield(element: FormspecElement): void {
+        const wrapper = document.createElement('div');
+        const x = Number(element.x || 0) * this.unitSize;
+        const y = Number(element.y || 0) * this.unitSize;
+        const w = Number(element.width || 1) * this.unitSize;
+        const h = Number(element.height || 1) * this.unitSize;
+        const name = String(element.name || '');
+        const label = String(element.label || '');
+
+        wrapper.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:${w}px;`;
+
+        if (label) {
+            const labelEl = document.createElement('div');
+            labelEl.style.cssText = 'font-size:11px;color:#ccc;margin-bottom:2px;';
+            labelEl.textContent = label;
+            wrapper.appendChild(labelEl);
+        }
+
+        const input = document.createElement('input');
+        input.type = 'password';
+        input.style.cssText = `width:100%;height:${h - (label ? 16 : 0)}px;padding:4px 6px;background:rgba(0,0,0,0.5);border:1px solid #666;border-radius:3px;color:white;font-size:13px;outline:none;box-sizing:border-box;`;
+        input.addEventListener('input', () => {
+            this.fields[name] = input.value;
+        });
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.stopPropagation();
+                this.fields[name] = input.value;
+                this.submitFields();
+            }
+        });
+        wrapper.appendChild(input);
+
+        this.fields[name] = '';
+        this.container!.appendChild(wrapper);
+    }
+
+    private renderTable(element: FormspecElement): void {
+        const wrapper = document.createElement('div');
+        const x = Number(element.x || 0) * this.unitSize;
+        const y = Number(element.y || 0) * this.unitSize;
+        const w = Number(element.width || 1) * this.unitSize;
+        const h = Number(element.height || 1) * this.unitSize;
+        const name = String(element.name || '');
+        const columnsStr = String(element.columns || '');
+        const rowsStr = String(element.rows || '');
+
+        wrapper.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px;overflow:auto;background:rgba(0,0,0,0.3);border:1px solid #555;border-radius:3px;`;
+
+        const table = document.createElement('table');
+        table.style.cssText = 'width:100%;border-collapse:collapse;font-size:12px;';
+
+        const columns = columnsStr.split(',').map(c => c.trim());
+
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        for (const col of columns) {
+            const th = document.createElement('th');
+            th.style.cssText = 'padding:4px 8px;text-align:left;background:rgba(80,80,80,0.8);color:white;border-bottom:1px solid #666;position:sticky;top:0;';
+            th.textContent = col;
+            headerRow.appendChild(th);
+        }
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        const rows = rowsStr.split('|').map(r => r.trim()).filter(r => r.length > 0);
+        const tbody = document.createElement('tbody');
+        for (const rowStr of rows) {
+            const cells = rowStr.split(',').map(c => c.trim());
+            const tr = document.createElement('tr');
+            tr.style.cssText = 'cursor:pointer;';
+            tr.addEventListener('mouseenter', () => {
+                tr.style.background = 'rgba(80,120,180,0.4)';
+            });
+            tr.addEventListener('mouseleave', () => {
+                tr.style.background = 'transparent';
+            });
+            tr.addEventListener('click', () => {
+                this.fields[name] = cells[0] || '';
+            });
+            for (let i = 0; i < columns.length; i++) {
+                const td = document.createElement('td');
+                td.style.cssText = 'padding:3px 8px;color:#ddd;border-bottom:1px solid rgba(100,100,100,0.3);';
+                td.textContent = cells[i] || '';
+                tr.appendChild(td);
+            }
+            tbody.appendChild(tr);
+        }
+        table.appendChild(tbody);
+        wrapper.appendChild(table);
+        this.container!.appendChild(wrapper);
+    }
+
+    private renderTabheader(element: FormspecElement): void {
+        const wrapper = document.createElement('div');
+        const x = Number(element.x || 0) * this.unitSize;
+        const y = Number(element.y || 0) * this.unitSize;
+        const name = String(element.name || '');
+        const tabsStr = String(element.tabs || '');
+        const selectedIdx = Number(element.selected || 0);
+
+        wrapper.style.cssText = `position:absolute;left:${x}px;top:${y}px;display:flex;gap:0;`;
+
+        const tabs = tabsStr.split(',');
+        for (let i = 0; i < tabs.length; i++) {
+            const tab = document.createElement('button');
+            const isActive = i === selectedIdx;
+            tab.style.cssText = `padding:6px 16px;background:${isActive ? 'rgba(80,120,180,0.9)' : 'rgba(50,50,50,0.9)'};color:white;border:1px solid #666;border-bottom:${isActive ? '2px solid #5588cc' : '1px solid #666'};cursor:pointer;font-size:13px;border-radius:3px 3px 0 0;`;
+            tab.textContent = tabs[i].trim();
+            tab.addEventListener('mouseenter', () => {
+                if (!isActive) tab.style.background = 'rgba(70,70,70,0.9)';
+            });
+            tab.addEventListener('mouseleave', () => {
+                if (!isActive) tab.style.background = 'rgba(50,50,50,0.9)';
+            });
+            tab.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.fields[name] = String(i);
+            });
+            wrapper.appendChild(tab);
+        }
+
+        this.fields[name] = String(selectedIdx);
+        this.container!.appendChild(wrapper);
+    }
+
+    private renderScrollbar(element: FormspecElement): void {
+        const wrapper = document.createElement('div');
+        const x = Number(element.x || 0) * this.unitSize;
+        const y = Number(element.y || 0) * this.unitSize;
+        const w = Number(element.width || 1) * this.unitSize;
+        const h = Number(element.height || 1) * this.unitSize;
+        const name = String(element.name || '');
+        const value = Number(element.value || 0);
+        const min = Number(element.min || 0);
+        const max = Number(element.max || 100);
+        const orientation = String(element.orientation || 'vertical');
+        const isVertical = orientation !== 'horizontal';
+
+        const input = document.createElement('input');
+        input.type = 'range';
+        input.min = String(min);
+        input.max = String(max);
+        input.value = String(value);
+
+        if (isVertical) {
+            const size = Math.max(w, h);
+            input.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:${size}px;height:${size}px;transform:rotate(-90deg);transform-origin:top left;accent-color:#5588cc;cursor:pointer;`;
+        } else {
+            input.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px;accent-color:#5588cc;cursor:pointer;`;
+        }
+
+        input.addEventListener('input', () => {
+            this.fields[name] = input.value;
+        });
+
+        this.fields[name] = String(value);
+        wrapper.appendChild(input);
+        this.container!.appendChild(wrapper);
+    }
+
+    private renderTooltip(element: FormspecElement): void {
+        const span = document.createElement('span');
+        const x = Number(element.x || 0) * this.unitSize;
+        const y = Number(element.y || 0) * this.unitSize;
+        const text = String(element.text || '');
+
+        span.style.cssText = `position:absolute;left:${x}px;top:${y}px;cursor:help;border-bottom:1px dotted #aaa;`;
+        span.textContent = '?';
+
+        const tip = document.createElement('span');
+        tip.style.cssText = 'visibility:hidden;position:absolute;bottom:120%;left:50%;transform:translateX(-50%);background:rgba(20,20,20,0.95);color:white;padding:4px 8px;border-radius:3px;font-size:12px;white-space:nowrap;border:1px solid #666;z-index:10;pointer-events:none;';
+        tip.textContent = text;
+
+        span.addEventListener('mouseenter', () => {
+            tip.style.visibility = 'visible';
+        });
+        span.addEventListener('mouseleave', () => {
+            tip.style.visibility = 'hidden';
+        });
+
+        span.appendChild(tip);
+        this.container!.appendChild(span);
+    }
+
+    private renderBackground(element: FormspecElement): void {
+        const div = document.createElement('div');
+        const x = Number(element.x || 0) * this.unitSize;
+        const y = Number(element.y || 0) * this.unitSize;
+        const w = Number(element.width || 1) * this.unitSize;
+        const h = Number(element.height || 1) * this.unitSize;
+        const texture = String(element.texture || '');
+
+        div.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px;pointer-events:none;overflow:hidden;`;
+
+        if (texture && texture.endsWith('.png') && !texture.includes('..') && !texture.includes('/') && /^[a-zA-Z0-9_\-]+\.png$/.test(texture)) {
+            div.style.backgroundImage = `url(${texture})`;
+            div.style.backgroundSize = 'cover';
+            div.style.backgroundPosition = 'center';
+        }
+
+        this.container!.appendChild(div);
+    }
+
+    private renderItemImage(element: FormspecElement): void {
+        const div = document.createElement('div');
+        const x = Number(element.x || 0) * this.unitSize;
+        const y = Number(element.y || 0) * this.unitSize;
+        const w = Number(element.width || 1) * this.unitSize;
+        const h = Number(element.height || 1) * this.unitSize;
+        const itemName = String(element.itemName || '');
+
+        div.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px;background:rgba(60,60,60,0.5);border:1px solid rgba(255,255,255,0.1);pointer-events:none;overflow:hidden;display:flex;align-items:center;justify-content:center;`;
+
+        const label = document.createElement('span');
+        label.style.cssText = 'font-size:9px;color:#aaa;text-align:center;word-break:break-all;padding:2px;';
+        label.textContent = itemName;
+        div.appendChild(label);
+
+        this.container!.appendChild(div);
+    }
+
+    private isValidCssColor(color: string): boolean {
+        if (!color || color.length === 0) return false;
+        if (color === 'transparent') return true;
+        if (color.startsWith('#')) {
+            return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(color);
+        }
+        if (color.startsWith('rgb')) {
+            return /^rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+(\s*,\s*[\d.]+)?\s*\)$/.test(color);
+        }
+        const safeColors = new Set([
+            'red', 'blue', 'green', 'black', 'white', 'gray', 'grey',
+            'yellow', 'orange', 'purple', 'pink', 'brown', 'cyan', 'magenta',
+            'navy', 'teal', 'maroon', 'olive', 'lime', 'aqua', 'silver', 'fuchsia'
+        ]);
+        return safeColors.has(color.toLowerCase());
+    }
+
+    private renderHypertext(element: FormspecElement): void {
+        const div = document.createElement('div');
+        const x = Number(element.x || 0) * this.unitSize;
+        const y = Number(element.y || 0) * this.unitSize;
+        const w = Number(element.width || 1) * this.unitSize;
+        const h = Number(element.height || 1) * this.unitSize;
+        const name = String(element.name || '');
+        const content = String(element.content || '');
+
+        div.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px;overflow:auto;background:rgba(0,0,0,0.3);border:1px solid #555;border-radius:3px;padding:8px;color:#ddd;font-size:13px;line-height:1.4;`;
+
+        const lines = content.split('\n');
+        for (const line of lines) {
+            const boldMatch = line.match(/^<b>(.*)<\/b>$/);
+            const italicMatch = line.match(/^<i>(.*)<\/i>$/);
+            const linkMatch = line.match(/^<a\s+href="([^"]*)">(.*?)<\/a>$/);
+
+            if (boldMatch) {
+                const strong = document.createElement('strong');
+                strong.textContent = boldMatch[1];
+                div.appendChild(strong);
+            } else if (italicMatch) {
+                const em = document.createElement('em');
+                em.textContent = italicMatch[1];
+                div.appendChild(em);
+            } else if (linkMatch) {
+                const link = document.createElement('a');
+                link.href = '#';
+                link.style.cssText = 'color:#5588cc;text-decoration:underline;cursor:pointer;';
+                link.textContent = linkMatch[2];
+                const capturedHref = linkMatch[1];
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.fields[name] = 'action:' + capturedHref;
+                });
+                div.appendChild(link);
+            } else {
+                const span = document.createElement('span');
+                span.textContent = line;
+                div.appendChild(span);
+            }
+            div.appendChild(document.createElement('br'));
+        }
+
+        this.container!.appendChild(div);
+    }
+
+    private renderAnimatedImage(element: FormspecElement): void {
+        const div = document.createElement('div');
+        const x = Number(element.x || 0) * this.unitSize;
+        const y = Number(element.y || 0) * this.unitSize;
+        const w = Number(element.width || 1) * this.unitSize;
+        const h = Number(element.height || 1) * this.unitSize;
+        const name = String(element.name || '');
+        const frameCount = Number(element.frameCount || 1);
+        const frameDuration = Number(element.frameDuration || 100);
+
+        div.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px;pointer-events:none;overflow:hidden;background:rgba(60,60,60,0.5);border:1px solid rgba(255,255,255,0.1);`;
+
+        const frameLabel = document.createElement('span');
+        frameLabel.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;color:#888;';
+        frameLabel.textContent = `[${name}]`;
+        div.appendChild(frameLabel);
+
+        let currentFrame = 0;
+        const interval = setInterval(() => {
+            if (!div.parentNode) {
+                clearInterval(interval);
+                return;
+            }
+            currentFrame = (currentFrame + 1) % frameCount;
+            this.fields[name] = String(currentFrame);
+        }, frameDuration);
+
+        this.container!.appendChild(div);
+    }
+
+    private applyStyle(element: FormspecElement): void {
+        const name = String(element.name || '');
+        const propertiesStr = String(element.properties || '');
+
+        if (!this.container || !name) return;
+
+        const props = propertiesStr.split(',').reduce<Record<string, string>>((acc, prop) => {
+            const parts = prop.split('=');
+            if (parts.length === 2) {
+                acc[parts[0].trim()] = parts[1].trim();
+            }
+            return acc;
+        }, {});
+
+        const elements = this.container.querySelectorAll(`[data-name="${name}"]`);
+        elements.forEach(el => {
+            const htmlEl = el as HTMLElement;
+            for (const [key, value] of Object.entries(props)) {
+                switch (key) {
+                    case 'bgcolor':
+                        htmlEl.style.backgroundColor = value;
+                        break;
+                    case 'fgcolor':
+                        htmlEl.style.color = value;
+                        break;
+                    case 'bordercolor':
+                        htmlEl.style.borderColor = value;
+                        break;
+                    case 'font':
+                        htmlEl.style.fontFamily = value;
+                        break;
+                    case 'fontsize':
+                        htmlEl.style.fontSize = value;
+                        break;
+                }
+            }
+        });
+    }
+
+    private renderVertlabel(element: FormspecElement): void {
+        const span = document.createElement('span');
+        const x = Number(element.x || 0) * this.unitSize;
+        const y = Number(element.y || 0) * this.unitSize;
+        const text = String(element.text || '');
+
+        span.style.cssText = `position:absolute;left:${x}px;top:${y}px;color:white;font-size:13px;writing-mode:vertical-rl;text-orientation:mixed;pointer-events:none;text-shadow:1px 1px 2px rgba(0,0,0,0.8);`;
+        span.textContent = text;
+        this.container!.appendChild(span);
     }
 
     private submitFields(): void {

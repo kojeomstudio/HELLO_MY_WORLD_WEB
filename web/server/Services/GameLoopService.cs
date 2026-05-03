@@ -49,6 +49,7 @@ public class GameLoopService : BackgroundService
     {
         _logger.LogInformation("Game loop service started");
         Entity.WorldReference = _gameServer.DefaultWorld;
+        Entity.BlockDefinitions = _blockDefinitionManager;
         var interval = TimeSpan.FromMilliseconds(1000.0 / _gameServer.TickRate);
         _lastTickTime = DateTime.UtcNow;
 

@@ -67,6 +67,15 @@ public class ChatCommandManager
     private readonly Func<string>? _getWorldName;
     private readonly Func<int>? _getLoadedChunkCount;
     private readonly Func<int>? _getEntityCount;
+    private readonly Action<string>? _setMapGen;
+    private readonly Func<string, bool>? _clearPassword;
+    private readonly Func<string, bool>? _removePlayer;
+    private readonly Action? _reloadAuth;
+    private readonly Func<string, string?>? _getLastLogin;
+    private readonly Func<int, int, int, int, string?>? _rollbackCheck;
+    private readonly Func<int, int, int, int, int, int, int>? _emergeBlocks;
+    private readonly Func<int, int, int, int, int, int, int>? _deleteBlocks;
+    private readonly Func<int, int, int, int, int, int, int>? _fixLight;
 
     public ChatCommandManager(
         Func<long> getGameTime,
@@ -109,7 +118,16 @@ public class ChatCommandManager
         Func<int>? getWorldSeed = null,
         Func<string>? getWorldName = null,
         Func<int>? getLoadedChunkCount = null,
-        Func<int>? getEntityCount = null)
+        Func<int>? getEntityCount = null,
+        Action<string>? setMapGen = null,
+        Func<string, bool>? clearPassword = null,
+        Func<string, bool>? removePlayer = null,
+        Action? reloadAuth = null,
+        Func<string, string?>? getLastLogin = null,
+        Func<int, int, int, int, string?>? rollbackCheck = null,
+        Func<int, int, int, int, int, int, int>? emergeBlocks = null,
+        Func<int, int, int, int, int, int, int>? deleteBlocks = null,
+        Func<int, int, int, int, int, int, int>? fixLight = null)
     {
         _getGameTime = getGameTime;
         _getTps = getTps;
@@ -152,6 +170,15 @@ public class ChatCommandManager
         _getWorldName = getWorldName;
         _getLoadedChunkCount = getLoadedChunkCount;
         _getEntityCount = getEntityCount;
+        _setMapGen = setMapGen;
+        _clearPassword = clearPassword;
+        _removePlayer = removePlayer;
+        _reloadAuth = reloadAuth;
+        _getLastLogin = getLastLogin;
+        _rollbackCheck = rollbackCheck;
+        _emergeBlocks = emergeBlocks;
+        _deleteBlocks = deleteBlocks;
+        _fixLight = fixLight;
         RegisterBuiltInCommands();
     }
 
@@ -399,7 +426,7 @@ public class ChatCommandManager
                 return Task.FromResult($"Spawned {args[0]} at ({x}, {y}, {z})");
             }, "give"));
 
-        Register(new ChatCommand("killall", "Clear all entities", new[] { "clearentities", "pulverize" },
+        Register(new ChatCommand("killall", "Clear all entities", new[] { "clearentities" },
             (_, _) =>
             {
                 if (_clearAllEntities == null) return Task.FromResult("Kill all command is not available.");
@@ -519,7 +546,7 @@ public class ChatCommandManager
                 return Task.FromResult($"Protected areas at ({x},{y},{z}):\n{string.Join("\n", lines)}");
             }));
 
-        Register(new ChatCommand("password", "Set your account password", new[] { "changepassword", "setpassword" },
+        Register(new ChatCommand("password", "Set your account password", new[] { "changepassword" },
             (playerName, args) =>
             {
                 if (_setPassword == null) return Task.FromResult("Password command is not available.");
@@ -894,6 +921,19 @@ public class ChatCommandManager
                 return Task.FromResult($"Rolled back {rolledBack} block changes by {targetPlayer} in the last {seconds}s.");
             }, "rollback"));
 
+        Register(new ChatCommand("setmapgen", "Change the world generator type", new[] { "setgen" },
+            (_playerName, args) =>
+            {
+                if (_setMapGen == null) return Task.FromResult("Set mapgen command is not available.");
+                if (args.Length == 0) return Task.FromResult("Usage: /setmapgen <v7|v5|fractal|singlenode|flat|noise>");
+                var validTypes = new[] { "v7", "v5", "fractal", "singlenode", "flat", "noise" };
+                var genType = args[0].ToLowerInvariant();
+                if (!validTypes.Contains(genType))
+                    return Task.FromResult($"Unknown generator '{genType}'. Valid types: {string.Join(", ", validTypes)}");
+                _setMapGen(genType);
+                return Task.FromResult($"World generator changed to '{genType}'. Only affects newly generated chunks.");
+            }, "server"));
+
         Register(new ChatCommand("rollbacktell", "Rollback block changes in an area within a time window", Array.Empty<string>(),
             (playerName, args) =>
             {
@@ -908,6 +948,135 @@ public class ChatCommandManager
                 var rolledBack = _rollbackArea(x1, y1, z1, x2, y2, z2, seconds);
                 return Task.FromResult($"Rolled back {rolledBack} block changes in ({x1},{y1},{z1})-({x2},{y2},{z2}) in the last {seconds}s.");
             }, "rollback"));
+
+        Register(new ChatCommand("timeoverride", "Override the day/night ratio", Array.Empty<string>(),
+            (playerName, args) =>
+            {
+                if (args.Length == 0)
+                    return Task.FromResult("Usage: /timeoverride <0-1|off>");
+                if (args[0].Equals("off", StringComparison.OrdinalIgnoreCase))
+                    return Task.FromResult("TIME_OVERRIDE:0:false");
+                if (!float.TryParse(args[0], out var ratio))
+                    return Task.FromResult("Invalid ratio. Use a number between 0 and 1, or 'off'.");
+                ratio = Math.Clamp(ratio, 0f, 1f);
+                return Task.FromResult($"TIME_OVERRIDE:{ratio}:true");
+            }, "server"));
+
+        Register(new ChatCommand("setpassword", "Set another player's password", Array.Empty<string>(),
+            (playerName, args) =>
+            {
+                if (_setPassword == null) return Task.FromResult("Password command is not available.");
+                if (args.Length < 2) return Task.FromResult("Usage: /setpassword <player> <new_password>");
+                var targetPlayer = args[0];
+                var newPassword = string.Join(' ', args[1..]);
+                if (newPassword.Length < 8) return Task.FromResult("Password must be at least 8 characters.");
+                if (newPassword.Length > 128) return Task.FromResult("Password must be at most 128 characters.");
+                var success = _setPassword(targetPlayer, newPassword);
+                return Task.FromResult(success
+                    ? $"Password updated for {targetPlayer}."
+                    : $"Failed to update password for {targetPlayer}.");
+            }, "password"));
+
+        Register(new ChatCommand("clearpassword", "Clear a player's password", Array.Empty<string>(),
+            (playerName, args) =>
+            {
+                if (_clearPassword == null) return Task.FromResult("Clear password command is not available.");
+                if (args.Length == 0) return Task.FromResult("Usage: /clearpassword <player>");
+                var success = _clearPassword(args[0]);
+                return Task.FromResult(success
+                    ? $"Password cleared for {args[0]}."
+                    : $"Failed to clear password for {args[0]}.");
+            }, "password"));
+
+        Register(new ChatCommand("remove_player", "Remove a player's account data", new[] { "removeplayer" },
+            (playerName, args) =>
+            {
+                if (_removePlayer == null) return Task.FromResult("Remove player command is not available.");
+                if (args.Length == 0) return Task.FromResult("Usage: /remove_player <player>");
+                var success = _removePlayer(args[0]);
+                return Task.FromResult(success
+                    ? $"Player '{args[0]}' account data removed."
+                    : $"Failed to remove player '{args[0]}'. Player may not exist.");
+            }, "server"));
+
+        Register(new ChatCommand("auth_reload", "Reload authentication data", new[] { "reloadauth" },
+            (_playerName, _args) =>
+            {
+                if (_reloadAuth == null) return Task.FromResult("Auth reload command is not available.");
+                _reloadAuth();
+                return Task.FromResult("Authentication data reloaded.");
+            }, "server"));
+
+        Register(new ChatCommand("last-login", "Show last login time for a player", new[] { "lastlogin" },
+            (playerName, args) =>
+            {
+                if (_getLastLogin == null) return Task.FromResult("Last login command is not available.");
+                if (args.Length == 0) return Task.FromResult("Usage: /last-login <player>");
+                var lastLogin = _getLastLogin(args[0]);
+                if (lastLogin == null) return Task.FromResult($"No login data found for '{args[0]}'.");
+                return Task.FromResult($"Last login for {args[0]}: {lastLogin}");
+            }, "server"));
+
+        Register(new ChatCommand("rollback_check", "Check rollback data for a position", new[] { "rbcheck" },
+            (playerName, args) =>
+            {
+                if (_rollbackCheck == null) return Task.FromResult("Rollback check command is not available.");
+                if (args.Length < 4) return Task.FromResult("Usage: /rollback_check <x> <y> <z> <radius>");
+                if (!int.TryParse(args[0], out var x) || !int.TryParse(args[1], out var y) ||
+                    !int.TryParse(args[2], out var z) || !int.TryParse(args[3], out var radius))
+                    return Task.FromResult("Invalid parameters. Usage: /rollback_check <x> <y> <z> <radius>");
+                if (radius < 1 || radius > 100) return Task.FromResult("Radius must be between 1 and 100.");
+                var result = _rollbackCheck(x, y, z, radius);
+                if (result == null) return Task.FromResult($"No rollback data found at ({x},{y},{z}) within radius {radius}.");
+                return Task.FromResult(result);
+            }, "rollback"));
+
+        Register(new ChatCommand("emergeblocks", "Force-generate chunks in an area", new[] { "emerge" },
+            (playerName, args) =>
+            {
+                if (_emergeBlocks == null) return Task.FromResult("Emerge blocks command is not available.");
+                if (args.Length < 6) return Task.FromResult("Usage: /emergeblocks <x1> <y1> <z1> <x2> <y2> <z2>");
+                if (!int.TryParse(args[0], out var x1) || !int.TryParse(args[1], out var y1) ||
+                    !int.TryParse(args[2], out var z1) || !int.TryParse(args[3], out var x2) ||
+                    !int.TryParse(args[4], out var y2) || !int.TryParse(args[5], out var z2))
+                    return Task.FromResult("Invalid coordinates. Usage: /emergeblocks <x1> <y1> <z1> <x2> <y2> <z2>");
+                var count = _emergeBlocks(x1, y1, z1, x2, y2, z2);
+                return Task.FromResult($"Emerged {count} blocks in ({x1},{y1},{z1})-({x2},{y2},{z2}).");
+            }, "server"));
+
+        Register(new ChatCommand("deleteblocks", "Delete blocks in an area", new[] { "deleteblocks" },
+            (playerName, args) =>
+            {
+                if (_deleteBlocks == null) return Task.FromResult("Delete blocks command is not available.");
+                if (args.Length < 6) return Task.FromResult("Usage: /deleteblocks <x1> <y1> <z1> <x2> <y2> <z2>");
+                if (!int.TryParse(args[0], out var x1) || !int.TryParse(args[1], out var y1) ||
+                    !int.TryParse(args[2], out var z1) || !int.TryParse(args[3], out var x2) ||
+                    !int.TryParse(args[4], out var y2) || !int.TryParse(args[5], out var z2))
+                    return Task.FromResult("Invalid coordinates. Usage: /deleteblocks <x1> <y1> <z1> <x2> <y2> <z2>");
+                var count = _deleteBlocks(x1, y1, z1, x2, y2, z2);
+                return Task.FromResult($"Deleted {count} blocks in ({x1},{y1},{z1})-({x2},{y2},{z2}).");
+            }, "server"));
+
+        Register(new ChatCommand("fixlight", "Fix lighting in an area", new[] { "fixlighting" },
+            (playerName, args) =>
+            {
+                if (_fixLight == null) return Task.FromResult("Fix light command is not available.");
+                if (args.Length < 6) return Task.FromResult("Usage: /fixlight <x1> <y1> <z1> <x2> <y2> <z2>");
+                if (!int.TryParse(args[0], out var x1) || !int.TryParse(args[1], out var y1) ||
+                    !int.TryParse(args[2], out var z1) || !int.TryParse(args[3], out var x2) ||
+                    !int.TryParse(args[4], out var y2) || !int.TryParse(args[5], out var z2))
+                    return Task.FromResult("Invalid coordinates. Usage: /fixlight <x1> <y1> <z1> <x2> <y2> <z2>");
+                var count = _fixLight(x1, y1, z1, x2, y2, z2);
+                return Task.FromResult($"Fixed lighting for {count} nodes in ({x1},{y1},{z1})-({x2},{y2},{z2}).");
+            }, "server"));
+
+        Register(new ChatCommand("pulverize", "Clear all entities", Array.Empty<string>(),
+            (_playerName, _args) =>
+            {
+                if (_clearAllEntities == null) return Task.FromResult("Pulverize command is not available.");
+                _clearAllEntities();
+                return Task.FromResult("All entities have been cleared");
+            }, "interact"));
     }
 
     public void RegisterExternalCommand(ChatCommand command)

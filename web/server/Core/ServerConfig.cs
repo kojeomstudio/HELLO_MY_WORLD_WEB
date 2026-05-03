@@ -13,6 +13,8 @@ public class ServerConfig
     public NetworkSettings Network { get; set; } = new();
     public LiquidSettings Liquid { get; set; } = new();
     public string[] CorsOrigins { get; set; } = ["http://localhost:5173", "http://localhost:3000"];
+    public int ChatMessageLimitPer10Sec { get; set; } = 8;
+    public int ItemEntityTTLSeconds { get; set; } = 900;
 }
 
 public class LiquidSettings

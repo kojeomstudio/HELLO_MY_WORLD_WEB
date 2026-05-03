@@ -48,6 +48,8 @@ if (!Directory.Exists(dataPath))
     dataPath = Path.Combine(Directory.GetCurrentDirectory(), "data");
 serverConfig.Physics.LoadFromFile(dataPath);
 
+ItemEntity.DefaultTTLSeconds = serverConfig.ItemEntityTTLSeconds;
+
 var abmConfigPath = Path.Combine(dataPath, "abm_config.json");
 using var abmConfigDoc = File.Exists(abmConfigPath) ? JsonDocument.Parse(File.ReadAllText(abmConfigPath)) : null;
 var abmModifiers = abmConfigDoc?.RootElement.GetProperty("modifiers");
@@ -696,7 +698,58 @@ builder.Services.AddSingleton<ChatCommandManager>(sp =>
         () => gameServer.DefaultWorld.Seed,
         () => gameServer.DefaultWorld.Name,
         () => gameServer.DefaultWorld.GetLoadedChunks().Count,
-        () => entityManager.Count);
+        () => entityManager.Count,
+        null,
+        (playerName) => {
+            try
+            {
+                var playerDb = sp.GetRequiredService<PlayerDatabase>();
+                playerDb.SetPasswordHash(playerName, string.Empty);
+                return true;
+            }
+            catch { return false; }
+        },
+        (playerName) => {
+            try
+            {
+                var playerDb = sp.GetRequiredService<PlayerDatabase>();
+                return playerDb.RemovePlayer(playerName);
+            }
+            catch { return false; }
+        },
+        () => {
+            try
+            {
+                var authService = sp.GetRequiredService<AuthenticationService>();
+                authService.ReloadAuth();
+            }
+            catch { }
+        },
+        (playerName) => {
+            try
+            {
+                var playerDb = sp.GetRequiredService<PlayerDatabase>();
+                return playerDb.GetLastLogin(playerName);
+            }
+            catch { return null; }
+        },
+        (x, y, z, radius) => {
+            var rollback = sp.GetRequiredService<RollbackSystem>();
+            return rollback.CheckPosition(x, y, z, radius);
+        },
+        (x1, y1, z1, x2, y2, z2) => {
+            var emergeMgr = sp.GetRequiredService<EmergeManager>();
+            return emergeMgr.EmergeArea(x1, y1, z1, x2, y2, z2);
+        },
+        (x1, y1, z1, x2, y2, z2) => {
+            gameServer.DeleteBlocks(x1, y1, z1, x2, y2, z2);
+            return 0;
+        },
+        (x1, y1, z1, x2, y2, z2) => {
+            var world = gameServer.DefaultWorld;
+            world.FixLighting(x1, y1, z1, x2, y2, z2);
+            return 0;
+        });
 });
 builder.Services.AddSingleton<CraftingSystem>(sp =>
 {

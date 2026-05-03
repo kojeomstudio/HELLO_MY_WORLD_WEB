@@ -8,6 +8,17 @@ public static class ToolConfig
 {
     public static readonly Dictionary<string, ToolMaterial> Materials = new();
     public static readonly Dictionary<string, int> WeaponDamage = new();
+    public static readonly Dictionary<string, string> WearBarColors = new()
+    {
+        ["wood"] = "#8B4513",
+        ["stone"] = "#808080",
+        ["iron"] = "#C0C0C0",
+        ["gold"] = "#FFD700",
+        ["diamond"] = "#00FFFF",
+        ["steel"] = "#A0A0A0",
+        ["mese"] = "#50FF50",
+        ["titanium"] = "#B0B0FF"
+    };
 
     public static void LoadFromFile(string filePath)
     {
@@ -105,4 +116,17 @@ public static class ToolConfig
 
     public static int GetWeaponDamage(string itemName) =>
         WeaponDamage.GetValueOrDefault(itemName.ToLowerInvariant(), 1);
+
+    public static string GetWearBarColor(string itemName)
+    {
+        var lower = itemName.ToLowerInvariant();
+        foreach (var (prefix, color) in WearBarColors)
+        {
+            if (lower.StartsWith(prefix + "_"))
+            {
+                return color;
+            }
+        }
+        return "#FFFFFF";
+    }
 }

@@ -180,6 +180,34 @@ public class PlayerDatabase
         return GetPasswordHash(playerName) != null;
     }
 
+    public bool RemovePlayer(string playerName)
+    {
+        try
+        {
+            using var connection = new SqliteConnection(_connectionString);
+            connection.Open();
+            var cmd = connection.CreateCommand();
+            cmd.CommandText = "DELETE FROM players WHERE name = $name";
+            cmd.Parameters.AddWithValue("$name", playerName);
+            return cmd.ExecuteNonQuery() > 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public string? GetLastLogin(string playerName)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT last_login FROM players WHERE name = $name";
+        cmd.Parameters.AddWithValue("$name", playerName);
+        var result = cmd.ExecuteScalar();
+        return result == null || result == DBNull.Value ? null : (string?)result;
+    }
+
     private static string SerializeInventory(Inventory inventory)
     {
         var items = inventory.GetAll().Select(i => i == null ? null : new { i.ItemId, i.Count, i.Metadata }).ToArray();

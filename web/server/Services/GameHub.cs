@@ -70,6 +70,11 @@ public interface IGameClient
     Task OnPlayerFlags(string playerName, bool isInvisible, bool makesFootstepSound, bool canZoom);
     Task OnItemColorUpdate(string itemId, string color);
     Task OnShowFormspec(string formName, string elementsJson);
+    Task OnOverrideDayNightRatio(float ratio, bool enable);
+    Task OnHudAdd(int hudId, string type, string positionJson, string name, string text, int number, string item, string direction, string alignment, float offset, float worldPos);
+    Task OnHudRemove(int hudId);
+    Task OnHudChange(int hudId, string statField, string value);
+    Task OnHudClear();
 }
 
 public class GameHub : Hub<IGameClient>
@@ -78,6 +83,7 @@ public class GameHub : Hub<IGameClient>
     private static readonly ConcurrentDictionary<string, (DateTime StartTime, float RequiredTime)> _activeDigs = new();
     private static readonly ConcurrentDictionary<string, int> _joinAttempts = new();
     private static readonly ConcurrentDictionary<string, (int FailCount, DateTime LockoutEnd)> _accountFailures = new();
+    private static readonly ConcurrentDictionary<string, Queue<DateTime>> _chatTimestamps = new();
 
     private readonly GameServer _gameServer;
     private readonly ILogger<GameHub> _logger;
@@ -352,6 +358,8 @@ public class GameHub : Hub<IGameClient>
 
         if (string.IsNullOrEmpty(message) || message.Length > 256) return;
 
+        if (!CheckChatRateLimit(Context.ConnectionId)) return;
+
         message = SanitizeChatMessage(message);
 
         if (!string.IsNullOrEmpty(message) && message[0] == '/')
@@ -493,6 +501,20 @@ public class GameHub : Hub<IGameClient>
                     player.ItemColors.Remove(itemId);
                     await Clients.Caller.OnItemColorUpdate(itemId, "");
                     await Clients.Caller.OnChatMessage("Server", $"Color removed from {itemId}", "system");
+                }
+                else if (result.StartsWith("TIME_OVERRIDE:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var parts = result.Substring(13).Split(':');
+                    if (parts.Length == 2 &&
+                        float.TryParse(parts[0], out var ratio) &&
+                        bool.TryParse(parts[1], out var enable))
+                    {
+                        await Clients.All.OnOverrideDayNightRatio(ratio, enable);
+                        var msg = enable
+                            ? $"Day/night ratio overridden to {ratio:F2}"
+                            : "Day/night ratio override disabled";
+                        await Clients.Caller.OnChatMessage("Server", msg, "system");
+                    }
                 }
                 else if (result.StartsWith("FLAG_UPDATE:", StringComparison.OrdinalIgnoreCase))
                 {
@@ -786,15 +808,22 @@ public class GameHub : Hub<IGameClient>
             return;
         }
 
-        var dropName = blockDef?.Drops ?? blockDef?.Name ?? oldBlock.Type.ToString().ToLowerInvariant();
-        var itemEntity = new ItemEntity(dropName, 1, new Vector3(x + 0.5f, y + 0.5f, z + 0.5f));
-        _entityManager.Add(itemEntity);
-
         var heldItem = player.GetSelectedHotbarItem();
+        var toolName = heldItem?.ItemId.ToLowerInvariant();
+
+        var drops = blockDef?.GetDrops(toolName) ?? Array.Empty<(string, int)>();
+        if (drops.Length > 0 && !string.IsNullOrEmpty(drops[0].itemId))
+        {
+            foreach (var (itemId, count) in drops)
+            {
+                var itemEntity = new ItemEntity(itemId, count, new Vector3(x + 0.5f, y + 0.5f, z + 0.5f));
+                _entityManager.Add(itemEntity);
+            }
+        }
+
         if (heldItem != null)
         {
-            var toolName = heldItem.ItemId.ToLowerInvariant();
-            var isTool = toolName.Contains("sword") || toolName.Contains("pickaxe") ||
+            var isTool = toolName!.Contains("sword") || toolName.Contains("pickaxe") ||
                 toolName.Contains("axe") || toolName.Contains("shovel") || toolName.Contains("hoe") ||
                 toolName.Contains("shears") || toolName.Contains("dagger");
 
@@ -1233,7 +1262,7 @@ public class GameHub : Hub<IGameClient>
                 var posKey = GameServer.PositionKey(x, y, z);
                 var chestInv = _gameServer.GetOrCreateChestInventory(posKey);
                 var items = chestInv
-                    .Select(i => i == null ? null : (object)new { itemId = i.ItemId, count = i.Count, metadata = i.Metadata })
+                    .Select(i => i == null ? null : (object)new { itemId = i.ItemId, count = i.Count, metadata = i.Metadata, maxPut = 99, maxTake = 99 })
                     .ToArray();
                 await Clients.Caller.OnChestInventory(items!);
             }
@@ -1245,7 +1274,9 @@ public class GameHub : Hub<IGameClient>
                     input = r.InputItemId,
                     result = r.ResultItemId,
                     cookTime = r.CookTime,
-                    experience = r.Experience
+                    experience = r.Experience,
+                    maxPut = 1,
+                    maxTake = 1
                 }).ToArray();
                 await Clients.Caller.OnSmeltingRecipes(recipeDtos!);
 
@@ -1790,7 +1821,7 @@ public class GameHub : Hub<IGameClient>
         var posKey = GameServer.PositionKey(x, y, z);
         var chestInv = _gameServer.GetOrCreateChestInventory(posKey);
         var items = chestInv
-            .Select(i => i == null ? null : (object)new { itemId = i.ItemId, count = i.Count, metadata = i.Metadata })
+            .Select(i => i == null ? null : (object)new { itemId = i.ItemId, count = i.Count, metadata = i.Metadata, maxPut = 99, maxTake = 99 })
             .ToArray();
         await Clients.Caller.OnChestInventory(items!);
     }
@@ -2135,6 +2166,84 @@ public class GameHub : Hub<IGameClient>
         return true;
     }
 
+    private static bool CheckChatRateLimit(string connectionId)
+    {
+        var now = DateTime.UtcNow;
+        var window = TimeSpan.FromSeconds(10);
+
+        var timestamps = _chatTimestamps.GetOrAdd(connectionId, _ => new Queue<DateTime>());
+
+        lock (timestamps)
+        {
+            while (timestamps.Count > 0 && now - timestamps.Peek() > window)
+            {
+                timestamps.Dequeue();
+            }
+
+            if (timestamps.Count >= 8)
+            {
+                return false;
+            }
+
+            timestamps.Enqueue(now);
+        }
+
+        return true;
+    }
+
+    public async Task OverrideDayNightRatio(float ratio, bool enable)
+    {
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
+
+        if (!_gameServer.Privileges.HasPrivilege(player.Name, "server")) return;
+
+        await Clients.All.OnOverrideDayNightRatio(ratio, enable);
+    }
+
+    public async Task AddHud(int hudId, string type, string positionJson, string name, string text, int number, string item, string direction, string alignment, float offset, float worldPos)
+    {
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
+
+        if (!_gameServer.Privileges.HasPrivilege(player.Name, "server")) return;
+
+        await Clients.All.OnHudAdd(hudId, type, positionJson, name, text, number, item, direction, alignment, offset, worldPos);
+    }
+
+    public async Task RemoveHud(int hudId)
+    {
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
+
+        if (!_gameServer.Privileges.HasPrivilege(player.Name, "server")) return;
+
+        await Clients.All.OnHudRemove(hudId);
+    }
+
+    public async Task ChangeHud(int hudId, string stat, string value)
+    {
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
+
+        if (string.IsNullOrEmpty(stat) || stat.Length > 64) return;
+        if (value == null || value.Length > 256) return;
+
+        if (!_gameServer.Privileges.HasPrivilege(player.Name, "server")) return;
+
+        await Clients.All.OnHudChange(hudId, stat, value);
+    }
+
+    public async Task ClearHud()
+    {
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
+
+        if (!_gameServer.Privileges.HasPrivilege(player.Name, "server")) return;
+
+        await Clients.All.OnHudClear();
+    }
+
     private static bool IsValidBlockCoord(int x, int y, int z)
     {
         return x >= short.MinValue && x <= short.MaxValue &&
@@ -2442,7 +2551,9 @@ public class GameHub : Hub<IGameClient>
         if (!CheckRateLimit(Context.ConnectionId, "modstorage", 200)) return null;
         var player = GetAuthenticatedPlayer();
         if (player == null) return null;
+        if (!_gameServer.Privileges.HasPrivilege(player.Name, "server") && !_gameServer.Privileges.HasPrivilege(player.Name, "interact")) return null;
         if (string.IsNullOrEmpty(modName) || modName.Length > 64) return null;
+        if (!IsValidModStorageName(modName)) return null;
         if (string.IsNullOrEmpty(key) || key.Length > 256) return null;
         return _modStorage.Get(modName, key);
     }
@@ -2452,7 +2563,9 @@ public class GameHub : Hub<IGameClient>
         if (!CheckRateLimit(Context.ConnectionId, "modstorage", 100)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
+        if (!_gameServer.Privileges.HasPrivilege(player.Name, "server")) return;
         if (string.IsNullOrEmpty(modName) || modName.Length > 64) return;
+        if (!IsValidModStorageName(modName)) return;
         if (string.IsNullOrEmpty(key) || key.Length > 256) return;
         if (value == null || value.Length > 4096) return;
         _modStorage.Set(modName, key, value);
@@ -2464,7 +2577,9 @@ public class GameHub : Hub<IGameClient>
         if (!CheckRateLimit(Context.ConnectionId, "modstorage", 100)) return false;
         var player = GetAuthenticatedPlayer();
         if (player == null) return false;
+        if (!_gameServer.Privileges.HasPrivilege(player.Name, "server")) return false;
         if (string.IsNullOrEmpty(modName) || modName.Length > 64) return false;
+        if (!IsValidModStorageName(modName)) return false;
         if (string.IsNullOrEmpty(key) || key.Length > 256) return false;
         var result = _modStorage.Remove(modName, key);
         if (result) _modStorage.Save();
@@ -2476,7 +2591,20 @@ public class GameHub : Hub<IGameClient>
         if (!CheckRateLimit(Context.ConnectionId, "modstorage", 100)) return null;
         var player = GetAuthenticatedPlayer();
         if (player == null) return null;
+        if (!_gameServer.Privileges.HasPrivilege(player.Name, "server")) return null;
         if (string.IsNullOrEmpty(modName) || modName.Length > 64) return null;
+        if (!IsValidModStorageName(modName)) return null;
         return _modStorage.GetModEntries(modName);
+    }
+
+    private static bool IsValidModStorageName(string modName)
+    {
+        if (string.IsNullOrEmpty(modName)) return false;
+        foreach (var c in modName)
+        {
+            if (!char.IsLetterOrDigit(c) && c != '_' && c != '-')
+                return false;
+        }
+        return true;
     }
 }

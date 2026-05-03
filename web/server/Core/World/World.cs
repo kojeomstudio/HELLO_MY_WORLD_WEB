@@ -456,4 +456,140 @@ public class World
 
         return results;
     }
+
+    public List<(Vector3s From, Vector3s To, BlockType Type)> CheckForFallingCascade(Vector3s pos, BlockDefinitionManager blockDefs)
+    {
+        var results = new List<(Vector3s From, Vector3s To, BlockType Type)>();
+        var visited = new HashSet<(short X, short Y, short Z)>();
+        var stack = new Stack<Vector3s>();
+        stack.Push(pos);
+
+        while (stack.Count > 0)
+        {
+            var current = stack.Pop();
+            if (!visited.Add((current.X, current.Y, current.Z)))
+                continue;
+
+            var block = GetBlock(current);
+            var blockData = (ushort)block.Type;
+            if (blockData == 0) continue;
+
+            var def = blockDefs.Get(blockData);
+            if (def == null) continue;
+
+            bool shouldFall = false;
+
+            if (def.Falling)
+            {
+                var belowPos = new Vector3s(current.X, (short)(current.Y - 1), current.Z);
+                var belowBlock = GetBlock(belowPos);
+                var belowData = (ushort)belowBlock.Type;
+
+                if (belowData == 0)
+                {
+                    shouldFall = true;
+                    results.Add((current, belowPos, block.Type));
+                }
+                else
+                {
+                    var belowDef = blockDefs.Get(belowData);
+                    if (belowDef != null && belowDef.Liquid)
+                    {
+                        shouldFall = true;
+                        results.Add((current, belowPos, block.Type));
+                    }
+                }
+            }
+
+            if (def.AttachedNode)
+            {
+                var belowPos = new Vector3s(current.X, (short)(current.Y - 1), current.Z);
+                var belowBlock = GetBlock(belowPos);
+                var belowData = (ushort)belowBlock.Type;
+
+                if (belowData == 0)
+                {
+                    var dropName = def.Drops ?? def.Name;
+                    results.Add((current, current, BlockType.Air));
+                    continue;
+                }
+                else
+                {
+                    var belowDef = blockDefs.Get(belowData);
+                    if (belowDef == null || !belowDef.Solid)
+                    {
+                        results.Add((current, current, BlockType.Air));
+                        continue;
+                    }
+                }
+            }
+
+            if (shouldFall)
+            {
+                var neighbors = new (short dx, short dy, short dz)[]
+                {
+                    (1, 0, 0), (-1, 0, 0), (0, 0, 1), (0, 0, -1), (0, 1, 0)
+                };
+
+                foreach (var (dx, dy, dz) in neighbors)
+                {
+                    var neighborPos = new Vector3s((short)(current.X + dx), (short)(current.Y + dy), (short)(current.Z + dz));
+                    if (!visited.Contains((neighborPos.X, neighborPos.Y, neighborPos.Z)))
+                    {
+                        stack.Push(neighborPos);
+                    }
+                }
+            }
+        }
+
+        return results;
+    }
+
+    public void FixLighting(int x1, int y1, int z1, int x2, int y2, int z2)
+    {
+        var minX = Math.Min(x1, x2);
+        var maxX = Math.Max(x1, x2);
+        var minY = Math.Min(y1, y2);
+        var maxY = Math.Max(y1, y2);
+        var minZ = Math.Min(z1, z2);
+        var maxZ = Math.Max(z1, z2);
+
+        for (int x = minX; x <= maxX; x++)
+        {
+            for (int z = minZ; z <= maxZ; z++)
+            {
+                for (int y = maxY; y >= minY; y--)
+                {
+                    var pos = new Vector3s((short)x, (short)y, (short)z);
+                    var block = GetBlock(pos);
+                    var def = _blockDefs?.Get((ushort)block.Type);
+
+                    byte sunLight = 15;
+                    byte artLight = (byte)(def?.Light ?? 0);
+
+                    if (def != null && def.Solid && !def.Transparent)
+                    {
+                        sunLight = 0;
+                    }
+                    else
+                    {
+                        var abovePos = new Vector3s((short)x, (short)(y + 1), (short)z);
+                        var aboveBlock = GetBlock(abovePos);
+                        if (y < maxY)
+                        {
+                            sunLight = Math.Max((byte)(aboveBlock.Light >> 4), (byte)(sunLight > 0 ? sunLight - 1 : 0));
+                        }
+                    }
+
+                    var newBlock = new Block(block.Type)
+                    {
+                        Param1 = block.Param1,
+                        Param2 = block.Param2,
+                        Light = (byte)((sunLight << 4) | artLight)
+                    };
+                    SetBlock(pos, newBlock);
+                }
+            }
+        }
+    }
 }

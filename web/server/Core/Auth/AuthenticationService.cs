@@ -125,4 +125,9 @@ public class AuthenticationService
 
     public bool IsBanned(string name) => _bannedNames.Contains(name) || (_banDatabase?.IsNameBanned(name) ?? false);
     public bool IsIpBanned(string ip) => _bannedIps.Contains(ip) || (_banDatabase?.IsIpBanned(ip) ?? false);
+
+    public void ReloadAuth()
+    {
+        _banDatabase?.Load();
+    }
 }

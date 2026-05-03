@@ -11,6 +11,10 @@ public class WorldGeneratorFactory
     {
         Register("flat", () => new FlatWorldGenerator());
         Register("noise", () => new NoiseWorldGenerator());
+        Register("v5", () => new MapgenV5());
+        Register("v7", () => new NoiseWorldGenerator());
+        Register("fractal", () => new MapgenFractal());
+        Register("singlenode", () => new MapgenSinglenode());
     }
 
     public void Register(string name, Func<IWorldGenerator> factory)

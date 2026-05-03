@@ -146,4 +146,27 @@ public class RollbackSystem
             .Take(count)
             .ToList();
     }
+
+    public string? CheckPosition(int x, int y, int z, int radius)
+    {
+        var changes = _changes
+            .Where(r =>
+            {
+                var dx = r.X - x;
+                var dy = r.Y - y;
+                var dz = r.Z - z;
+                return dx * dx + dy * dy + dz * dz <= radius * radius;
+            })
+            .OrderByDescending(r => r.Timestamp)
+            .Take(20)
+            .ToList();
+
+        if (changes.Count == 0)
+            return "No changes found in radius.";
+
+        var lines = changes.Select(r =>
+            $"[{r.Timestamp:yyyy-MM-dd HH:mm:ss}] {r.PlayerName}: {r.ChangeType} at ({r.X},{r.Y},{r.Z})");
+
+        return string.Join("\n", lines);
+    }
 }

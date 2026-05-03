@@ -109,6 +109,7 @@ export class Renderer {
     private waterOverlayEl: HTMLElement;
     private damageFlashIntensity: number = 0;
     private currentBrightness: number = 1;
+    private skyBrightnessOverride: number | null = null;
     private isRaining: boolean = false;
     private playerLight: THREE.PointLight;
     private normalFogNear: number = 80;
@@ -392,6 +393,10 @@ export class Renderer {
         this.gameTime = time;
         this.currentBrightness = brightness;
 
+        if (this.skyBrightnessOverride !== null) {
+            brightness = this.skyBrightnessOverride;
+        }
+
         if (this.isUnderwater) {
             const waterColor = new THREE.Color(0x1a3a6a);
             this.fog.near = this.underwaterFogNear;
@@ -525,6 +530,13 @@ export class Renderer {
 
     updateSkyBrightness(brightness: number): void {
         this.updateSky(this.gameTime, brightness);
+    }
+
+    setSkyBrightnessOverride(ratio: number | null): void {
+        this.skyBrightnessOverride = ratio;
+        if (ratio !== null) {
+            this.updateSky(this.gameTime, ratio);
+        }
     }
 
     updateSkyParams(params: { sunColor?: string; moonColor?: string; starsCount?: number; fogColor?: string; reset?: boolean }): void {
