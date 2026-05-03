@@ -57,34 +57,64 @@ public class PhysicsEngine
 
             newState.Velocity = new Vector3(moveDir.X, 0, moveDir.Z);
 
-            if (input.Jump) newState.Velocity = new Vector3(newState.Velocity.X, ClimbSpeed, newState.Velocity.Z);
+            var ladderDef = BlockDefs?.Get((ushort)BlockType.Ladder);
+            var noJumpOnLadder = ladderDef != null && ladderDef.NoJump;
+
+            if (input.Jump && !noJumpOnLadder) newState.Velocity = new Vector3(newState.Velocity.X, ClimbSpeed, newState.Velocity.Z);
             else if (input.Sneak) newState.Velocity = new Vector3(newState.Velocity.X, -ClimbSpeed, newState.Velocity.Z);
         }
         else if (inLiquid)
         {
-            var speed = WalkSpeed * 0.5f;
+            var liquidBlock = GetLiquidBlock(state.Position, world);
+            var liquidDef = liquidBlock.HasValue ? BlockDefs?.Get((ushort)liquidBlock.Value) : null;
+            var noSwim = liquidDef != null && liquidDef.LiquidNoSwim;
 
-            var moveDir = new Vector3(0, 0, 0);
-            if (input.Forward) moveDir += new Vector3(-MathF.Sin(state.Yaw), 0, -MathF.Cos(state.Yaw));
-            if (input.Backward) moveDir += new Vector3(MathF.Sin(state.Yaw), 0, MathF.Cos(state.Yaw));
-            if (input.Left) moveDir += new Vector3(-MathF.Cos(state.Yaw), 0, MathF.Sin(state.Yaw));
-            if (input.Right) moveDir += new Vector3(MathF.Cos(state.Yaw), 0, -MathF.Sin(state.Yaw));
-
-            if (moveDir.Length > 0)
+            if (noSwim)
             {
-                moveDir = moveDir.Normalized * speed;
+                var speed = WalkSpeed;
+                var moveDir = new Vector3(0, 0, 0);
+                if (input.Forward) moveDir += new Vector3(-MathF.Sin(state.Yaw), 0, -MathF.Cos(state.Yaw));
+                if (input.Backward) moveDir += new Vector3(MathF.Sin(state.Yaw), 0, MathF.Cos(state.Yaw));
+                if (input.Left) moveDir += new Vector3(-MathF.Cos(state.Yaw), 0, MathF.Sin(state.Yaw));
+                if (input.Right) moveDir += new Vector3(MathF.Cos(state.Yaw), 0, -MathF.Sin(state.Yaw));
+                if (moveDir.Length > 0) moveDir = moveDir.Normalized * speed;
+
+                newState.Velocity = new Vector3(
+                    state.Velocity.X * (1 - LiquidDrag * dt) + moveDir.X,
+                    state.Velocity.Y * (1 - LiquidDrag * dt) - Gravity * dt,
+                    state.Velocity.Z * (1 - LiquidDrag * dt) + moveDir.Z);
+
+                if (newState.Velocity.Y < -TerminalVelocity * 0.2f)
+                {
+                    newState.Velocity = new Vector3(newState.Velocity.X, -TerminalVelocity * 0.2f, newState.Velocity.Z);
+                }
             }
-
-            newState.Velocity = new Vector3(
-                state.Velocity.X * (1 - LiquidDrag * dt) + moveDir.X,
-                state.Velocity.Y * (1 - LiquidDrag * dt) - Gravity * dt * 0.2f,
-                state.Velocity.Z * (1 - LiquidDrag * dt) + moveDir.Z);
-
-            if (input.Jump) newState.Velocity = new Vector3(newState.Velocity.X, ClimbSpeed * 0.5f, newState.Velocity.Z);
-
-            if (newState.Velocity.Y < -TerminalVelocity * 0.2f)
+            else
             {
-                newState.Velocity = new Vector3(newState.Velocity.X, -TerminalVelocity * 0.2f, newState.Velocity.Z);
+                var speed = WalkSpeed * 0.5f;
+
+                var moveDir = new Vector3(0, 0, 0);
+                if (input.Forward) moveDir += new Vector3(-MathF.Sin(state.Yaw), 0, -MathF.Cos(state.Yaw));
+                if (input.Backward) moveDir += new Vector3(MathF.Sin(state.Yaw), 0, MathF.Cos(state.Yaw));
+                if (input.Left) moveDir += new Vector3(-MathF.Cos(state.Yaw), 0, MathF.Sin(state.Yaw));
+                if (input.Right) moveDir += new Vector3(MathF.Cos(state.Yaw), 0, -MathF.Sin(state.Yaw));
+
+                if (moveDir.Length > 0)
+                {
+                    moveDir = moveDir.Normalized * speed;
+                }
+
+                newState.Velocity = new Vector3(
+                    state.Velocity.X * (1 - LiquidDrag * dt) + moveDir.X,
+                    state.Velocity.Y * (1 - LiquidDrag * dt) - Gravity * dt * 0.2f,
+                    state.Velocity.Z * (1 - LiquidDrag * dt) + moveDir.Z);
+
+                if (input.Jump) newState.Velocity = new Vector3(newState.Velocity.X, ClimbSpeed * 0.5f, newState.Velocity.Z);
+
+                if (newState.Velocity.Y < -TerminalVelocity * 0.2f)
+                {
+                    newState.Velocity = new Vector3(newState.Velocity.X, -TerminalVelocity * 0.2f, newState.Velocity.Z);
+                }
             }
         }
         else
@@ -104,7 +134,14 @@ public class PhysicsEngine
 
             newState.Velocity = new Vector3(moveDir.X, state.Velocity.Y, moveDir.Z);
 
-            if (state.IsOnGround && input.Jump)
+            var groundBlockForJump = GetBlockAt(
+                (int)Math.Floor(newState.Position.X),
+                (int)Math.Floor(newState.Position.Z),
+                (int)Math.Floor(newState.Position.Y - PlayerHeight - 0.1), world);
+            var groundJumpDef = BlockDefs?.Get((ushort)groundBlockForJump);
+            var noJump = groundJumpDef != null && groundJumpDef.NoJump;
+
+            if (state.IsOnGround && input.Jump && !noJump)
             {
                 newState.Velocity = new Vector3(newState.Velocity.X, JumpForce, newState.Velocity.Z);
                 newState.IsOnGround = false;
@@ -146,6 +183,8 @@ public class PhysicsEngine
                 if (fallDistance > 3.0f)
                 {
                     var fallDamage = fallDistance - 3.0f;
+                    var fallDamagePercent = groundBlockDef?.FallDamageAddPercent ?? 0;
+                    fallDamage *= (1.0f + fallDamagePercent / 100.0f);
                     newState = newState with { Health = Math.Max(0, newState.Health - fallDamage) };
                 }
             }
@@ -181,6 +220,13 @@ public class PhysicsEngine
         var feetBlockY = (short)Math.Floor(position.Y - PlayerHeight * 0.5);
         var block = world.GetBlock(new Vector3s((short)position.X, (short)feetBlockY, (short)position.Z));
         return IsLiquid(block.Type);
+    }
+
+    private BlockType? GetLiquidBlock(Vector3 position, WorldMap world)
+    {
+        var feetBlockY = (short)Math.Floor(position.Y - PlayerHeight * 0.5);
+        var block = world.GetBlock(new Vector3s((short)position.X, (short)feetBlockY, (short)position.Z));
+        return IsLiquid(block.Type) ? block.Type : null;
     }
 
     private bool IsClimbable(Vector3 position, WorldMap world)

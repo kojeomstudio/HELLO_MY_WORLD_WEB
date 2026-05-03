@@ -67,6 +67,14 @@ public class BlockDefinitionManager
                 def.SoundGroup = soundsEl.GetString() ?? "default";
             }
 
+            def.NoJump = el.TryGetProperty("noJump", out var nj) && nj.GetBoolean();
+            def.LiquidNoSwim = el.TryGetProperty("liquidNoSwim", out var lns) && lns.GetBoolean();
+            def.BuildableTo = el.TryGetProperty("buildableTo", out var bt) && bt.GetBoolean();
+            def.AttachedNode = el.TryGetProperty("attachedNode", out var an) && an.GetBoolean();
+            def.FallDamageAddPercent = el.TryGetProperty("fallDamageAddPercent", out var fdap) ? fdap.GetInt32() : 0;
+            def.Waving = el.TryGetProperty("waving", out var wv) ? wv.GetInt32() : 0;
+            def.DamageGroup = el.TryGetProperty("damageGroup", out var dg) ? dg.GetString() ?? "fleshy" : "fleshy";
+
             _definitions[id] = def;
         }
     }
@@ -79,10 +87,10 @@ public class BlockDefinitionManager
             [(ushort)BlockType.Stone] = new() { Id = 1, Name = "stone", Solid = true, Color = "#808080", Hardness = 1.5f, Drops = "cobblestone", Groups = new() { ["cracky"] = 3 }, SoundGroup = "stone" },
             [(ushort)BlockType.Dirt] = new() { Id = 2, Name = "dirt", Solid = true, Color = "#8B4513", Hardness = 0.5f, Groups = new() { ["crumbly"] = 3 }, SoundGroup = "dirt" },
             [(ushort)BlockType.Grass] = new() { Id = 3, Name = "grass", Solid = true, Color = "#228B22", Hardness = 0.6f, Drops = "dirt", Groups = new() { ["crumbly"] = 3 }, SoundGroup = "grass" },
-            [(ushort)BlockType.Water] = new() { Id = 4, Name = "water", Solid = false, Transparent = true, Color = "#4169E1", Liquid = true, Drowning = true, LiquidRange = 7, LiquidViscosity = 1, LiquidRenewable = true, Level = 8, SoundGroup = "water" },
+            [(ushort)BlockType.Water] = new() { Id = 4, Name = "water", Solid = false, Transparent = true, Color = "#4169E1", Liquid = true, Drowning = true, LiquidRange = 7, LiquidViscosity = 1, LiquidRenewable = true, Level = 8, Waving = 3, SoundGroup = "water" },
             [(ushort)BlockType.Sand] = new() { Id = 5, Name = "sand", Solid = true, Color = "#F4A460", Hardness = 0.5f, Falling = true, Groups = new() { ["crumbly"] = 3 }, SoundGroup = "sand" },
             [(ushort)BlockType.Wood] = new() { Id = 6, Name = "wood", Solid = true, Color = "#DEB887", Hardness = 2.0f, Groups = new() { ["choppy"] = 3 }, SoundGroup = "wood" },
-            [(ushort)BlockType.Leaves] = new() { Id = 7, Name = "leaves", Solid = true, Transparent = true, Color = "#32CD32", Hardness = 0.2f, Groups = new() { ["snappy"] = 3 }, SoundGroup = "leaves" },
+            [(ushort)BlockType.Leaves] = new() { Id = 7, Name = "leaves", Solid = true, Transparent = true, Color = "#32CD32", Hardness = 0.2f, Groups = new() { ["snappy"] = 3 }, Waving = 2, SoundGroup = "leaves" },
             [(ushort)BlockType.Glass] = new() { Id = 8, Name = "glass", Solid = true, Transparent = true, Color = "#ADD8E6", Hardness = 0.3f, Groups = new() { ["cracky"] = 3, ["oddly_breakable_by_hand"] = 3 }, SoundGroup = "glass" },
             [(ushort)BlockType.Brick] = new() { Id = 9, Name = "brick", Solid = true, Color = "#B22222", Hardness = 2.0f, Groups = new() { ["cracky"] = 2 }, SoundGroup = "stone" },
             [(ushort)BlockType.OreIron] = new() { Id = 10, Name = "ore_iron", Solid = true, Color = "#C4A882", Hardness = 3.0f, Drops = "iron_ingot", Groups = new() { ["cracky"] = 3 }, SoundGroup = "stone" },
@@ -145,11 +153,11 @@ public class BlockDefinitionManager
             [(ushort)BlockType.HayBale] = new() { Id = 67, Name = "hay_bale", Solid = true, Color = "#DAA520", Hardness = 0.5f, Groups = new() { ["snappy"] = 3 }, SoundGroup = "grass" },
             [(ushort)BlockType.DesertStone] = new() { Id = 68, Name = "desert_stone", Solid = true, Color = "#A0926B", Hardness = 1.5f, Groups = new() { ["cracky"] = 3 }, SoundGroup = "stone" },
             [(ushort)BlockType.DirtWithSnow] = new() { Id = 69, Name = "dirt_with_snow", Solid = true, Color = "#8B8B8B", Hardness = 0.6f, Drops = "dirt", Groups = new() { ["crumbly"] = 3 }, SoundGroup = "dirt" },
-            [(ushort)BlockType.JungleGrass] = new() { Id = 70, Name = "junglegrass", Solid = false, Transparent = true, Color = "#00AA00", Hardness = 0.0f, Groups = new() { ["dig_immediate"] = 3 }, SoundGroup = "grass" },
+            [(ushort)BlockType.JungleGrass] = new() { Id = 70, Name = "junglegrass", Solid = false, Transparent = true, Color = "#00AA00", Hardness = 0.0f, Groups = new() { ["dig_immediate"] = 3 }, Waving = 1, SoundGroup = "grass" },
             [(ushort)BlockType.JungleWood] = new() { Id = 71, Name = "jungle_wood", Solid = true, Color = "#6B5030", Hardness = 2.0f, Groups = new() { ["choppy"] = 3 }, SoundGroup = "wood" },
-            [(ushort)BlockType.JungleLeaves] = new() { Id = 72, Name = "jungle_leaves", Solid = true, Transparent = true, Color = "#1A8C1A", Hardness = 0.2f, Groups = new() { ["snappy"] = 3 }, SoundGroup = "leaves" },
+            [(ushort)BlockType.JungleLeaves] = new() { Id = 72, Name = "jungle_leaves", Solid = true, Transparent = true, Color = "#1A8C1A", Hardness = 0.2f, Groups = new() { ["snappy"] = 3 }, Waving = 2, SoundGroup = "leaves" },
             [(ushort)BlockType.PineWood] = new() { Id = 73, Name = "pine_wood", Solid = true, Color = "#5C3D1E", Hardness = 2.0f, Groups = new() { ["choppy"] = 3 }, SoundGroup = "wood" },
-            [(ushort)BlockType.PineNeedles] = new() { Id = 74, Name = "pine_needles", Solid = true, Transparent = true, Color = "#1A5C1A", Hardness = 0.2f, Groups = new() { ["snappy"] = 3 }, SoundGroup = "leaves" },
+            [(ushort)BlockType.PineNeedles] = new() { Id = 74, Name = "pine_needles", Solid = true, Transparent = true, Color = "#1A5C1A", Hardness = 0.2f, Groups = new() { ["snappy"] = 3 }, Waving = 2, SoundGroup = "leaves" },
             [(ushort)BlockType.RiverWater] = new() { Id = 75, Name = "river_water", Solid = false, Transparent = true, Color = "#3060C0", Liquid = true, Drowning = true, LiquidRange = 7, LiquidViscosity = 1, LiquidRenewable = true, Level = 8, SoundGroup = "water" },
             [(ushort)BlockType.CobblestoneSlab] = new() { Id = 76, Name = "cobblestone_slab", Solid = true, Color = "#6B6B6B", Hardness = 2.0f, DrawType = "slab", Groups = new() { ["cracky"] = 3 }, SoundGroup = "stone" },
             [(ushort)BlockType.WoodSlab] = new() { Id = 77, Name = "wood_slab", Solid = true, Color = "#BC8F5A", Hardness = 2.0f, DrawType = "slab", Groups = new() { ["choppy"] = 2 }, SoundGroup = "wood" },
@@ -195,14 +203,14 @@ public class BlockDefinitionManager
             [(ushort)BlockType.LitPumpkin] = new() { Id = 117, Name = "jack_o_lantern", Solid = true, Color = "#FF8C00", Hardness = 1.0f, Light = 15, Groups = new() { ["choppy"] = 2 }, SoundGroup = "wood" },
             [(ushort)BlockType.CactusBlock] = new() { Id = 118, Name = "cactus_block", Solid = true, Color = "#0A5C0A", Hardness = 0.4f, Damage = 1, Groups = new() { ["choppy"] = 2 }, SoundGroup = "wood" },
             [(ushort)BlockType.SugarCaneBlock] = new() { Id = 119, Name = "sugar_cane_block", Solid = false, Transparent = true, Color = "#90EE90", Hardness = 0.2f, Groups = new() { ["dig_immediate"] = 3 }, SoundGroup = "grass" },
-            [(ushort)BlockType.DeadBush] = new() { Id = 120, Name = "dead_bush", Solid = false, Transparent = true, Color = "#8B7355", Hardness = 0.0f, DrawType = "plantlike", Groups = new() { ["dig_immediate"] = 3 }, SoundGroup = "grass" },
-            [(ushort)BlockType.TallGrass] = new() { Id = 121, Name = "tall_grass", Solid = false, Transparent = true, Color = "#4A8C3A", Hardness = 0.0f, DrawType = "plantlike", Groups = new() { ["dig_immediate"] = 3 }, SoundGroup = "grass" },
-            [(ushort)BlockType.FlowerRed] = new() { Id = 122, Name = "flower_red", Solid = false, Transparent = true, Color = "#FF3333", Hardness = 0.0f, DrawType = "plantlike", Groups = new() { ["dig_immediate"] = 3, ["flower"] = 1 }, SoundGroup = "grass" },
-            [(ushort)BlockType.FlowerYellow] = new() { Id = 123, Name = "flower_yellow", Solid = false, Transparent = true, Color = "#FFFF33", Hardness = 0.0f, DrawType = "plantlike", Groups = new() { ["dig_immediate"] = 3, ["flower"] = 1 }, SoundGroup = "grass" },
-            [(ushort)BlockType.FlowerRose] = new() { Id = 124, Name = "flower_rose", Solid = false, Transparent = true, Color = "#CC0000", Hardness = 0.0f, DrawType = "plantlike", Groups = new() { ["dig_immediate"] = 3, ["flower"] = 1 }, SoundGroup = "grass" },
-            [(ushort)BlockType.FlowerTulip] = new() { Id = 125, Name = "flower_tulip", Solid = false, Transparent = true, Color = "#FF6699", Hardness = 0.0f, DrawType = "plantlike", Groups = new() { ["dig_immediate"] = 3, ["flower"] = 1 }, SoundGroup = "grass" },
-            [(ushort)BlockType.MushroomRedBlock] = new() { Id = 126, Name = "mushroom_red_block", Solid = false, Transparent = true, Color = "#CC2222", Hardness = 0.0f, DrawType = "plantlike", Groups = new() { ["dig_immediate"] = 3 }, SoundGroup = "grass" },
-            [(ushort)BlockType.MushroomBrownBlock] = new() { Id = 127, Name = "mushroom_brown_block", Solid = false, Transparent = true, Color = "#8B6B4A", Hardness = 0.0f, DrawType = "plantlike", Groups = new() { ["dig_immediate"] = 3 }, SoundGroup = "grass" },
+            [(ushort)BlockType.DeadBush] = new() { Id = 120, Name = "dead_bush", Solid = false, Transparent = true, Color = "#8B7355", Hardness = 0.0f, DrawType = "plantlike", Groups = new() { ["dig_immediate"] = 3 }, Waving = 1, SoundGroup = "grass" },
+            [(ushort)BlockType.TallGrass] = new() { Id = 121, Name = "tall_grass", Solid = false, Transparent = true, Color = "#4A8C3A", Hardness = 0.0f, DrawType = "plantlike", Groups = new() { ["dig_immediate"] = 3 }, Waving = 1, SoundGroup = "grass" },
+            [(ushort)BlockType.FlowerRed] = new() { Id = 122, Name = "flower_red", Solid = false, Transparent = true, Color = "#FF3333", Hardness = 0.0f, DrawType = "plantlike", Groups = new() { ["dig_immediate"] = 3, ["flower"] = 1 }, Waving = 1, SoundGroup = "grass" },
+            [(ushort)BlockType.FlowerYellow] = new() { Id = 123, Name = "flower_yellow", Solid = false, Transparent = true, Color = "#FFFF33", Hardness = 0.0f, DrawType = "plantlike", Groups = new() { ["dig_immediate"] = 3, ["flower"] = 1 }, Waving = 1, SoundGroup = "grass" },
+            [(ushort)BlockType.FlowerRose] = new() { Id = 124, Name = "flower_rose", Solid = false, Transparent = true, Color = "#CC0000", Hardness = 0.0f, DrawType = "plantlike", Groups = new() { ["dig_immediate"] = 3, ["flower"] = 1 }, Waving = 1, SoundGroup = "grass" },
+            [(ushort)BlockType.FlowerTulip] = new() { Id = 125, Name = "flower_tulip", Solid = false, Transparent = true, Color = "#FF6699", Hardness = 0.0f, DrawType = "plantlike", Groups = new() { ["dig_immediate"] = 3, ["flower"] = 1 }, Waving = 1, SoundGroup = "grass" },
+            [(ushort)BlockType.MushroomRedBlock] = new() { Id = 126, Name = "mushroom_red_block", Solid = false, Transparent = true, Color = "#CC2222", Hardness = 0.0f, DrawType = "plantlike", Groups = new() { ["dig_immediate"] = 3 }, Waving = 1, SoundGroup = "grass" },
+            [(ushort)BlockType.MushroomBrownBlock] = new() { Id = 127, Name = "mushroom_brown_block", Solid = false, Transparent = true, Color = "#8B6B4A", Hardness = 0.0f, DrawType = "plantlike", Groups = new() { ["dig_immediate"] = 3 }, Waving = 1, SoundGroup = "grass" },
             [(ushort)BlockType.GoldOre] = new() { Id = 128, Name = "gold_ore", Solid = true, Color = "#FFD700", Hardness = 3.0f, Drops = "gold_ingot", Groups = new() { ["cracky"] = 3 }, SoundGroup = "stone" },
             [(ushort)BlockType.LapisOre] = new() { Id = 129, Name = "lapis_ore", Solid = true, Color = "#1A3A8A", Hardness = 3.0f, Drops = "lapis_lazuli", Groups = new() { ["cracky"] = 3 }, SoundGroup = "stone" },
             [(ushort)BlockType.EmeraldOre] = new() { Id = 130, Name = "emerald_ore", Solid = true, Color = "#1A8A3A", Hardness = 3.0f, Drops = "emerald", Groups = new() { ["cracky"] = 3 }, SoundGroup = "stone" },
@@ -214,7 +222,7 @@ public class BlockDefinitionManager
             [(ushort)BlockType.Dripstone] = new() { Id = 136, Name = "dripstone", Solid = true, Color = "#8B7D6B", Hardness = 1.5f, Groups = new() { ["cracky"] = 3 }, SoundGroup = "stone" },
             [(ushort)BlockType.Calcite] = new() { Id = 137, Name = "calcite", Solid = true, Color = "#D4CDC4", Hardness = 0.75f, Groups = new() { ["cracky"] = 3 }, SoundGroup = "stone" },
             [(ushort)BlockType.Deepslate] = new() { Id = 138, Name = "deepslate", Solid = true, Color = "#4A4A4A", Hardness = 3.0f, Groups = new() { ["cracky"] = 3 }, SoundGroup = "stone" },
-            [(ushort)BlockType.Cobweb] = new() { Id = 139, Name = "cobweb", Solid = false, Transparent = true, Color = "#DDDDDD", Hardness = 0.4f, Groups = new() { ["snappy"] = 2 }, SoundGroup = "cloth" },
+            [(ushort)BlockType.Cobweb] = new() { Id = 139, Name = "cobweb", Solid = false, Transparent = true, Color = "#DDDDDD", Hardness = 0.4f, MoveResistance = 0.8f, Groups = new() { ["snappy"] = 2 }, SoundGroup = "cloth" },
             [(ushort)BlockType.Fire] = new() { Id = 140, Name = "fire", Solid = false, Transparent = true, Color = "#FF6600", Damage = 1, Light = 15, DrawType = "firelike", Groups = new() { ["dig_immediate"] = 3 }, SoundGroup = "default" },
             [(ushort)BlockType.SoulTorch] = new() { Id = 141, Name = "soul_torch", Solid = false, Transparent = true, Color = "#6699FF", Light = 10, DrawType = "torch", Groups = new() { ["dig_immediate"] = 3 }, SoundGroup = "default" },
             [(ushort)BlockType.Lantern] = new() { Id = 142, Name = "lantern", Solid = true, Transparent = true, Color = "#FFCC66", Hardness = 3.5f, Light = 15, Groups = new() { ["cracky"] = 3 }, SoundGroup = "metal" },
@@ -301,6 +309,11 @@ public class BlockDefinitionManager
             [(ushort)BlockType.SeaPickle] = new() { Id = 224, Name = "sea_pickle", Solid = false, Transparent = true, Color = "#80CC30", Light = 6, Hardness = 0.0f, Groups = new() { ["dig_immediate"] = 3 }, SoundGroup = "grass" },
             [(ushort)BlockType.Conduit] = new() { Id = 225, Name = "conduit", Solid = true, Transparent = true, Color = "#40A0CC", Light = 15, Hardness = 3.0f, Groups = new() { ["cracky"] = 2 }, SoundGroup = "stone" },
             [(ushort)BlockType.TurtleEgg] = new() { Id = 226, Name = "turtle_egg", Solid = true, Color = "#D8D0B8", Hardness = 0.5f, Groups = new() { ["crumbly"] = 3, ["oddly_breakable_by_hand"] = 3 }, SoundGroup = "sand" },
+            [(ushort)BlockType.Mud] = new() { Id = 231, Name = "mud", Solid = true, Color = "#554433", Hardness = 0.5f, MoveResistance = 0.4f, Groups = new() { ["crumbly"] = 3 }, SoundGroup = "dirt" },
+            [(ushort)BlockType.PackedMud] = new() { Id = 232, Name = "packed_mud", Solid = true, Color = "#6B5540", Hardness = 1.0f, Groups = new() { ["crumbly"] = 2 }, SoundGroup = "stone" },
+            [(ushort)BlockType.MudBricks] = new() { Id = 233, Name = "mud_bricks", Solid = true, Color = "#7A6550", Hardness = 2.0f, Groups = new() { ["cracky"] = 2 }, SoundGroup = "stone" },
+            [(ushort)BlockType.MudBrickStairs] = new() { Id = 234, Name = "mud_brick_stairs", Solid = true, Color = "#7A6550", Hardness = 2.0f, DrawType = "stair", Groups = new() { ["cracky"] = 2 }, SoundGroup = "stone" },
+            [(ushort)BlockType.MudBrickSlab] = new() { Id = 235, Name = "mud_brick_slab", Solid = true, Color = "#7A6550", Hardness = 2.0f, DrawType = "slab", Groups = new() { ["cracky"] = 2 }, SoundGroup = "stone" },
         };
     }
 
@@ -339,6 +352,13 @@ public class BlockDefinition
     public int MaxLevel { get; set; } = 8;
     public Dictionary<string, int> Groups { get; set; } = new();
     public string SoundGroup { get; set; } = "default";
+    public bool NoJump { get; set; }
+    public bool LiquidNoSwim { get; set; }
+    public bool BuildableTo { get; set; }
+    public bool AttachedNode { get; set; }
+    public int FallDamageAddPercent { get; set; }
+    public int Waving { get; set; }
+    public string DamageGroup { get; set; } = "fleshy";
 
     public string? TextureName => Name switch
     {

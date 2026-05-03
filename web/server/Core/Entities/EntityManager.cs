@@ -52,6 +52,17 @@ public class EntityManager
 
     public IEnumerable<Entity> GetAll() => _entities.Values;
 
+    public int ClearMobs()
+    {
+        var mobs = _entities.Values.Where(e => e is MobEntity).ToList();
+        foreach (var mob in mobs)
+        {
+            OnEntityDespawned?.Invoke(mob);
+            _entities.TryRemove(mob.Id, out _);
+        }
+        return mobs.Count;
+    }
+
     public void UpdateAll(float dt)
     {
         foreach (var entity in _entities.Values)

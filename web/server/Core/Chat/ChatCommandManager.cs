@@ -56,6 +56,7 @@ public class ChatCommandManager
     private readonly Action<string>? _clearPhysicsOverride;
     private readonly Action<string>? _sendPhysicsParams;
     private readonly Action<string, float, float, float, string, string>? _addWaypoint;
+    private readonly Action? _killAllMobs;
 
     public ChatCommandManager(
         Func<long> getGameTime,
@@ -88,7 +89,8 @@ public class ChatCommandManager
         Action<string, float?, float?, float?, float?, float?>? setPhysicsOverride = null,
         Action<string>? clearPhysicsOverride = null,
         Action<string>? sendPhysicsParams = null,
-        Action<string, float, float, float, string, string>? addWaypoint = null)
+        Action<string, float, float, float, string, string>? addWaypoint = null,
+        Action? killAllMobs = null)
     {
         _getGameTime = getGameTime;
         _getTps = getTps;
@@ -121,6 +123,7 @@ public class ChatCommandManager
         _clearPhysicsOverride = clearPhysicsOverride;
         _sendPhysicsParams = sendPhysicsParams;
         _addWaypoint = addWaypoint;
+        _killAllMobs = killAllMobs;
         RegisterBuiltInCommands();
     }
 
@@ -672,6 +675,43 @@ public class ChatCommandManager
             {
                 return Task.FromResult("CLEAR_CHAT");
             }));
+
+        Register(new ChatCommand("setclouds", "Set cloud parameters", new[] { "clouds" },
+            (playerName, args) =>
+            {
+                if (args.Length == 0 || args[0] == "reset")
+                    return Task.FromResult("CLOUD_SET:density:0.4:thickness:16:height:120:speed:2.0");
+                if (args.Length < 2)
+                    return Task.FromResult("Usage: /setclouds <param> <value>. Params: density(0-1), thickness(1-32), height(50-200), speed(0-20), reset");
+                var param = args[0].ToLowerInvariant();
+                var value = args[1];
+                if (param is not ("density" or "thickness" or "height" or "speed"))
+                    return Task.FromResult("Unknown param. Use: density, thickness, height, speed, reset");
+                return Task.FromResult($"CLOUD_SET:{param}:{value}");
+            }, "server"));
+
+        Register(new ChatCommand("spawnmob", "Spawn a mob at a location", new[] { "summonmob" },
+            (playerName, args) =>
+            {
+                if (args.Length < 1)
+                    return Task.FromResult("Usage: /spawnmob <type> [x y z]");
+                return Task.FromResult($"SPAWNMOB:{args[0]}:{(args.Length >= 4 ? $"{args[1]} {args[2]} {args[3]}" : "")}");
+            }, "server"));
+
+        Register(new ChatCommand("killmobs", "Kill all mob entities", new[] { "killentities2" },
+            (_playerName, _args) =>
+            {
+                _killAllMobs?.Invoke();
+                return Task.FromResult("All mobs killed.");
+            }, "server"));
+
+        Register(new ChatCommand("getblock", "Get block info at a position", new[] { "blockinfo" },
+            (playerName, args) =>
+            {
+                if (args.Length < 3)
+                    return Task.FromResult("Usage: /getblock <x> <y> <z>");
+                return Task.FromResult($"GETBLOCK:{args[0]}:{args[1]}:{args[2]}");
+            }, "interact"));
     }
 
     public void RegisterExternalCommand(ChatCommand command)

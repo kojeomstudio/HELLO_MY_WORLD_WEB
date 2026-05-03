@@ -6,7 +6,7 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 
 - **Voxel World**: Procedurally generated 3D world with noise-based terrain, caves, ores, schematic-based trees (oak, pine, jungle, birch, cactus), rivers, multi-room dungeons, and 10 biomes (grassland, forest, desert, snow, taiga, jungle, savanna, mountains, swamp, ocean) selected via heat/humidity noise
 - **161 Block Types**: Including stone variants, 9 ore types (diamond, gold, iron, coal, redstone, emerald, lapis, copper), wood types (oak, jungle, pine), stairs/slabs, fences, walls, glass panes, doors, decorative blocks, flowers, mushrooms, utility blocks, light sources, fire, cobweb, Nether/End blocks, redstone components, and all wood variants (spruce/birch/jungle/acacia/dark oak doors, fences, planks)
-- **226 Block Definitions**: Full block enum (IDs 0-227) with complete defaults in code and JSON data override. Fixed: duplicate ID 117 resolved (LitPumpkin=117, JackOLantern=212), Pumpking typo corrected to Pumpkin
+- **226 Block Definitions**: Full block enum (IDs 0-235) with complete defaults in code and JSON data override. Fixed: duplicate ID 117 resolved (LitPumpkin=117, JackOLantern=212), Pumpking typo corrected to Pumpkin
 - **220+ Items**: Tools (wood/stone/iron/diamond/gold/steel/mese/titanium), special weapons (fire sword, ice sword, blood sword, heal sword, elemental sword, daggers), steel shears, alchemy ingredients, crafting materials, armor (leather/iron/gold/diamond), food, resources, utility items, and fishing/breeding drops
 - **Crafting System**: 166+ recipes including shaped crafting, tool creation, special weapon recipes, ore block storage, copper processing, decoration recipes, gold tool recipes, titanium recipes, armor, building blocks, food, and tool repair. Grid-based crafting system with pattern offset matching and item group support.
 - **Fuel Registry**: Configurable fuel items with burn times loaded from `items.json` (coal, charcoal, wood, lava bucket, etc.)
@@ -78,6 +78,13 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Creative Mode**: No tool wear, no item drops on dig, infinite block placement
 - **Lighting Settings**: `/set_lighting` command for runtime shadow intensity, exposure, ambient boost, bloom
 - **HUD Flags**: `/hudflag <flag> [on|off]` to toggle HUD elements (hotbar, healthbar, crosshair, breathbar, hungerbar, minimap, debug, chat)
+- **Entity Armor Groups**: Per-entity damage absorption (fleshy, fiery, icy) matching minetest armorball; mobs have configurable armor ratings
+- **Block Properties**: NoJump (disables jumping), LiquidNoSwim (treats liquid as non-swimmable), BuildableTo (placement replaces block), AttachedNode, FallDamageAddPercent (per-block fall damage modifier)
+- **Waving Blocks**: Plants (waving=1), leaves (waving=2), liquids (waving=3) flagged for client-side animation
+- **New Blocks**: Mud, packed_mud, mud_bricks, mud_brick_stairs, mud_brick_slab; cobweb now has move resistance
+- **Mob Nametags**: Server-defined nametags with configurable colors for all mob types
+- **Mob Footstep Sounds**: `makesFootstepSound` flag per mob type for footstep audio
+- **New Commands**: `/spawnmob <type> [x y z]`, `/killmobs`, `/getblock <x> <y> <z>`, `/setclouds <param> <value>`
 
 ## Architecture
 
@@ -143,7 +150,7 @@ web/
 │       ├── GameHub.cs            # SignalR hub
 │       └── GameLoopService.cs    # Background game loop
 ├── data/                # JSON configuration
-│   ├── blocks.json       # 227 block definitions (IDs 0-227, full defaults in code)
+│   ├── blocks.json       # 236 block definitions (IDs 0-235, full defaults in code)
 │   ├── items.json        # 220+ items, 166+ recipes, food values, tool capabilities
 │   ├── mobs.json         # 6 mob definitions
 │   ├── tools.json        # 8 tool material definitions
@@ -242,7 +249,7 @@ node cli-test.mjs list          # List available suites
 node cli-test.mjs multiplayer   # 2-player test
 ```
 
-Available test suites: `api-status`, `connection`, `position`, `chat`, `chunk`, `block-ops`, `crafting`, `smelting`, `inventory`, `privileges`, `armor`, `fishing`, `entity`, `gamemode`, `teleport`, `give`, `worldborder`, `daynight`, `interact`, `bucket`, `multiplayer`, `full-protocol`, `privs`, `respawn`, `sign`, `detached`, `waypoint`
+Available test suites: `api-status`, `connection`, `position`, `chat`, `chunk`, `block-ops`, `crafting`, `smelting`, `inventory`, `privileges`, `armor`, `fishing`, `entity`, `gamemode`, `teleport`, `give`, `worldborder`, `daynight`, `interact`, `bucket`, `multiplayer`, `full-protocol`, `privs`, `respawn`, `sign`, `detached`, `waypoint`, `mob-commands`, `block-props`
 
 ## Communication
 
@@ -326,6 +333,10 @@ The Vite dev server proxies `/game` to the server.
 | /clear | Clear chat history |
 | /set_lighting [shadow] [exposure_min] [exposure_max] [ambient] [bloom] | Set lighting params (/set_lighting reset) |
 | /hudflag <flag> [on|off] | Toggle HUD element (hotbar, healthbar, crosshair, breathbar, hungerbar, minimap, debug, chat) |
+| /spawnmob <type> [x y z] | Spawn mob at location (Zombie, Skeleton, Spider, Cow, Pig, Chicken) |
+| /killmobs | Kill all mob entities |
+| /getblock <x> <y> <z> | Get block info at coordinates |
+| /setclouds <param> <value> | Set cloud params (density, thickness, height, speed, reset) |
 
 ## Ported from minetest_sub_project
 

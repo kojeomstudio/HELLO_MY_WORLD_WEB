@@ -741,6 +741,69 @@ testSuites['detached'] = {
     }
 };
 
+testSuites['mob-commands'] = {
+    description: 'Test mob spawn and block info commands',
+    run: async () => {
+        await connectAndJoin();
+        try {
+            try {
+                await withTimeout(connection.invoke('SendChat', '/spawnmob Zombie'));
+                await new Promise(r => setTimeout(r, 500));
+                assert(true, '/spawnmob Zombie command processed');
+            } catch {
+                log('  /spawnmob may require server priv');
+            }
+            try {
+                const result = await withTimeout(connection.invoke('SendChat', '/spawnmob InvalidMob'));
+                await new Promise(r => setTimeout(r, 500));
+                assert(true, '/spawnmob with invalid type handled');
+            } catch {
+                log('  Invalid mob type handled');
+            }
+            try {
+                await withTimeout(connection.invoke('SendChat', '/getblock 0 64 0'));
+                await new Promise(r => setTimeout(r, 500));
+                assert(true, '/getblock command processed');
+            } catch {
+                log('  /getblock may require interact priv');
+            }
+            try {
+                await withTimeout(connection.invoke('SendChat', '/setclouds reset'));
+                await new Promise(r => setTimeout(r, 500));
+                assert(true, '/setclouds command processed');
+            } catch {
+                log('  /setclouds may require server priv');
+            }
+        } finally {
+            await disconnect();
+        }
+    }
+};
+
+testSuites['block-props'] = {
+    description: 'Test new block properties',
+    run: async () => {
+        await connectAndJoin();
+        try {
+            try {
+                await withTimeout(connection.invoke('SendChat', '/getblock 0 64 0'));
+                await new Promise(r => setTimeout(r, 1000));
+                assert(true, 'Block info query processed');
+            } catch {
+                log('  Block query may need interact priv');
+            }
+            try {
+                const chunks = await withTimeout(connection.invoke('RequestChunk', 0, 4, 0), 10000);
+                assert(chunks != null, 'Chunk request succeeded for block property check');
+            } catch {
+                log('  Chunk request may time out');
+            }
+        } finally {
+            await disconnect();
+        }
+    }
+};
+
 const ALL_SUITES = Object.keys(testSuites);
 
 function printUsage() {

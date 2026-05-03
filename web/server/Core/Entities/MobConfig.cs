@@ -12,7 +12,11 @@ public record MobDefinition(
     float DetectionRange,
     bool Hostile,
     int DespawnRange,
-    (string itemId, int count)[] Drops);
+    (string itemId, int count)[] Drops,
+    Dictionary<string, int> ArmorGroups,
+    bool MakesFootstepSound,
+    string? Nametag,
+    string? NametagColor);
 
 public static class MobConfig
 {
@@ -45,17 +49,43 @@ public static class MobConfig
             {
                 foreach (var dropEl in dropsArray.EnumerateArray())
                 {
-                    var dropItems = new string[dropsArray.EnumerateArray().Count()];
                     var itemId = dropEl[0].GetString() ?? "";
                     var count = dropEl[1].GetInt32();
                     drops.Add((itemId, count));
                 }
             }
 
+            var armorGroups = new Dictionary<string, int>();
+            if (mobEl.TryGetProperty("armorGroups", out var agEl))
+            {
+                foreach (var agProp in agEl.EnumerateObject())
+                {
+                    armorGroups[agProp.Name] = agProp.Value.GetInt32();
+                }
+            }
+
+            var makesFootstepSound = false;
+            if (mobEl.TryGetProperty("makesFootstepSound", out var mfsEl))
+            {
+                makesFootstepSound = mfsEl.GetBoolean();
+            }
+
+            string? nametag = null;
+            if (mobEl.TryGetProperty("nametag", out var ntEl))
+            {
+                nametag = ntEl.GetString();
+            }
+
+            string? nametagColor = null;
+            if (mobEl.TryGetProperty("nametagColor", out var ntcEl))
+            {
+                nametagColor = ntcEl.GetString();
+            }
+
             Definitions[type] = new MobDefinition(
                 type, health, attackDamage, speed, attackRange,
                 attackCooldown, detectionRange, hostile, despawnRange,
-                drops.ToArray());
+                drops.ToArray(), armorGroups, makesFootstepSound, nametag, nametagColor);
         }
     }
 

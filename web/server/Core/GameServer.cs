@@ -1369,6 +1369,11 @@ public class GameServer
         return count;
     }
 
+    public int ClearMobs()
+    {
+        return _entityManager.ClearMobs();
+    }
+
     public void BroadcastWaypoint(string playerName, float x, float y, float z, string name, string color)
     {
         var connectionId = GetPlayerConnectionId(playerName);

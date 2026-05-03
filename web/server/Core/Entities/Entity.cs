@@ -162,6 +162,10 @@ public class MobEntity : Entity
     public Guid? TargetPlayerId { get; set; }
     public MobState State { get; set; } = MobState.Wander;
     public bool IsHurt { get; private set; }
+    public bool MakesFootstepSound { get; set; }
+    public Dictionary<string, int> ArmorGroups { get; set; } = new();
+    public string? Nametag { get; set; }
+    public string? NametagColor { get; set; }
     private const float MobGravity = 20.0f;
     private DateTime _lastAttackTime;
     private int AttackCooldownMs = 1000;
@@ -188,6 +192,10 @@ public class MobEntity : Entity
             DetectionRange = def.DetectionRange;
             AttackCooldownMs = (int)(def.AttackCooldown * 1000);
             IsHostile = def.Hostile;
+            MakesFootstepSound = def.MakesFootstepSound;
+            ArmorGroups = new Dictionary<string, int>(def.ArmorGroups);
+            Nametag = def.Nametag;
+            NametagColor = def.NametagColor;
         }
     }
 
@@ -196,9 +204,32 @@ public class MobEntity : Entity
         Health = Math.Min(MaxHealth, Health + amount);
     }
 
-    public void TakeDamage(float amount)
+    public float CalculateArmorReduction(string damageGroup, float rawDamage)
     {
-        Health -= amount;
+        if (ArmorGroups.Count == 0) return rawDamage;
+
+        if (ArmorGroups.TryGetValue(damageGroup, out var groupRating))
+        {
+            if (groupRating <= 0) return rawDamage;
+            var multiplier = Math.Max(0f, 1.0f - groupRating * 0.05f);
+            return rawDamage * multiplier;
+        }
+
+        if (ArmorGroups.TryGetValue("fleshy", out var fleshyRating))
+        {
+            if (fleshyRating <= 0) return rawDamage;
+            var multiplier = Math.Max(0f, 1.0f - fleshyRating * 0.05f);
+            return rawDamage * multiplier * 0.5f;
+        }
+
+        return rawDamage;
+    }
+
+    public void TakeDamage(float amount, string damageGroup = "fleshy")
+    {
+        var actualDamage = CalculateArmorReduction(damageGroup, amount);
+        if (actualDamage <= 0 && ArmorGroups.ContainsKey("immortal")) return;
+        Health -= Math.Abs(actualDamage);
         _lastHurtTime = DateTime.UtcNow;
         IsHurt = true;
 

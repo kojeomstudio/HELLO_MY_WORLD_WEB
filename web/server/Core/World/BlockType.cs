@@ -232,5 +232,10 @@ public enum BlockType : ushort
     DoorOpen = 227,
     IronDoorOpen = 228,
     LeverOn = 229,
-    ButtonPressed = 230
+    ButtonPressed = 230,
+    Mud = 231,
+    PackedMud = 232,
+    MudBricks = 233,
+    MudBrickStairs = 234,
+    MudBrickSlab = 235
 }

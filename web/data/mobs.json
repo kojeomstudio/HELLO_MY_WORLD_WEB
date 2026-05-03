@@ -10,7 +10,11 @@
             "detectionRange": 16,
             "hostile": true,
             "despawnRange": 128,
-            "drops": [["rotten_flesh", 1], ["iron_ingot", 1]]
+            "drops": [["rotten_flesh", 1], ["iron_ingot", 1]],
+            "armorGroups": { "fleshy": 100 },
+            "makesFootstepSound": true,
+            "nametag": "Zombie",
+            "nametagColor": "#55AA55"
         },
         {
             "type": "Skeleton",
@@ -22,7 +26,11 @@
             "detectionRange": 16,
             "hostile": true,
             "despawnRange": 128,
-            "drops": [["bone", 2], ["flint", 1]]
+            "drops": [["bone", 2], ["flint", 1]],
+            "armorGroups": { "fleshy": 100 },
+            "makesFootstepSound": true,
+            "nametag": "Skeleton",
+            "nametagColor": "#AAAAAA"
         },
         {
             "type": "Spider",
@@ -34,7 +42,11 @@
             "detectionRange": 16,
             "hostile": true,
             "despawnRange": 128,
-            "drops": [["string", 1]]
+            "drops": [["string", 1]],
+            "armorGroups": { "fleshy": 75 },
+            "makesFootstepSound": true,
+            "nametag": "Spider",
+            "nametagColor": "#664422"
         },
         {
             "type": "Cow",
@@ -46,7 +58,11 @@
             "detectionRange": 16,
             "hostile": false,
             "despawnRange": 128,
-            "drops": [["leather", 1], ["raw_beef", 2]]
+            "drops": [["leather", 1], ["raw_beef", 2]],
+            "armorGroups": { "fleshy": 50 },
+            "makesFootstepSound": true,
+            "nametag": "Cow",
+            "nametagColor": "#8B6914"
         },
         {
             "type": "Pig",
@@ -58,7 +74,11 @@
             "detectionRange": 16,
             "hostile": false,
             "despawnRange": 128,
-            "drops": [["raw_pork", 2]]
+            "drops": [["raw_pork", 2]],
+            "armorGroups": { "fleshy": 50 },
+            "makesFootstepSound": true,
+            "nametag": "Pig",
+            "nametagColor": "#FFAAAA"
         },
         {
             "type": "Chicken",
@@ -70,7 +90,11 @@
             "detectionRange": 16,
             "hostile": false,
             "despawnRange": 128,
-            "drops": [["feather", 1]]
+            "drops": [["feather", 1]],
+            "armorGroups": { "fleshy": 25 },
+            "makesFootstepSound": false,
+            "nametag": "Chicken",
+            "nametagColor": "#FFFFFF"
         }
     ]
 }

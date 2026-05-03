@@ -396,6 +396,71 @@ public class GameHub : Hub<IGameClient>
                     {
                         await Clients.Caller.OnChatMessage("", "__CLEAR__", "clear");
                     }
+                    else if (result.StartsWith("CLOUD_SET:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var parts = result.Substring(10).Split(':');
+                        await Clients.Caller.OnChatMessage("Server", $"Cloud settings updated: {string.Join(", ", parts)}", "system");
+                    }
+                    else if (result.StartsWith("SPAWNMOB:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var parts = result.Substring(9).Split(':');
+                        var mobType = parts[0];
+                        var validMobTypes = new[] { "Zombie", "Skeleton", "Spider", "Cow", "Pig", "Chicken" };
+                        if (!validMobTypes.Contains(mobType))
+                        {
+                            await Clients.Caller.OnChatMessage("Server", $"Invalid mob type '{mobType}'. Valid: {string.Join(", ", validMobTypes)}", "system");
+                        }
+                        else
+                        {
+                            Vector3 pos = player.Position + new Vector3(0, 2, 0);
+                            if (parts.Length >= 2 && !string.IsNullOrEmpty(parts[1]))
+                            {
+                                var coords = parts[1].Split(' ');
+                                if (coords.Length == 3 &&
+                                    float.TryParse(coords[0], out var px) &&
+                                    float.TryParse(coords[1], out var py) &&
+                                    float.TryParse(coords[2], out var pz))
+                                {
+                                    pos = new Vector3(px, py, pz);
+                                }
+                            }
+                            _gameServer.SpawnEntity(mobType, pos);
+                            await Clients.Caller.OnChatMessage("Server", $"Spawned {mobType} at ({pos.X:F1}, {pos.Y:F1}, {pos.Z:F1})", "system");
+                        }
+                    }
+                    else if (result.StartsWith("GETBLOCK:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var parts = result.Substring(8).Split(':');
+                        if (parts.Length == 3 &&
+                            int.TryParse(parts[0], out var bx) &&
+                            int.TryParse(parts[1], out var by) &&
+                            int.TryParse(parts[2], out var bz))
+                        {
+                            var block = _gameServer.DefaultWorld.GetBlock(new Vector3s((short)bx, (short)by, (short)bz));
+                            var def = _gameServer.BlockDefinitions.Get((ushort)block.Type);
+                            if (def != null)
+                            {
+                                var info = $"Block at ({bx},{by},{bz}): {def.Name} (ID:{def.Id}) Solid={def.Solid} Hardness={def.Hardness:F1}";
+                                if (def.Damage > 0) info += $" Damage={def.Damage}";
+                                if (def.MoveResistance > 0) info += $" MoveResistance={def.MoveResistance:F1}";
+                                if (def.Climbable) info += " Climbable";
+                                if (def.NoJump) info += " NoJump";
+                                if (def.LiquidNoSwim) info += " LiquidNoSwim";
+                                if (def.BuildableTo) info += " BuildableTo";
+                                if (def.AttachedNode) info += " AttachedNode";
+                                if (def.FallDamageAddPercent != 0) info += $" FallDmgAdd={def.FallDamageAddPercent}%";
+                                if (def.Bouncy > 0) info += $" Bouncy={def.Bouncy}";
+                                if (def.Waving > 0) info += $" Waving={def.Waving}";
+                                if (def.Light > 0) info += $" Light={def.Light}";
+                                if (def.Groups.Count > 0) info += $" Groups=[{string.Join(",", def.Groups.Select(g => $"{g.Key}={g.Value}"))}]";
+                                await Clients.Caller.OnChatMessage("Server", info, "system");
+                            }
+                            else
+                            {
+                                await Clients.Caller.OnChatMessage("Server", $"Block at ({bx},{by},{bz}): ID={block.Type} (unknown definition)", "system");
+                            }
+                        }
+                    }
                     else
                     {
                         await Clients.Caller.OnChatMessage("Server", result, "system");
@@ -1196,10 +1261,19 @@ public class GameHub : Hub<IGameClient>
         if (distance > _gameServer.Config.Physics.PunchRange) return;
 
         var damage = 1.0f;
+        var damageGroup = "fleshy";
         if (toolItem != null)
         {
             var toolName = toolItem.ItemId.ToLowerInvariant();
             damage = ToolConfig.GetWeaponDamage(toolName);
+            if (toolName.Contains("fire") || toolName.Contains("fiery"))
+            {
+                damageGroup = "fiery";
+            }
+            else if (toolName.Contains("ice") || toolName.Contains("icy"))
+            {
+                damageGroup = "icy";
+            }
         }
 
         if (entity is MobEntity mob)
@@ -1210,7 +1284,7 @@ public class GameHub : Hub<IGameClient>
             }
             else
             {
-                mob.TakeDamage(damage);
+                mob.TakeDamage(damage, damageGroup);
             }
         }
     }
