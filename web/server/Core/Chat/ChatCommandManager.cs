@@ -608,6 +608,24 @@ public class ChatCommandManager
                 bloom = Math.Clamp(bloom, 0, 1);
                 return Task.FromResult($"LIGHTING:{shadow}:{expMin}:{expMax}:{ambient}:{bloom}");
             }, "server"));
+
+        Register(new ChatCommand("hudflag", "Toggle a HUD element visibility", new[] { "hudtoggleflag", "togglehud" },
+            (playerName, args) =>
+            {
+                if (args.Length == 0)
+                    return Task.FromResult("Usage: /hudflag <flag> [on|off]. Flags: hotbar, healthbar, crosshair, breathbar, hungerbar, minimap, debug, chat");
+                var flag = args[0].ToLowerInvariant();
+                var validFlags = new[] { "hotbar", "healthbar", "crosshair", "breathbar", "hungerbar", "minimap", "debug", "chat" };
+                if (!validFlags.Contains(flag))
+                    return Task.FromResult($"Invalid flag '{flag}'. Valid flags: {string.Join(", ", validFlags)}");
+                if (args.Length > 1)
+                {
+                    var val = args[1].ToLowerInvariant();
+                    if (val == "on") return Task.FromResult($"HUD_SET:{flag}:true");
+                    if (val == "off") return Task.FromResult($"HUD_SET:{flag}:false");
+                }
+                return Task.FromResult($"HUD_TOGGLE:{flag}");
+            }, "interact"));
     }
 
     public void Register(ChatCommand command)

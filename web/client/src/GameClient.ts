@@ -295,6 +295,10 @@ export class GameClient {
         this.connection.on('OnLightingUpdate', (shadowIntensity: number, exposureMin: number, exposureMax: number, ambientBoost: number, bloomStrength: number) => {
             this.renderer.setLighting({ shadowIntensity, exposureMin, exposureMax, ambientBoost, bloomStrength });
         });
+
+        this.connection.on('OnHudFlag', (flag: string, enabled: boolean) => {
+            this.uiManager.setHudFlag(flag, enabled);
+        });
     }
 
     sendChat(message: string): void {

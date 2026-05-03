@@ -77,6 +77,7 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Detached Inventory UI**: Visual detached inventory panel for shared/trash inventories via `/detached` and `/trash` commands
 - **Creative Mode**: No tool wear, no item drops on dig, infinite block placement
 - **Lighting Settings**: `/set_lighting` command for runtime shadow intensity, exposure, ambient boost, bloom
+- **HUD Flags**: `/hudflag <flag> [on|off]` to toggle HUD elements (hotbar, healthbar, crosshair, breathbar, hungerbar, minimap, debug, chat)
 
 ## Architecture
 
@@ -317,6 +318,7 @@ The Vite dev server proxies `/game` to the server.
 | /detached name size | Create a detached inventory |
 | /trash | Open shared trash inventory |
 | /set_lighting [shadow] [exposure_min] [exposure_max] [ambient] [bloom] | Set lighting params (/set_lighting reset) |
+| /hudflag <flag> [on|off] | Toggle HUD element (hotbar, healthbar, crosshair, breathbar, hungerbar, minimap, debug, chat) |
 
 ## Ported from minetest_sub_project
 

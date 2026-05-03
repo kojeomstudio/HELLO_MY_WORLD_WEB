@@ -39,6 +39,16 @@ export class UIManager {
     private detachedOverlay: HTMLElement | null = null;
     private waypoints: Array<{ x: number; y: number; z: number; name: string; color: string }> = [];
     private waypointUpdateInterval: number = 0;
+    private hudFlags: Record<string, boolean> = {
+        hotbar: true,
+        healthbar: true,
+        crosshair: true,
+        breathbar: true,
+        hungerbar: true,
+        minimap: true,
+        debug: true,
+        chat: true
+    };
 
     constructor() {
         this.chatMessages = document.getElementById('chat-messages')!;
@@ -1135,12 +1145,12 @@ export class UIManager {
     }
 
     showWeatherNotification(weatherType: string): void {
-        const label = weatherType === 'none' ? 'Clear' :
+        var label = weatherType === 'none' ? 'Clear' :
                       weatherType === 'rain' ? 'Rain' :
                       weatherType === 'snow' ? 'Snow' :
                       weatherType === 'thunderstorm' ? 'Thunderstorm' : weatherType;
 
-        const notification = document.createElement('div');
+        var notification = document.createElement('div');
         notification.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:white;font-size:24px;text-shadow:2px 2px 4px black;pointer-events:none;z-index:200;opacity:1;transition:opacity 1s;';
         notification.textContent = `Weather: ${label}`;
         document.body.appendChild(notification);
@@ -1153,6 +1163,43 @@ export class UIManager {
                 notification.parentNode.removeChild(notification);
             }
         }, 2500);
+    }
+
+    setHudFlag(flag: string, enabled: boolean): void {
+        var key = flag.toLowerCase();
+        this.hudFlags[key] = enabled;
+        this.applyHudFlags();
+    }
+
+    toggleHudFlag(flag: string): boolean {
+        var key = flag.toLowerCase();
+        if (key in this.hudFlags) {
+            this.hudFlags[key] = !this.hudFlags[key];
+            this.applyHudFlags();
+            return this.hudFlags[key];
+        }
+        return false;
+    }
+
+    private applyHudFlags(): void {
+        this.hotbar.style.display = this.hudFlags['hotbar'] ? '' : 'none';
+        this.healthBar.style.display = this.hudFlags['healthbar'] ? '' : 'none';
+        this.debugInfo.style.display = this.hudFlags['debug'] ? '' : 'none';
+        this.chatMessages.style.display = this.hudFlags['chat'] ? '' : 'none';
+        if (this.breathBar) {
+            this.breathBar.style.display = this.hudFlags['breathbar'] ? '' : 'none';
+        }
+        if (this.hungerBar) {
+            this.hungerBar.style.display = this.hudFlags['hungerbar'] ? '' : 'none';
+        }
+        var crosshair = document.getElementById('crosshair');
+        if (crosshair) {
+            crosshair.style.display = this.hudFlags['crosshair'] ? '' : 'none';
+        }
+    }
+
+    getHudFlags(): Record<string, boolean> {
+        return { ...this.hudFlags };
     }
 
     showDetachedInventory(name: string, items: any[]): void {

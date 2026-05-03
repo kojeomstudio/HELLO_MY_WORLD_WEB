@@ -62,6 +62,7 @@ public interface IGameClient
     Task OnFov(float fov, float transitionTime);
     Task OnWaypoint(float x, float y, float z, string name, string color);
     Task OnLightingUpdate(float shadowIntensity, float exposureMin, float exposureMax, float ambientBoost, float bloomStrength);
+    Task OnHudFlag(string flag, bool enabled);
 }
 
 public class GameHub : Hub<IGameClient>
@@ -347,6 +348,21 @@ public class GameHub : Hub<IGameClient>
                         await Clients.Caller.OnLightingUpdate(shadow, expMin, expMax, ambient, bloom);
                         await Clients.Caller.OnChatMessage("Server", $"Lighting updated: shadow={shadow:F2} exposure_min={expMin:F2} exposure_max={expMax:F2} ambient={ambient:F2} bloom={bloom:F2}", "system");
                     }
+                }
+                else if (result.StartsWith("HUD_SET:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var parts = result.Substring(8).Split(':');
+                    if (parts.Length == 2 && bool.TryParse(parts[1], out var enabled))
+                    {
+                        await Clients.Caller.OnHudFlag(parts[0], enabled);
+                        await Clients.Caller.OnChatMessage("Server", $"HUD flag '{parts[0]}' set to {(enabled ? "visible" : "hidden")}", "system");
+                    }
+                }
+                else if (result.StartsWith("HUD_TOGGLE:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var flag = result.Substring(11);
+                    await Clients.Caller.OnHudFlag(flag, false);
+                    await Clients.Caller.OnChatMessage("Server", $"HUD flag '{flag}' toggled", "system");
                 }
                 else
                 {
