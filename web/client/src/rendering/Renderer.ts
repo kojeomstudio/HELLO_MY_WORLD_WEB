@@ -491,6 +491,10 @@ export class Renderer {
         }
     }
 
+    updateCloudParams(density: number, thickness: number, height: number, speed: number): void {
+        this.cloudSystem.setParamsDirect(density, thickness, height, speed);
+    }
+
     updateClouds(dt: number): void {
         this.cloudSystem.update(this.currentBrightness, dt);
     }

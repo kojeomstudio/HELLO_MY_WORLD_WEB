@@ -48,6 +48,14 @@ export class CloudSystem {
         if (params.thickness !== undefined) this.cloudDensity = Math.max(0.1, Math.min(1, params.thickness / 32));
     }
 
+    setParamsDirect(density: number, thickness: number, height: number, speed: number): void {
+        this.cloudDensity = Math.max(0, Math.min(1, density));
+        this.cloudHeight = Math.max(50, Math.min(200, height));
+        this.cloudSpeed = Math.max(0, Math.min(20, speed));
+        this.mesh.position.y = this.cloudHeight;
+        this.material.opacity = Math.max(0.1, Math.min(1, thickness / 32));
+    }
+
     getParams(): { density: number; height: number; speed: number } {
         return { density: this.cloudDensity, height: this.cloudHeight, speed: this.cloudSpeed };
     }

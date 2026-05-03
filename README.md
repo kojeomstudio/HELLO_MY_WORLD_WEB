@@ -102,6 +102,14 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **World Backup**: Periodic auto-backup every 30 minutes, `/backup` and `/restore` commands
 - **Player Flags**: Invisible (hidden from other players), footstep sounds, zoom toggle per player
 - **Dungeon Loot Tables**: Tiered loot (common/uncommon/rare/special) with varied items
+- **VoxelManipulator**: Bulk node read/write utility for mapgen and world manipulation (CopyFrom/CopyTo/Fill/Replace/Blit)
+- **Advanced Ore Generation**: 6 ore placement algorithms — Scatter (noise-based), Vein (random-walk), Sheet (horizontal layer), Blob (spherical radius), Puff (3D thickness noise), Stratum (noise-contoured horizontal layers)
+- **Entity Interpolation**: Smooth position transitions for mobs and items using hermite spline interpolation
+- **Cloud Parameters Protocol**: Server-driven cloud density, thickness, height, and speed via SignalR `OnCloudParams` message
+- **Dig Time Verification**: Server-side anti-cheat validates dig completion time against block hardness and tool speed
+- **Loading Block Modifiers (LBM)**: Chunk-load-time block transformations with trigger block matching
+- **Extended DrawTypes**: glasslike_framed (framed glass with edge borders), signlike (wall-mounted flat signs), raillike (connected rail segments)
+- **Tool Group Capabilities**: Per-material group effectiveness (cracky, crumbly, choppy, snappy) and full punch interval configuration
 - **Redstone Repeater/Comparator**: New redstone components with delay and signal comparison
 - **Creative Search**: Real-time search by name or block ID with result highlighting
 - **Frustum Culling**: Camera frustum-based chunk visibility culling for performance

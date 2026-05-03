@@ -1,13 +1,13 @@
 {
     "materials": {
-        "wooden": { "durability": 59, "miningSpeed": 2.0 },
-        "stone": { "durability": 131, "miningSpeed": 4.0 },
-        "iron": { "durability": 250, "miningSpeed": 6.0 },
-        "diamond": { "durability": 1561, "miningSpeed": 8.0 },
-        "gold": { "durability": 32, "miningSpeed": 12.0 },
-        "mese": { "durability": 1337, "miningSpeed": 10.0 },
-        "steel": { "durability": 400, "miningSpeed": 6.0 },
-        "titanium": { "durability": 2000, "miningSpeed": 9.0 }
+        "wooden": { "durability": 59, "miningSpeed": 2.0, "fullPunchInterval": 0.5, "groupCapabilities": { "cracky": 1.0, "crumbly": 1.0, "choppy": 1.0, "snappy": 1.0 } },
+        "stone": { "durability": 131, "miningSpeed": 4.0, "fullPunchInterval": 0.5, "groupCapabilities": { "cracky": 2.0, "crumbly": 1.5, "choppy": 1.5, "snappy": 1.5 } },
+        "iron": { "durability": 250, "miningSpeed": 6.0, "fullPunchInterval": 0.4, "groupCapabilities": { "cracky": 3.0, "crumbly": 2.0, "choppy": 2.0, "snappy": 2.0 } },
+        "diamond": { "durability": 1561, "miningSpeed": 8.0, "fullPunchInterval": 0.35, "groupCapabilities": { "cracky": 4.0, "crumbly": 3.0, "choppy": 3.0, "snappy": 3.0 } },
+        "gold": { "durability": 32, "miningSpeed": 12.0, "fullPunchInterval": 0.3, "groupCapabilities": { "cracky": 2.0, "crumbly": 3.0, "choppy": 2.0, "snappy": 2.0 } },
+        "mese": { "durability": 1337, "miningSpeed": 10.0, "fullPunchInterval": 0.3, "groupCapabilities": { "cracky": 5.0, "crumbly": 4.0, "choppy": 4.0, "snappy": 4.0 } },
+        "steel": { "durability": 400, "miningSpeed": 6.0, "fullPunchInterval": 0.4, "groupCapabilities": { "cracky": 3.0, "crumbly": 2.0, "choppy": 2.0, "snappy": 2.0 } },
+        "titanium": { "durability": 2000, "miningSpeed": 9.0, "fullPunchInterval": 0.35, "groupCapabilities": { "cracky": 4.0, "crumbly": 3.0, "choppy": 3.0, "snappy": 3.0 } }
     },
     "weaponDamage": {
         "wooden_sword": 4,

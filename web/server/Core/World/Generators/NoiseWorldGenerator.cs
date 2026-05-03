@@ -411,6 +411,159 @@ public class NoiseWorldGenerator : IWorldGenerator
         }
 
         GenerateOreSheet(blocks, baseX, baseY, baseZ, rng);
+        GenerateOreBlob(blocks, baseX, baseY, baseZ, rng);
+        GenerateOrePuff(blocks, baseX, baseY, baseZ, rng);
+        GenerateOreStratum(blocks, baseX, baseY, baseZ, rng);
+    }
+
+    private void GenerateOreBlob(ushort[,,] blocks, int baseX, int baseY, int baseZ, Random rng)
+    {
+        var blobDefinitions = new (BlockType Type, int YMin, int YMax, float Chance, int Radius)[]
+        {
+            (BlockType.Diorite, 0, 80, 0.004f, 3),
+            (BlockType.Granite, 0, 80, 0.004f, 3),
+            (BlockType.Andesite, 0, 80, 0.004f, 3)
+        };
+
+        foreach (var (oreType, yMin, yMax, chance, radius) in blobDefinitions)
+        {
+            var numBlobs = (int)(Chunk.Size * Chunk.Size * Chunk.Size * chance);
+            for (int b = 0; b < numBlobs; b++)
+            {
+                var cx = rng.Next(0, Chunk.Size);
+                var cy = rng.Next(0, Chunk.Size);
+                var cz = rng.Next(0, Chunk.Size);
+                var worldY = baseY + cy;
+                if (worldY < yMin || worldY > yMax) continue;
+                if (blocks[cx, cy, cz] != (ushort)BlockType.Stone &&
+                    blocks[cx, cy, cz] != (ushort)BlockType.DesertStone) continue;
+
+                for (int dx = -radius; dx <= radius; dx++)
+                {
+                    for (int dy = -radius; dy <= radius; dy++)
+                    {
+                        for (int dz = -radius; dz <= radius; dz++)
+                        {
+                            var distSq = dx * dx + dy * dy + dz * dz;
+                            if (distSq > radius * radius) continue;
+
+                            var nx = cx + dx;
+                            var ny = cy + dy;
+                            var nz = cz + dz;
+                            if (nx < 0 || nx >= Chunk.Size || ny < 0 || ny >= Chunk.Size || nz < 0 || nz >= Chunk.Size) continue;
+
+                            if (blocks[nx, ny, nz] == (ushort)BlockType.Stone ||
+                                blocks[nx, ny, nz] == (ushort)BlockType.DesertStone)
+                            {
+                                blocks[nx, ny, nz] = (ushort)oreType;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private void GenerateOrePuff(ushort[,,] blocks, int baseX, int baseY, int baseZ, Random rng)
+    {
+        var puffDefinitions = new (BlockType Type, int YMin, int YMax, float Chance, int Radius, float NoiseThreshold)[]
+        {
+            (BlockType.Tuff, 0, 40, 0.003f, 4, 0.6f),
+            (BlockType.Calcite, 0, 40, 0.002f, 3, 0.65f)
+        };
+
+        foreach (var (oreType, yMin, yMax, chance, radius, noiseThreshold) in puffDefinitions)
+        {
+            var numPuffs = (int)(Chunk.Size * Chunk.Size * Chunk.Size * chance);
+            for (int p = 0; p < numPuffs; p++)
+            {
+                var cx = rng.Next(0, Chunk.Size);
+                var cy = rng.Next(0, Chunk.Size);
+                var cz = rng.Next(0, Chunk.Size);
+                var worldY = baseY + cy;
+                if (worldY < yMin || worldY > yMax) continue;
+                if (blocks[cx, cy, cz] != (ushort)BlockType.Stone) continue;
+
+                var worldCX = baseX + cx;
+                var worldCZ = baseZ + cz;
+
+                for (int dx = -radius; dx <= radius; dx++)
+                {
+                    for (int dy = -radius; dy <= radius; dy++)
+                    {
+                        for (int dz = -radius; dz <= radius; dz++)
+                        {
+                            var distSq = dx * dx + dy * dy + dz * dz;
+                            if (distSq > radius * radius) continue;
+
+                            var nx = cx + dx;
+                            var ny = cy + dy;
+                            var nz = cz + dz;
+                            if (nx < 0 || nx >= Chunk.Size || ny < 0 || ny >= Chunk.Size || nz < 0 || nz >= Chunk.Size) continue;
+
+                            var thicknessNoise = PerlinNoise3D(
+                                (worldCX + dx) * 0.2f + 5000,
+                                (worldY + dy) * 0.2f + 5000,
+                                (worldCZ + dz) * 0.2f + 5000);
+
+                            if (thicknessNoise > noiseThreshold &&
+                                (blocks[nx, ny, nz] == (ushort)BlockType.Stone ||
+                                 blocks[nx, ny, nz] == (ushort)BlockType.DesertStone))
+                            {
+                                blocks[nx, ny, nz] = (ushort)oreType;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private void GenerateOreStratum(ushort[,,] blocks, int baseX, int baseY, int baseZ, Random rng)
+    {
+        var stratumDefinitions = new (BlockType Type, int YMin, int YMax, float Chance, int MinThickness, int MaxThickness)[]
+        {
+            (BlockType.Deepslate, 0, 16, 0.005f, 3, 8),
+            (BlockType.Tuff, 0, 30, 0.003f, 2, 5)
+        };
+
+        foreach (var (oreType, yMin, yMax, chance, minThickness, maxThickness) in stratumDefinitions)
+        {
+            if (rng.NextDouble() > chance) continue;
+
+            var stratumY = rng.Next(0, Chunk.Size);
+            var worldY = baseY + stratumY;
+            if (worldY < yMin || worldY > yMax) continue;
+
+            var thickness = rng.Next(minThickness, maxThickness + 1);
+            var noiseScale = 0.05f + rng.NextSingle() * 0.1f;
+            var noiseOffset = rng.Next(0, 10000);
+
+            for (int x = 0; x < Chunk.Size; x++)
+            {
+                for (int z = 0; z < Chunk.Size; z++)
+                {
+                    var worldX = baseX + x;
+                    var worldZ = baseZ + z;
+                    var stratumNoise = PerlinNoise3D(
+                        worldX * noiseScale + noiseOffset,
+                        worldY * noiseScale + noiseOffset,
+                        worldZ * noiseScale + noiseOffset);
+
+                    if (stratumNoise < -0.2f) continue;
+
+                    for (int t = 0; t < thickness; t++)
+                    {
+                        var ly = stratumY + t;
+                        if (ly >= Chunk.Size) break;
+                        if (blocks[x, ly, z] == (ushort)BlockType.Stone)
+                        {
+                            blocks[x, ly, z] = (ushort)oreType;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private void GenerateOreSheet(ushort[,,] blocks, int baseX, int baseY, int baseZ, Random rng)

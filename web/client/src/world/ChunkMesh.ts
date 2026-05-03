@@ -301,6 +301,119 @@ function buildFirelike(ctx: BuildCtx, wx: number, wy: number, wz: number, color:
         [0, 0, 1], color, lm, 1.0);
 }
 
+function buildGlasslikeFramed(
+    ctx: BuildCtx, wx: number, wy: number, wz: number,
+    blockId: number, color: THREE.Color, frameColor: THREE.Color
+): void {
+    const faces = [
+        { dir: [0, 1, 0], corners: [[0, 1, 0], [1, 1, 0], [1, 1, 1], [0, 1, 1]], normal: [0, 1, 0] },
+        { dir: [0, -1, 0], corners: [[0, 0, 1], [1, 0, 1], [1, 0, 0], [0, 0, 0]], normal: [0, -1, 0] },
+        { dir: [1, 0, 0], corners: [[1, 0, 0], [1, 1, 0], [1, 1, 1], [1, 0, 1]], normal: [1, 0, 0] },
+        { dir: [-1, 0, 0], corners: [[0, 0, 1], [0, 1, 1], [0, 1, 0], [0, 0, 0]], normal: [-1, 0, 0] },
+        { dir: [0, 0, 1], corners: [[0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]], normal: [0, 0, 1] },
+        { dir: [0, 0, -1], corners: [[1, 0, 0], [0, 0, 0], [0, 1, 0], [1, 1, 0]], normal: [0, 0, -1] },
+    ];
+
+    const frameW = 0.0625;
+
+    for (const face of faces) {
+        const nx = wx + face.dir[0];
+        const ny = wy + face.dir[1];
+        const nz = wz + face.dir[2];
+        const neighborId = ctx.getNeighborBlock(nx, ny, nz);
+
+        if (neighborId === blockId) continue;
+
+        const lm = getBlockLight(ctx, wx, wy, wz);
+
+        const c = face.corners;
+        const n = face.normal;
+
+        const topFrame = [
+            [c[0][0], c[0][1], c[0][2]],
+            [c[1][0], c[1][1], c[1][2]],
+            [c[2][0], c[2][1], c[2][2]],
+            [c[3][0], c[3][1], c[3][2]]
+        ];
+        pushQuad(ctx, wx, wy, wz, topFrame[0], topFrame[1], topFrame[2], topFrame[3], n, frameColor, lm, 1.0);
+
+        const innerCorners = c.map(corner => {
+            return corner.map((v, i) => {
+                if (n[i] !== 0) return v;
+                return v < 0.5 ? v + frameW : v - frameW;
+            });
+        });
+
+        pushQuad(ctx, wx, wy, wz,
+            innerCorners[0], innerCorners[1], innerCorners[2], innerCorners[3],
+            n, color, lm, 0.85);
+    }
+}
+
+function buildSignlike(ctx: BuildCtx, wx: number, wy: number, wz: number, param2: number, color: THREE.Color): void {
+    const lm = getBlockLight(ctx, wx, wy, wz);
+    const thickness = 0.0625;
+
+    let nx = 0, nz = -1;
+    switch (param2 % 4) {
+        case 0: nx = 0; nz = -1; break;
+        case 1: nx = 1; nz = 0; break;
+        case 2: nx = 0; nz = 1; break;
+        case 3: nx = -1; nz = 0; break;
+    }
+
+    const x0 = nx > 0 ? 1 - thickness : 0;
+    const x1 = nx > 0 ? 1 : thickness;
+    const z0 = nz > 0 ? 1 - thickness : 0;
+    const z1 = nz > 0 ? 1 : thickness;
+
+    if (nx !== 0) {
+        pushQuad(ctx, wx, wy, wz,
+            [x0, 0, 0.15], [x0, 1, 0.15],
+            [x0, 1, 0.85], [x0, 0, 0.85],
+            [nx, 0, 0], color, lm, 1.0);
+        pushQuad(ctx, wx, wy, wz,
+            [x1, 0, 0.85], [x1, 1, 0.85],
+            [x1, 1, 0.15], [x1, 0, 0.15],
+            [-nx, 0, 0], color, lm, 0.8);
+    } else {
+        pushQuad(ctx, wx, wy, wz,
+            [0.15, 0, z0], [0.85, 0, z0],
+            [0.85, 1, z0], [0.15, 1, z0],
+            [0, 0, nz], color, lm, 1.0);
+        pushQuad(ctx, wx, wy, wz,
+            [0.85, 0, z1], [0.15, 0, z1],
+            [0.15, 1, z1], [0.85, 1, z1],
+            [0, 0, -nz], color, lm, 0.8);
+    }
+}
+
+function buildRaillike(ctx: BuildCtx, wx: number, wy: number, wz: number, blockId: number, color: THREE.Color): void {
+    const lm = getBlockLight(ctx, wx, wy, wz);
+    const nb = ctx.getNeighborBlock;
+    const north = nb(wx, wy, wz - 1) === blockId;
+    const south = nb(wx, wy, wz + 1) === blockId;
+    const east = nb(wx + 1, wy, wz) === blockId;
+    const west = nb(wx - 1, wy, wz) === blockId;
+
+    const railY = 0.0;
+    const railH = 0.125;
+    const railW = 0.125;
+
+    pushBox(ctx, wx, wy, wz, 0.5 - railW, railY, 0.5 - railW, 0.5 + railW, railY + railH, 0.5 + railW, color, lm);
+
+    if (north || south) {
+        const z0 = north ? 0 : 0.5 - railW;
+        const z1 = south ? 1 : 0.5 + railW;
+        pushBox(ctx, wx, wy, wz, 0.5 - railW, railY, z0, 0.5 + railW, railY + railH, z1, color, lm);
+    }
+    if (east || west) {
+        const x0 = west ? 0 : 0.5 - railW;
+        const x1 = east ? 1 : 0.5 + railW;
+        pushBox(ctx, wx, wy, wz, x0, railY, 0.5 - railW, x1, railY + railH, 0.5 + railW, color, lm);
+    }
+}
+
 function buildGlasslike(
     ctx: BuildCtx, wx: number, wy: number, wz: number,
     blockId: number, color: THREE.Color
@@ -706,6 +819,15 @@ export class ChunkMesh {
                             break;
                         case 'glasslike':
                             buildGlasslike(ctx, worldX, worldY, worldZ, blockId, color);
+                            break;
+                        case 'glasslike_framed':
+                            buildGlasslikeFramed(ctx, worldX, worldY, worldZ, blockId, color, new THREE.Color('#8B8B8B'));
+                            break;
+                        case 'signlike':
+                            buildSignlike(ctx, worldX, worldY, worldZ, param2, color);
+                            break;
+                        case 'raillike':
+                            buildRaillike(ctx, worldX, worldY, worldZ, blockId, color);
                             break;
                     }
                 }

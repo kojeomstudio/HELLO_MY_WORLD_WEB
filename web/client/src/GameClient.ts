@@ -311,6 +311,10 @@ export class GameClient {
             this.renderer.updateSkyParams(params);
         });
 
+        this.connection.on('OnCloudParams', (density: number, thickness: number, height: number, speed: number) => {
+            this.renderer.updateCloudParams(density, thickness, height, speed);
+        });
+
         this.connection.on('OnPlayerFlags', (playerName: string, isInvisible: boolean, _makesFootstepSound: boolean, _canZoom: boolean) => {
             if (playerName === '__local__') return;
             this.worldManager.setPlayerVisibility(playerName, !isInvisible);

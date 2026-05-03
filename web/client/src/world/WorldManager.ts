@@ -108,6 +108,7 @@ export class WorldManager {
     private playerMeshes: Map<string, PlayerInfo> = new Map();
     private entityMeshes: Map<string, THREE.Mesh> = new Map();
     private entityAutoRotateSpeeds: Map<string, number> = new Map();
+    private entityInterpolation: Map<string, { prevX: number; prevY: number; prevZ: number; targetX: number; targetY: number; targetZ: number; time: number }> = new Map();
     private pendingChunks: Set<string> = new Set();
     private connection: HubConnection.HubConnection | null = null;
     private textureAtlas: TextureAtlas | null = null;
@@ -810,16 +811,33 @@ export class WorldManager {
             }
             this.entityMeshes.delete(entityId);
             this.entityAutoRotateSpeeds.delete(entityId);
+            this.entityInterpolation.delete(entityId);
         }
     }
 
     updateEntityPosition(entityId: string, x: number, y: number, z: number): void {
         const obj = this.entityMeshes.get(entityId);
-        if (obj) {
+        if (!obj) return;
+
+        const existing = this.entityInterpolation.get(entityId);
+        if (existing) {
+            existing.prevX = obj.position.x;
+            existing.prevY = obj.position.y;
+            existing.prevZ = obj.position.z;
+            existing.targetX = x;
+            existing.targetY = y;
+            existing.targetZ = z;
+            existing.time = 0;
+        } else {
             obj.position.set(x, y, z);
             if (entityId.startsWith('item_')) {
                 obj.position.y += 0.15;
             }
+            this.entityInterpolation.set(entityId, {
+                prevX: x, prevY: y, prevZ: z,
+                targetX: x, targetY: y, targetZ: z,
+                time: 1
+            });
         }
     }
 
@@ -874,6 +892,22 @@ export class WorldManager {
 
     update(dt: number): void {
         this.entityAnimTime += dt;
+
+        const interpolationSpeed = 10.0;
+        for (const [entityId, interp] of this.entityInterpolation) {
+            if (interp.time >= 1.0) continue;
+            interp.time = Math.min(1.0, interp.time + dt * interpolationSpeed);
+            const t = interp.time * interp.time * (3.0 - 2.0 * interp.time);
+            const obj = this.entityMeshes.get(entityId);
+            if (obj) {
+                obj.position.x = interp.prevX + (interp.targetX - interp.prevX) * t;
+                obj.position.y = interp.prevY + (interp.targetY - interp.prevY) * t;
+                obj.position.z = interp.prevZ + (interp.targetZ - interp.prevZ) * t;
+                if (entityId.startsWith('item_')) {
+                    obj.position.y += 0.15;
+                }
+            }
+        }
 
         for (const [entityId, mesh] of this.entityMeshes) {
             if (entityId.startsWith('item_')) {

@@ -64,6 +64,7 @@ public interface IGameClient
     Task OnLightingUpdate(float shadowIntensity, float exposureMin, float exposureMax, float ambientBoost, float bloomStrength);
     Task OnHudFlag(string flag, bool enabled);
     Task OnSkyParams(object parameters);
+    Task OnCloudParams(float density, float thickness, float height, float speed);
     Task OnPlayerFlags(string playerName, bool isInvisible, bool makesFootstepSound, bool canZoom);
     Task OnItemColorUpdate(string itemId, string color);
 }
@@ -71,6 +72,7 @@ public interface IGameClient
 public class GameHub : Hub<IGameClient>
 {
     private static readonly ConcurrentDictionary<string, DateTime> _lastActionTimes = new();
+    private static readonly ConcurrentDictionary<string, (DateTime StartTime, float RequiredTime)> _activeDigs = new();
     private static readonly ConcurrentDictionary<string, int> _joinAttempts = new();
     private static readonly ConcurrentDictionary<string, (int FailCount, DateTime LockoutEnd)> _accountFailures = new();
 
@@ -714,6 +716,21 @@ public class GameHub : Hub<IGameClient>
         var distance = Vector3.Distance(player.Position, blockCenter);
         if (distance > _gameServer.Config.Physics.DigRange) return;
 
+        if (player.Mode != GameMode.Creative && player.Mode != GameMode.Spectator)
+        {
+            if (_activeDigs.TryGetValue(Context.ConnectionId, out var digInfo))
+            {
+                var elapsed = (float)(DateTime.UtcNow - digInfo.StartTime).TotalSeconds;
+                var tolerance = 0.3f;
+                if (elapsed < digInfo.RequiredTime - tolerance)
+                {
+                    _activeDigs.TryRemove(Context.ConnectionId, out _);
+                    return;
+                }
+                _activeDigs.TryRemove(Context.ConnectionId, out _);
+            }
+        }
+
         var blockPos = new Vector3s((short)x, (short)y, (short)z);
         var oldBlock = _gameServer.DefaultWorld.GetBlock(blockPos);
         var blockData = oldBlock.ToPacked();
@@ -823,7 +840,14 @@ public class GameHub : Hub<IGameClient>
         }
 
         var digTime = hardness / toolMultiplier;
-        return Math.Max(digTime, 0.1f);
+        digTime = Math.Max(digTime, 0.1f);
+
+        if (player.Mode != GameMode.Creative)
+        {
+            _activeDigs[Context.ConnectionId] = (DateTime.UtcNow, digTime);
+        }
+
+        return digTime;
     }
 
     public async Task<bool> UseBucket(int x, int y, int z, bool place)

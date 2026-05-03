@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace WebGameServer.Core;
 
-public record ToolMaterial(string Name, int Durability, float MiningSpeed);
+public record ToolMaterial(string Name, int Durability, float MiningSpeed, float FullPunchInterval = 0.5f, Dictionary<string, float>? GroupCapabilities = null);
 
 public static class ToolConfig
 {
@@ -23,7 +23,21 @@ public static class ToolConfig
             {
                 var durability = prop.Value.GetProperty("durability").GetInt32();
                 var miningSpeed = prop.Value.GetProperty("miningSpeed").GetSingle();
-                Materials[prop.Name] = new ToolMaterial(prop.Name, durability, miningSpeed);
+                var fullPunchInterval = 0.5f;
+                if (prop.Value.TryGetProperty("fullPunchInterval", out var fpi))
+                    fullPunchInterval = fpi.GetSingle();
+
+                Dictionary<string, float>? groupCaps = null;
+                if (prop.Value.TryGetProperty("groupCapabilities", out var gcEl))
+                {
+                    groupCaps = new Dictionary<string, float>();
+                    foreach (var gc in gcEl.EnumerateObject())
+                    {
+                        groupCaps[gc.Name] = gc.Value.GetSingle();
+                    }
+                }
+
+                Materials[prop.Name] = new ToolMaterial(prop.Name, durability, miningSpeed, fullPunchInterval, groupCaps);
             }
         }
 
@@ -57,6 +71,33 @@ public static class ToolConfig
             if (lower.StartsWith(prefix + "_"))
             {
                 return material.MiningSpeed;
+            }
+        }
+        return 1.0f;
+    }
+
+    public static float GetFullPunchInterval(string itemName)
+    {
+        var lower = itemName.ToLowerInvariant();
+        foreach (var (prefix, material) in Materials)
+        {
+            if (lower.StartsWith(prefix + "_"))
+            {
+                return material.FullPunchInterval;
+            }
+        }
+        return 0.5f;
+    }
+
+    public static float GetGroupCapability(string itemName, string groupName)
+    {
+        var lower = itemName.ToLowerInvariant();
+        foreach (var (prefix, material) in Materials)
+        {
+            if (lower.StartsWith(prefix + "_") && material.GroupCapabilities != null)
+            {
+                if (material.GroupCapabilities.TryGetValue(groupName, out var value))
+                    return value;
             }
         }
         return 1.0f;
