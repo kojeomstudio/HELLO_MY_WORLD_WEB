@@ -59,6 +59,7 @@ public interface IGameClient
     Task OnPhysicsParams(float gravity, float jumpForce, float walkSpeed, float sprintSpeed, float flySpeed, float climbSpeed, float liquidDrag);
     Task OnWeatherUpdate(string weatherType, float intensity);
     Task OnDetachedInventory(string name, object[] items);
+    Task OnFov(float fov, float transitionTime);
 }
 
 public class GameHub : Hub<IGameClient>
