@@ -1,0 +1,94 @@
+{
+  "trees": [
+    {
+      "name": "default_tree",
+      "axiom": "FFFA",
+      "rules": [
+        { "key": "A", "value": "&FB" },
+        { "key": "B", "value": "F[+B][-B]" }
+      ],
+      "angle": 45,
+      "iterations": 4,
+      "trunkType": "single",
+      "trunkBlock": "wood",
+      "leavesBlock": "leaves",
+      "fruitBlock": "apple",
+      "fruitChance": 0.1,
+      "randomLevel": 0,
+      "biomes": ["grassland", "forest"],
+      "maxTreeLength": 256
+    },
+    {
+      "name": "jungle_tree",
+      "axiom": "FFFAA",
+      "rules": [
+        { "key": "A", "value": "FF[+FA][-FA]FA" },
+        { "key": "B", "value": "F[+B][-B]" }
+      ],
+      "angle": 35,
+      "iterations": 4,
+      "trunkType": "single",
+      "trunkBlock": "jungle_wood",
+      "leavesBlock": "jungle_leaves",
+      "fruitBlock": "",
+      "fruitChance": 0.0,
+      "randomLevel": 1,
+      "biomes": ["jungle"],
+      "maxTreeLength": 512
+    },
+    {
+      "name": "pine_tree",
+      "axiom": "FFFA",
+      "rules": [
+        { "key": "A", "value": "^FB" },
+        { "key": "B", "value": "F[+B][-B][^B]" }
+      ],
+      "angle": 25,
+      "iterations": 5,
+      "trunkType": "single",
+      "trunkBlock": "pine_wood",
+      "leavesBlock": "pine_needles",
+      "fruitBlock": "",
+      "fruitChance": 0.0,
+      "randomLevel": 0,
+      "biomes": ["snow", "taiga"],
+      "maxTreeLength": 384
+    },
+    {
+      "name": "large_oak",
+      "axiom": "FFFFFA",
+      "rules": [
+        { "key": "A", "value": "[&FFB][&&FFB][&^FFB][^^FFB]" },
+        { "key": "B", "value": "F[+B][-B]FB" }
+      ],
+      "angle": 30,
+      "iterations": 3,
+      "trunkType": "single",
+      "trunkBlock": "wood",
+      "leavesBlock": "leaves",
+      "fruitBlock": "apple",
+      "fruitChance": 0.08,
+      "randomLevel": 1,
+      "biomes": ["forest"],
+      "maxTreeLength": 512
+    },
+    {
+      "name": "savanna_acacia",
+      "axiom": "FFFA",
+      "rules": [
+        { "key": "A", "value": "FF[+FA][-FA]A" },
+        { "key": "B", "value": "F[+B][-B]" }
+      ],
+      "angle": 55,
+      "iterations": 3,
+      "trunkType": "single",
+      "trunkBlock": "wood",
+      "leavesBlock": "leaves",
+      "fruitBlock": "",
+      "fruitChance": 0.0,
+      "randomLevel": 2,
+      "biomes": ["savanna"],
+      "maxTreeLength": 256
+    }
+  ]
+}

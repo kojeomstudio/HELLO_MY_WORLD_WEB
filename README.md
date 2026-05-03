@@ -143,6 +143,11 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Item Color Tinting**: `/color` command to dye inventory items with hex colors
 - **Bone Manipulation**: Server-driven entity bone rotation/scale (head tracking)
 - **Per-Player FOV**: Server-driven FOV override via `/fov` command
+- **L-System Tree Generation**: Axiom/rule-based procedural tree generation with turtle graphics (F/T/f/R/G commands, yaw/pitch/roll rotation, state push/pop), 5 predefined tree types (default, jungle, pine, large_oak, savanna_acacia), biome-specific placement, random variation support
+- **Schematic Placement System**: JSON-based structure placement with per-node probability, Y-slice probability, rotation (0/90/180/270), force-place option, surface placement API; 2 predefined schematics (small_house, outpost_tower)
+- **MapgenValleys**: River valley terrain generator with altitude-chill biome adjustment, noise-based river carving, configurable valley depth/width
+- **MapgenCarpathian**: Terraced mountain terrain generator with step-height quantization, ridge noise for mountain ridges, stone surface at high altitudes, optional rivers
+- **Async Job System**: Background job queue with concurrency limiting (4 parallel), progress tracking, cancellation, job status (Pending/Running/Completed/Failed/Cancelled), automatic cleanup of completed jobs
 
 ## Architecture
 
@@ -207,9 +212,15 @@ web/
 │   │   ├── ToolWear/             # Tool wear/durability system
 │   │   ├── Smelting/             # Smelting system
 │   │   ├── ModStorage/           # Persistent mod key-value storage
+│   │   ├── AsyncJobSystem.cs     # Background job queue with progress tracking
 │   │   ├── UI/                   # Formspec parser and system
 │   │   ├── Weather/              # Server weather system (rain, snow, thunderstorm)
 │   │   └── World/                # World, chunks, generators, lighting, ABMs, redstone
+│   │       ├── Generators/       # MapgenV5, V7/Noise, Valleys, Carpathian, Fractal, Singlenode, Flat
+│   │       │   ├── LSystemTree.cs        # L-system tree generation engine
+│   │       │   ├── SchematicPlacer.cs    # Schematic placement with rotation/probability
+│   │       │   ├── MapgenValleys.cs      # River valley terrain generator
+│   │       │   └── MapgenCarpathian.cs   # Terraced mountain terrain generator
 │   └── Services/
 │       ├── GameHub.cs            # SignalR hub
 │       └── GameLoopService.cs    # Background game loop
@@ -220,6 +231,10 @@ web/
 │   ├── tools.json        # 8 tool material definitions
 │   ├── biomes.json       # 10 biome definitions with tree types and decorations
 │   ├── tree_schematics.json # Tree schematic definitions (oak, pine, jungle, birch, cactus)
+│   ├── lsystem_trees.json   # L-system tree definitions (5 types with axiom/rules)
+│   ├── schematics.json      # Structure schematics (small_house, outpost_tower)
+│   ├── mapgen_valleys.json  # Valleys generator config
+│   ├── mapgen_carpathian.json # Carpathian generator config
 │   ├── physics_constants.json
 │   ├── privileges.json   # 19 privileges
 │   ├── abm_config.json   # ABM modifier parameters (intervals, chances)

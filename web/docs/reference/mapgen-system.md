@@ -164,13 +164,25 @@ MapgenBasic 사용 안 함. 자체 생물군계 시스템 (NORMAL/DESERT/JUNGLE/
 
 평평한 지형. 선택적 호수/언덕 (2D 노이즈). 노이즈 6개.
 
-### MapgenValleys
+### MapgenValleys (구현됨)
 
 강 계곡. 고도-냉기, 습윤-강, 가변 강 깊이. 노이즈 12개.
 
-### MapgenCarpathian
+**웹 포팅 구현:**
+- 파일: `web/server/Core/World/Generators/MapgenValleys.cs`
+- 설정: `web/data/mapgen_valleys.json` (altitudeChill, riverDepth, riverSize, valleyDepth, valleyWidth)
+- 특징: 고도-냉기 시스템 (높은 곳일수록 열 감소), 강 생성 (노이즈 기반), 계곡 지형
+- 파이프라인: 지형 → 동굴 → 던전 → 강 → 나무 → 장식
+
+### MapgenCarpathian (구현됨)
 
 계단식 산. 선택적 강, 4가지 높이 노이즈. 노이즈 16개.
+
+**웹 포팅 구현:**
+- 파일: `web/server/Core/World/Generators/MapgenCarpathian.cs`
+- 설정: `web/data/mapgen_carpathian.json` (baseTerrainScale, ridgeScale, stepHeight, ridgeDepth)
+- 특징: 계단식 지형 (stepHeight 단위로 높이 반올림), 능선 산맥, 높은 지형은 돌 표면
+- 파이프라인: 지형 → 동굴 → 던전 → 강 → 나무 → 장식
 
 ### MapgenFractal
 
@@ -325,7 +337,7 @@ struct DungeonParams {
 | 정글 나무 | 8-12블록 | 7×5×7 | 넓은 기둥 기부 |
 | 소나무 | 9-13블록 | 계단식 원뿔 | 꼭대기 눈 |
 
-### L-시스템 나무
+### L-시스템 나무 (구현됨)
 
 ```
 공리(axiom) 확장: A-D 문자를 규칙으로 교체
@@ -339,7 +351,15 @@ struct DungeonParams {
           trunk_type ("single"/"double"/"crossed")
 ```
 
-## 13. Schematic 시스템 (`src/mapgen/mg_schematic.h`)
+**웹 포팅 구현:**
+- 파일: `web/server/Core/World/Generators/LSystemTree.cs`
+- 설정: `web/data/lsystem_trees.json` (5종 나무 정의: default_tree, jungle_tree, pine_tree, large_oak, savanna_acacia)
+- `LSystemTreeGenerator` 클래스: LoadDefinitions(), GetDefinitionForBiome(), GenerateTree()
+- `LSystemTreeDefinition` 클래스: Name, Axiom, Rules, Angle, Iterations, TrunkType, TrunkBlock, LeavesBlock, FruitBlock, FruitChance, RandomLevel, Biomes, MaxTreeLength
+- 거북이 그래픽스: yaw/pitch/roll 회전, 상태 푸시/팝 ([ ]), 전진 명령 (F/T/f/R/G)
+- randomLevel: 규칙 적용 시 무작위 생략 (자연스러운 변이)
+
+## 13. Schematic 시스템 (구현됨)
 
 ### MTSM 파일 포맷 (v4)
 
@@ -363,6 +383,16 @@ MTSCHEM_FORCE_PLACE = 0x80  (param1 비트 7)
 회전 지원 (0/90/180/270도)
 CONTENT_IGNORE 건너뜀
 ```
+
+**웹 포팅 구현:**
+- 파일: `web/server/Core/World/Generators/SchematicPlacer.cs`
+- 설정: `web/data/schematics.json` (2종 구조물: small_house, outpost_tower)
+- `SchematicPlacer` 클래스: LoadSchematics(), PlaceSchematic(), TryPlaceSchematicOnSurface()
+- `Schematic` 클래스: Name, SizeX/Y/Z, YSliceProbabilities, Nodes[,,]
+- `SchematicNode` 구조체: BlockType, Probability, ForcePlace
+- 회전 지원: 0/90/180/270도 (RotateCoord)
+- 확률 시스템: 노드별 확률 + Y-슬라이스 확률
+- forcePlace: 기존 블록 덮어쓰기 옵션
 
 ## 14. 노이즈 시스템 (`src/noise.h`)
 

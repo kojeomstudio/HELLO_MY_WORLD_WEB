@@ -606,6 +606,7 @@ builder.Services.AddSingleton(new PlayerDatabase(playerDbPath));
 builder.Services.AddSingleton(new BlockMetadataDatabase(blockMetaDbPath));
 builder.Services.AddSingleton<GameServer>();
 builder.Services.AddSingleton<AuthenticationService>();
+builder.Services.AddSingleton<AsyncJobSystem>();
 builder.Services.AddSingleton<ChatCommandManager>(sp =>
 {
     var gameServer = sp.GetRequiredService<GameServer>();

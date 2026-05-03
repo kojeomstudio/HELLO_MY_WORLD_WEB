@@ -1,0 +1,6 @@
+{
+  "baseTerrainScale": 0.01,
+  "ridgeScale": 0.005,
+  "stepHeight": 6,
+  "ridgeDepth": 0.35
+}

@@ -15,6 +15,8 @@ public class WorldGeneratorFactory
         Register("v7", () => new NoiseWorldGenerator());
         Register("fractal", () => new MapgenFractal());
         Register("singlenode", () => new MapgenSinglenode());
+        Register("valleys", () => new MapgenValleys());
+        Register("carpathian", () => new MapgenCarpathian());
     }
 
     public void Register(string name, Func<IWorldGenerator> factory)

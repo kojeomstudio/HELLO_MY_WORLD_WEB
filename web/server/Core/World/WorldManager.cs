@@ -14,9 +14,16 @@ public class WorldManager
         _generatorFactory = generatorFactory;
     }
 
-    public World CreateWorld(string name, int seed, string generatorType)
+    public World CreateWorld(string name, int seed, string generatorType, string? dataPath = null)
     {
         var generator = _generatorFactory.Create(generatorType);
+        if (dataPath == null)
+        {
+            dataPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "data");
+            if (!Directory.Exists(dataPath))
+                dataPath = Path.Combine(Directory.GetCurrentDirectory(), "data");
+        }
+        generator.LoadBiomes(dataPath);
         var world = new World(name, seed, generator);
         _worlds.TryAdd(name, world);
         return world;
