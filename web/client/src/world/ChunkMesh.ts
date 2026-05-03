@@ -442,6 +442,59 @@ function buildGlasslike(
     }
 }
 
+function buildLeveled(ctx: BuildCtx, wx: number, wy: number, wz: number, param2: number, color: THREE.Color): void {
+    const lm = getBlockLight(ctx, wx, wy, wz);
+    const height = Math.max(0.0625, Math.min(1.0, param2 / 8.0));
+
+    pushQuad(ctx, wx, wy, wz,
+        [0, height, 0], [1, height, 0],
+        [1, height, 1], [0, height, 1],
+        [0, 1, 0], color, lm, 1.1);
+    pushQuad(ctx, wx, wy, wz,
+        [0, 0, 1], [1, 0, 1],
+        [1, 0, 0], [0, 0, 0],
+        [0, -1, 0], color, lm, 0.7);
+
+    const aboveId = ctx.getNeighborBlock(wx, wy + 1, wz);
+    if (aboveId === 0) {
+        pushQuad(ctx, wx, wy, wz,
+            [0, height, 0], [1, height, 0],
+            [1, height, 1], [0, height, 1],
+            [0, 1, 0], color, lm, 1.1);
+    }
+
+    const nb = ctx.getNeighborBlock;
+    const front = nb(wx, wy, wz - 1);
+    const back = nb(wx, wy, wz + 1);
+    const left = nb(wx - 1, wy, wz);
+    const right = nb(wx + 1, wy, wz);
+
+    if (front === 0 || front !== ctx.getNeighborBlock(wx, wy, wz)) {
+        pushQuad(ctx, wx, wy, wz,
+            [1, 0, 0], [0, 0, 0],
+            [0, height, 0], [1, height, 0],
+            [0, 0, -1], color, lm, 0.9);
+    }
+    if (back === 0 || back !== ctx.getNeighborBlock(wx, wy, wz)) {
+        pushQuad(ctx, wx, wy, wz,
+            [0, 0, 1], [1, 0, 1],
+            [1, height, 1], [0, height, 1],
+            [0, 0, 1], color, lm, 0.9);
+    }
+    if (left === 0 || left !== ctx.getNeighborBlock(wx, wy, wz)) {
+        pushQuad(ctx, wx, wy, wz,
+            [0, 0, 0], [0, 0, 1],
+            [0, height, 1], [0, height, 0],
+            [-1, 0, 0], color, lm, 0.95);
+    }
+    if (right === 0 || right !== ctx.getNeighborBlock(wx, wy, wz)) {
+        pushQuad(ctx, wx, wy, wz,
+            [1, 0, 1], [1, 0, 0],
+            [1, height, 0], [1, height, 1],
+            [1, 0, 0], color, lm, 0.95);
+    }
+}
+
 export class ChunkMesh {
     public mesh: THREE.Mesh | null = null;
     public transparentMesh: THREE.Mesh | null = null;
@@ -828,6 +881,9 @@ export class ChunkMesh {
                             break;
                         case 'raillike':
                             buildRaillike(ctx, worldX, worldY, worldZ, blockId, color);
+                            break;
+                        case 'leveled':
+                            buildLeveled(ctx, worldX, worldY, worldZ, param2, color);
                             break;
                     }
                 }

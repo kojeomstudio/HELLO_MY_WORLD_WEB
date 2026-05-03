@@ -10,6 +10,7 @@ public class ActiveBlockModifier
     public string? RequiredNeighbor { get; init; }
     public int MinY { get; init; } = -31000;
     public int MaxY { get; init; } = 31000;
+    public int ActiveBlockRange { get; init; } = 3;
     public Func<BlockDefinition, Vector3s, World, bool> Action { get; init; } = (_, _, _) => false;
 }
 
@@ -31,8 +32,30 @@ public class ActiveBlockModifierSystem
         _lastRun[abm] = -abm.Interval;
     }
 
-    public void Process(World world, int tickCount, BlockDefinitionManager blockDefs)
+    public void Process(World world, int tickCount, BlockDefinitionManager blockDefs, IEnumerable<Vector3> playerPositions)
     {
+        var playerChunks = new HashSet<ChunkCoord>();
+        foreach (var pos in playerPositions)
+        {
+            var cx = (int)Math.Floor(pos.X / Chunk.Size);
+            var cy = (int)Math.Floor(pos.Y / Chunk.Size);
+            var cz = (int)Math.Floor(pos.Z / Chunk.Size);
+            var range = 3;
+
+            for (int dx = -range; dx <= range; dx++)
+            {
+                for (int dy = -range; dy <= range; dy++)
+                {
+                    for (int dz = -range; dz <= range; dz++)
+                    {
+                        playerChunks.Add(new ChunkCoord(cx + dx, cy + dy, cz + dz));
+                    }
+                }
+            }
+        }
+
+        if (playerChunks.Count == 0) return;
+
         foreach (var abm in _abms)
         {
             if (tickCount - _lastRun[abm] < abm.Interval)
@@ -40,10 +63,8 @@ public class ActiveBlockModifierSystem
 
             _lastRun[abm] = tickCount;
 
-            var loadedChunks = world.GetLoadedChunks();
-            for (int ci = 0; ci < loadedChunks.Count; ci++)
+            foreach (var chunkCoord in playerChunks)
             {
-                var chunkCoord = loadedChunks[ci];
                 var chunk = world.GetChunkIfExists(chunkCoord);
                 if (chunk == null) continue;
 

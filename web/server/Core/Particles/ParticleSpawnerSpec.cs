@@ -30,32 +30,59 @@ public readonly record struct ParticleSpawnerSpec(
 
 public class ParticleSpawnerManager
 {
-    private readonly Dictionary<Guid, ParticleSpawnerSpec> _spawners = new();
+    private readonly Dictionary<Guid, (ParticleSpawnerSpec Spec, DateTime CreatedAt)> _spawners = new();
     private readonly Random _random = new();
 
     public void CreateSpawner(Guid id, ParticleSpawnerSpec spec)
     {
-        _spawners[id] = spec;
+        _spawners[id] = (spec, DateTime.UtcNow);
     }
 
     public bool RemoveSpawner(Guid id) => _spawners.Remove(id);
 
-    public IReadOnlyDictionary<Guid, ParticleSpawnerSpec> GetActiveSpawners() => _spawners;
+    public IReadOnlyDictionary<Guid, ParticleSpawnerSpec> GetActiveSpawners()
+    {
+        var result = new Dictionary<Guid, ParticleSpawnerSpec>();
+        foreach (var (id, (spec, _)) in _spawners)
+        {
+            result[id] = spec;
+        }
+        return result;
+    }
+
+    public void Update(float deltaTime)
+    {
+        var expired = new List<Guid>();
+        foreach (var (id, (spec, createdAt)) in _spawners)
+        {
+            var elapsed = (DateTime.UtcNow - createdAt).TotalSeconds;
+            if (spec.Time > 0 && elapsed >= spec.Time)
+            {
+                expired.Add(id);
+            }
+        }
+        foreach (var id in expired)
+        {
+            _spawners.Remove(id);
+        }
+    }
+
+    public int ActiveCount => _spawners.Count;
 
     public ParticleSpec? GenerateParticle(Guid spawnerId)
     {
-        if (!_spawners.TryGetValue(spawnerId, out var spec)) return null;
-        return CreateParticleFromSpec(spec);
+        if (!_spawners.TryGetValue(spawnerId, out var entry)) return null;
+        return CreateParticleFromSpec(entry.Spec);
     }
 
     public List<ParticleSpec> GenerateParticles(Guid spawnerId)
     {
         var particles = new List<ParticleSpec>();
-        if (!_spawners.TryGetValue(spawnerId, out var spec)) return particles;
+        if (!_spawners.TryGetValue(spawnerId, out var entry)) return particles;
 
-        for (var i = 0; i < spec.Amount; i++)
+        for (var i = 0; i < entry.Spec.Amount; i++)
         {
-            var particle = CreateParticleFromSpec(spec);
+            var particle = CreateParticleFromSpec(entry.Spec);
             particles.Add(particle);
         }
 
@@ -65,8 +92,11 @@ public class ParticleSpawnerManager
     public Dictionary<Guid, List<ParticleSpec>> GenerateAllParticles()
     {
         var result = new Dictionary<Guid, List<ParticleSpec>>();
-        foreach (var (id, spec) in _spawners)
+        foreach (var (id, (spec, createdAt)) in _spawners)
         {
+            var elapsed = (DateTime.UtcNow - createdAt).TotalSeconds;
+            if (spec.Time > 0 && elapsed >= spec.Time) continue;
+
             var particles = new List<ParticleSpec>(spec.Amount);
             for (var i = 0; i < spec.Amount; i++)
             {

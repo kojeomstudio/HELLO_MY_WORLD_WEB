@@ -1,4 +1,10 @@
 import * as THREE from 'three';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
+import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { CloudSystem } from './CloudSystem';
 
 const SKY_COLORS = {
@@ -131,6 +137,10 @@ export class Renderer {
     private starsCount: number = 1000;
     private frustumCulling: boolean = true;
     private frustum = new Frustum();
+    private composer: EffectComposer | null = null;
+    private bloomPass: UnrealBloomPass | null = null;
+    private fxaaPass: ShaderPass | null = null;
+    private postProcessingEnabled: boolean = true;
 
     constructor(container: HTMLElement) {
         this.canvas = document.createElement('canvas');
@@ -179,6 +189,33 @@ export class Renderer {
         this.vignetteEl = document.getElementById('cave-vignette')!;
         this.lavaOverlayEl = document.getElementById('lava-overlay')!;
         this.waterOverlayEl = document.getElementById('water-overlay')!;
+
+        this.initPostProcessing();
+    }
+
+    private initPostProcessing(): void {
+        try {
+            this.composer = new EffectComposer(this.renderer);
+            const renderPass = new RenderPass(this.scene, this.camera);
+            this.composer.addPass(renderPass);
+
+            this.bloomPass = new UnrealBloomPass(
+                new THREE.Vector2(window.innerWidth, window.innerHeight),
+                0.3, 0.4, 0.85
+            );
+            this.bloomPass.enabled = false;
+            this.composer.addPass(this.bloomPass);
+
+            this.fxaaPass = new ShaderPass(FXAAShader);
+            this.fxaaPass.uniforms['resolution'].value.set(1 / window.innerWidth, 1 / window.innerHeight);
+            this.composer.addPass(this.fxaaPass);
+
+            const outputPass = new OutputPass();
+            this.composer.addPass(outputPass);
+        } catch (_e) {
+            this.composer = null;
+            this.postProcessingEnabled = false;
+        }
     }
 
     private addSkyDome(): void {
@@ -286,6 +323,12 @@ export class Renderer {
             this.camera.aspect = window.innerWidth / window.innerHeight;
             this.camera.updateProjectionMatrix();
             this.renderer.setSize(window.innerWidth, window.innerHeight);
+            if (this.composer) {
+                this.composer.setSize(window.innerWidth, window.innerHeight);
+            }
+            if (this.fxaaPass) {
+                this.fxaaPass.uniforms['resolution'].value.set(1 / window.innerWidth, 1 / window.innerHeight);
+            }
         });
     }
 
@@ -304,7 +347,13 @@ export class Renderer {
         if (params.exposureMin !== undefined) this.exposureMin = params.exposureMin;
         if (params.exposureMax !== undefined) this.exposureMax = params.exposureMax;
         if (params.ambientBoost !== undefined) this.ambientBoost = params.ambientBoost;
-        if (params.bloomStrength !== undefined) this.bloomStrength = params.bloomStrength;
+        if (params.bloomStrength !== undefined) {
+            this.bloomStrength = params.bloomStrength;
+            if (this.bloomPass) {
+                this.bloomPass.enabled = this.bloomStrength > 0;
+                this.bloomPass.strength = this.bloomStrength;
+            }
+        }
     }
 
     getLighting(): { shadowIntensity: number; exposureMin: number; exposureMax: number; ambientBoost: number; bloomStrength: number } {
@@ -591,6 +640,10 @@ export class Renderer {
             }
         }
 
-        this.renderer.render(this.scene, this.camera);
+        if (this.composer && this.postProcessingEnabled) {
+            this.composer.render();
+        } else {
+            this.renderer.render(this.scene, this.camera);
+        }
     }
 }

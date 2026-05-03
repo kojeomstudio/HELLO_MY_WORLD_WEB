@@ -114,6 +114,14 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Creative Search**: Real-time search by name or block ID with result highlighting
 - **Frustum Culling**: Camera frustum-based chunk visibility culling for performance
 - **Modding API**: Client-side mod loading system with lifecycle hooks and game API
+- **LiquidSimulator**: Full liquid flow simulation with viscosity-based speed, range-limited spread, source renewal, and water-lava interaction (obsidian/cobblestone/stone generation)
+- **Post-Processing Pipeline**: Three.js EffectComposer with UnrealBloomPass (server-toggleable glow effects), FXAA anti-aliasing, and tone mapping output
+- **Player-Centric ABM Processing**: Active Block Modifiers only process chunks within player radius (3-chunk range) for scalable server performance
+- **MapBlock Monoblock Optimization**: Chunks with all identical blocks serialize to 5 bytes (with 0xFF marker) instead of 16KB
+- **Per-Block Dirty Tracking**: Chunks track modification state; only dirty chunks need saving
+- **Anti-Cheat Validator**: Server-side movement validation (speed, fly, jump height), violation counting with auto-correction, teleport distance threshold, move resistance awareness
+- **Particle Spawner Lifecycle**: Server-side spawner expiration based on lifetime, automatic cleanup in update loop
+- **Leveled NodeBox**: Dynamic-height blocks (snow layers, farmland) rendered with param2-based height and neighbor-aware side faces
 - **Mod Channels**: Server-side inter-mod communication framework
 - **i18n Framework**: Internationalization support with English/Korean translations
 - **Formspec Components**: Reusable dropdown and scrollbar UI components

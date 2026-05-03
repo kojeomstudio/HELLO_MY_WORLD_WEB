@@ -378,7 +378,8 @@ public class GameServer
 
         DefaultWorld.UpdateLiquids(_tickCount);
 
-        _abmSystem.Process(DefaultWorld, _tickCount, _blockDefinitionManager);
+        _abmSystem.Process(DefaultWorld, _tickCount, _blockDefinitionManager,
+            _players.Values.Select(p => p.Position));
 
         Agriculture?.GrowAllCrops(1f / TickRate);
 
