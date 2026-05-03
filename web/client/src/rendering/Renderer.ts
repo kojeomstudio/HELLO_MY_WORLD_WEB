@@ -10,6 +10,81 @@ const SKY_COLORS = {
     nightHorizon: new THREE.Color(0.098, 0.098, 0.196)
 };
 
+class FrustumPlane {
+    normal: THREE.Vector3;
+    distance: number;
+
+    constructor(nx: number, ny: number, nz: number, d: number) {
+        this.normal = new THREE.Vector3(nx, ny, nz);
+        this.distance = d;
+    }
+}
+
+class Frustum {
+    planes: FrustumPlane[] = [];
+
+    constructor() {
+        for (let i = 0; i < 6; i++) {
+            this.planes.push(new FrustumPlane(0, 0, 0, 0));
+        }
+    }
+
+    setFromProjectionMatrix(projectionMatrix: THREE.Matrix4): void {
+        const me = projectionMatrix.elements;
+        const p0 = this.planes[0];
+        p0.normal.set(me[3] + me[0], me[7] + me[4], me[11] + me[8]);
+        p0.distance = me[15] + me[12];
+
+        const p1 = this.planes[1];
+        p1.normal.set(me[3] - me[0], me[7] - me[4], me[11] - me[8]);
+        p1.distance = me[15] - me[12];
+
+        const p2 = this.planes[2];
+        p2.normal.set(me[3] + me[1], me[7] + me[5], me[11] + me[9]);
+        p2.distance = me[15] + me[13];
+
+        const p3 = this.planes[3];
+        p3.normal.set(me[3] - me[1], me[7] - me[5], me[11] - me[9]);
+        p3.distance = me[15] - me[13];
+
+        const p4 = this.planes[4];
+        p4.normal.set(me[3] + me[2], me[7] + me[6], me[11] + me[10]);
+        p4.distance = me[15] + me[14];
+
+        const p5 = this.planes[5];
+        p5.normal.set(me[3] - me[2], me[7] - me[6], me[11] - me[10]);
+        p5.distance = me[15] - me[14];
+
+        for (const plane of this.planes) {
+            const len = plane.normal.length();
+            if (len > 0) {
+                const invLen = 1 / len;
+                plane.normal.multiplyScalar(invLen);
+                plane.distance *= invLen;
+            }
+        }
+    }
+
+    intersectsBox(center: THREE.Vector3, halfExtents: THREE.Vector3): boolean {
+        for (const plane of this.planes) {
+            const nx = plane.normal.x;
+            const ny = plane.normal.y;
+            const nz = plane.normal.z;
+            const px = nx > 0 ? halfExtents.x : -halfExtents.x;
+            const py = ny > 0 ? halfExtents.y : -halfExtents.y;
+            const pz = nz > 0 ? halfExtents.z : -halfExtents.z;
+            if (nx * (center.x + px) + ny * (center.y + py) + nz * (center.z + pz) + plane.distance < 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+}
+
+const _tempMatrix = new THREE.Matrix4();
+const _boxCenter = new THREE.Vector3();
+const _boxHalfExtents = new THREE.Vector3();
+
 export class Renderer {
     private scene: THREE.Scene;
     private camera: THREE.PerspectiveCamera;
@@ -50,6 +125,12 @@ export class Renderer {
     private exposureMax: number = 1.0;
     private ambientBoost: number = 0;
     private bloomStrength: number = 0;
+    private sunColorOverride: string | null = null;
+    private moonColorOverride: string | null = null;
+    private fogColorOverride: string | null = null;
+    private starsCount: number = 1000;
+    private frustumCulling: boolean = true;
+    private frustum = new Frustum();
 
     constructor(container: HTMLElement) {
         this.canvas = document.createElement('canvas');
@@ -154,7 +235,12 @@ export class Renderer {
     }
 
     private createStarField(): void {
-        const starCount = 1000;
+        if (this.starField) {
+            this.scene.remove(this.starField);
+            this.starField.geometry.dispose();
+            (this.starField.material as THREE.PointsMaterial).dispose();
+        }
+        const starCount = this.starsCount;
         const positions = new Float32Array(starCount * 3);
         const sizes = new Float32Array(starCount);
         const rng = this.seededRandom(42);
@@ -319,8 +405,15 @@ export class Renderer {
             horizonColor.lerp(rainColor, rainMix);
         }
 
+        if (this.sunColorOverride) {
+            sunColor.set(this.sunColorOverride);
+        }
+
         this.skyColor.copy(horizonColor);
         this.fog.color.copy(horizonColor);
+        if (this.fogColorOverride) {
+            this.fog.color.set(this.fogColorOverride);
+        }
         this.scene.background = this.skyColor;
 
         this.fog.near = this.isRaining ? this.rainFogNear : this.normalFogNear;
@@ -349,13 +442,18 @@ export class Renderer {
         if (this.sunMesh) {
             this.sunMesh.position.set(sunX, Math.max(sunY, -50), -100);
             this.sunMesh.visible = sunIntensity > 0;
+            if (this.sunColorOverride) {
+                (this.sunMesh.material as THREE.MeshBasicMaterial).color.set(this.sunColorOverride);
+            }
         }
 
         if (this.moonMesh) {
-            this.moonMesh.position.set(-sunX, -sunY + 100, -100);
             const mat = this.moonMesh.material as THREE.MeshBasicMaterial;
             this.currentMoonIntensity += (this.targetMoonIntensity - this.currentMoonIntensity) * 0.05;
             mat.opacity = this.currentMoonIntensity;
+            if (this.moonColorOverride) {
+                mat.color.set(this.moonColorOverride);
+            }
         }
 
         if (this.starField) {
@@ -367,6 +465,30 @@ export class Renderer {
 
     updateSkyBrightness(brightness: number): void {
         this.updateSky(this.gameTime, brightness);
+    }
+
+    updateSkyParams(params: { sunColor?: string; moonColor?: string; starsCount?: number; fogColor?: string; reset?: boolean }): void {
+        if (params.reset) {
+            this.sunColorOverride = null;
+            this.moonColorOverride = null;
+            this.fogColorOverride = null;
+            this.starsCount = 1000;
+            this.createStarField();
+            return;
+        }
+        if (params.sunColor !== undefined) {
+            this.sunColorOverride = params.sunColor;
+        }
+        if (params.moonColor !== undefined) {
+            this.moonColorOverride = params.moonColor;
+        }
+        if (params.fogColor !== undefined) {
+            this.fogColorOverride = params.fogColor;
+        }
+        if (params.starsCount !== undefined) {
+            this.starsCount = Math.max(100, Math.min(5000, params.starsCount));
+            this.createStarField();
+        }
     }
 
     updateClouds(dt: number): void {
@@ -424,7 +546,47 @@ export class Renderer {
         this.playerLight.position.set(x, y, z);
     }
 
+    setFrustumCulling(enabled: boolean): void {
+        this.frustumCulling = enabled;
+    }
+
+    getFrustumCulling(): boolean {
+        return this.frustumCulling;
+    }
+
     render(): void {
+        if (this.frustumCulling) {
+            this.camera.updateMatrixWorld();
+            this.camera.updateProjectionMatrix();
+            _tempMatrix.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
+            this.frustum.setFromProjectionMatrix(_tempMatrix);
+
+            const children = this.scene.children;
+            for (let i = 0; i < children.length; i++) {
+                const child = children[i];
+                if (!(child instanceof THREE.Mesh) || !child.userData.isChunk) continue;
+
+                const geometry = child.geometry;
+                if (!geometry.boundingBox) {
+                    geometry.computeBoundingBox();
+                }
+                const box = geometry.boundingBox;
+                box.getCenter(_boxCenter);
+                box.getSize(_boxHalfExtents).multiplyScalar(0.5);
+
+                const visible = this.frustum.intersectsBox(_boxCenter, _boxHalfExtents);
+                child.visible = visible;
+            }
+        } else {
+            const children = this.scene.children;
+            for (let i = 0; i < children.length; i++) {
+                const child = children[i];
+                if (child instanceof THREE.Mesh && child.userData.isChunk) {
+                    child.visible = true;
+                }
+            }
+        }
+
         this.renderer.render(this.scene, this.camera);
     }
 }

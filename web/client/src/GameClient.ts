@@ -99,6 +99,7 @@ export class GameClient {
         this.playerController.setConnection(this.connection);
         this.setupServerHandlers();
         this.uiManager.setConnection(this.connection);
+        this.uiManager.setItemRegistry(this.itemRegistry);
 
         try {
             await this.connection.start();
@@ -163,16 +164,22 @@ export class GameClient {
             this.renderer.updateSky(time, skyBrightness);
         });
 
-        this.connection.on('OnEntitySpawned', (entityId: string, entityType: string, entityName: string, x: number, y: number, z: number, isBaby: boolean) => {
-            this.worldManager.spawnEntity(entityId, entityType, x, y, z, isBaby, entityName);
+        this.connection.on('OnEntitySpawned', (entityId: string, entityType: string, entityName: string, x: number, y: number, z: number, isBaby: boolean, visualScale: number, infotext: string, autoRotateSpeed: number) => {
+            this.worldManager.spawnEntity(entityId, entityType, x, y, z, isBaby, entityName, visualScale, infotext, autoRotateSpeed);
         });
 
         this.connection.on('OnEntityDespawned', (entityId: string) => {
             this.worldManager.removeEntity(entityId);
         });
 
-        this.connection.on('OnEntityUpdate', (entityId: string, x: number, y: number, z: number) => {
+        this.connection.on('OnEntityUpdate', (entityId: string, x: number, y: number, z: number, boneName?: string, boneRotX?: number, boneRotY?: number, boneRotZ?: number, boneScaleX?: number, boneScaleY?: number, boneScaleZ?: number) => {
             this.worldManager.updateEntityPosition(entityId, x, y, z);
+            if (boneName && boneRotX !== undefined && boneRotY !== undefined && boneRotZ !== undefined) {
+                this.worldManager.setEntityBoneRotation(entityId, boneName, { x: boneRotX, y: boneRotY, z: boneRotZ });
+            }
+            if (boneName && boneScaleX !== undefined && boneScaleY !== undefined && boneScaleZ !== undefined) {
+                this.worldManager.setEntityBoneScale(entityId, boneName, { x: boneScaleX, y: boneScaleY, z: boneScaleZ });
+            }
         });
 
         this.connection.on('OnCraftResult', (itemId: string, count: number) => {
@@ -298,6 +305,19 @@ export class GameClient {
 
         this.connection.on('OnHudFlag', (flag: string, enabled: boolean) => {
             this.uiManager.setHudFlag(flag, enabled);
+        });
+
+        this.connection.on('OnSkyParams', (params: { sunColor?: string; moonColor?: string; starsCount?: number; fogColor?: string; reset?: boolean }) => {
+            this.renderer.updateSkyParams(params);
+        });
+
+        this.connection.on('OnPlayerFlags', (playerName: string, isInvisible: boolean, _makesFootstepSound: boolean, _canZoom: boolean) => {
+            if (playerName === '__local__') return;
+            this.worldManager.setPlayerVisibility(playerName, !isInvisible);
+        });
+
+        this.connection.on('OnItemColorUpdate', (itemId: string, color: string) => {
+            this.itemRegistry.setItemColor(itemId, color);
         });
     }
 

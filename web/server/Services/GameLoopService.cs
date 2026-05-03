@@ -23,7 +23,9 @@ public class GameLoopService : BackgroundService
     private DateTime _lastTickTime;
     private int _tpsFrameCount;
     private float _currentTps;
+    private DateTime _lastBackupTime;
     private const int AutoSaveIntervalSeconds = 300;
+    private const int AutoBackupIntervalSeconds = 1800;
     private const int FallingBlockInterval = 10;
 
     public GameLoopService(
@@ -40,6 +42,7 @@ public class GameLoopService : BackgroundService
         _logger = logger;
         _blockDefinitionManager = blockDefinitionManager;
         _config = config;
+        _lastBackupTime = DateTime.UtcNow;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -87,6 +90,8 @@ public class GameLoopService : BackgroundService
             }
 
             CheckAutoSave();
+
+            CheckAutoBackup();
 
             TrackTps(now);
 
@@ -173,7 +178,10 @@ public class GameLoopService : BackgroundService
                                         entity.Position.X,
                                         entity.Position.Y,
                                         entity.Position.Z,
-                                        mobEntity?.IsBaby ?? false);
+                                        mobEntity?.IsBaby ?? false,
+                                        mobEntity?.VisualScale ?? 1.0f,
+                                        mobEntity?.Infotext ?? "",
+                                        mobEntity?.AutoRotateSpeed ?? 0f);
                                 }
                                 catch (Exception ex)
                                 {
@@ -271,6 +279,33 @@ public class GameLoopService : BackgroundService
             {
                 _logger.LogError(ex, "Failed to auto-save world");
             }
+        }
+    }
+
+    private void CheckAutoBackup()
+    {
+        if (DateTime.UtcNow - _lastBackupTime < TimeSpan.FromSeconds(AutoBackupIntervalSeconds)) return;
+
+        try
+        {
+            var worldDataPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "data", "worlds", "default");
+            if (!Directory.Exists(worldDataPath))
+                worldDataPath = Path.Combine(Directory.GetCurrentDirectory(), "data", "worlds", "default");
+
+            var backupPath = WorldBackup.CreateBackup(worldDataPath);
+            if (backupPath != null)
+            {
+                _lastBackupTime = DateTime.UtcNow;
+                _logger.LogInformation("World auto-backup created: {BackupPath}", backupPath);
+            }
+            else
+            {
+                _logger.LogWarning("Failed to create auto-backup");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create auto-backup");
         }
     }
 

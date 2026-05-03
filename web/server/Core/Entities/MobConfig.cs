@@ -16,7 +16,10 @@ public record MobDefinition(
     Dictionary<string, int> ArmorGroups,
     bool MakesFootstepSound,
     string? Nametag,
-    string? NametagColor);
+    string? NametagColor,
+    float VisualScale,
+    string Infotext,
+    float AutoRotateSpeed);
 
 public static class MobConfig
 {
@@ -82,10 +85,29 @@ public static class MobConfig
                 nametagColor = ntcEl.GetString();
             }
 
+            var visualScale = 1.0f;
+            if (mobEl.TryGetProperty("visual_scale", out var vsEl))
+            {
+                visualScale = vsEl.GetSingle();
+            }
+
+            var infotext = "";
+            if (mobEl.TryGetProperty("infotext", out var itEl))
+            {
+                infotext = itEl.GetString() ?? "";
+            }
+
+            var autoRotateSpeed = 0f;
+            if (mobEl.TryGetProperty("auto_rotate_speed", out var arsEl))
+            {
+                autoRotateSpeed = arsEl.GetSingle();
+            }
+
             Definitions[type] = new MobDefinition(
                 type, health, attackDamage, speed, attackRange,
                 attackCooldown, detectionRange, hostile, despawnRange,
-                drops.ToArray(), armorGroups, makesFootstepSound, nametag, nametagColor);
+                drops.ToArray(), armorGroups, makesFootstepSound, nametag, nametagColor,
+                visualScale, infotext, autoRotateSpeed);
         }
     }
 

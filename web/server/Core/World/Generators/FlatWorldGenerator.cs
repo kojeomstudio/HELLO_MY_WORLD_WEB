@@ -1,4 +1,5 @@
 using WebGameServer.Core.World;
+using ItemStack = WebGameServer.Core.Player.ItemStack;
 
 namespace WebGameServer.Core.World.Generators;
 
@@ -54,5 +55,10 @@ public class FlatWorldGenerator : IWorldGenerator
     public int GetGroundHeight(int x, int z)
     {
         return _groundLevel - 1;
+    }
+
+    public List<(int X, int Y, int Z, List<ItemStack> Loot)> PopPendingDungeonChests()
+    {
+        return new();
     }
 }

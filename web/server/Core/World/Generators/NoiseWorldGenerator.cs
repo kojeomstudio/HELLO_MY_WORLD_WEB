@@ -1,5 +1,7 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 using WebGameServer.Core.World;
+using ItemStack = WebGameServer.Core.Player.ItemStack;
 
 namespace WebGameServer.Core.World.Generators;
 
@@ -21,6 +23,10 @@ public class NoiseWorldGenerator : IWorldGenerator
     private const int TerrainHeight = 20;
     private const int WaterLevel = 28;
     private const int TreeMinHeight = 5;
+
+    private readonly ConcurrentBag<DungeonChestData> _pendingDungeonChests = new();
+
+    private record DungeonChestData(int X, int Y, int Z, List<ItemStack> Loot);
 
     private record BiomeDefinition(
         string Name, int YMin, int YMax, float HeatPoint, float HumidityPoint,
@@ -768,6 +774,9 @@ public class NoiseWorldGenerator : IWorldGenerator
                         && curY + 1 < Chunk.Size && blocks[chestX, curY + 1, chestZ] == (ushort)BlockType.Air)
                     {
                         blocks[chestX, curY + 1, chestZ] = (ushort)BlockType.Chest;
+                        var loot = GenerateDungeonLoot(rng);
+                        _pendingDungeonChests.Add(new DungeonChestData(
+                            baseX + chestX, baseY + curY + 1, baseZ + chestZ, loot));
                         placedChest = true;
                     }
                 }
@@ -839,6 +848,111 @@ public class NoiseWorldGenerator : IWorldGenerator
                 ? (ushort)BlockType.Torch
                 : (ushort)BlockType.Lantern;
         }
+    }
+
+    public List<(int X, int Y, int Z, List<ItemStack> Loot)> PopPendingDungeonChests()
+    {
+        var results = new List<(int X, int Y, int Z, List<ItemStack> Loot)>();
+        while (_pendingDungeonChests.TryTake(out var chest))
+        {
+            results.Add((chest.X, chest.Y, chest.Z, chest.Loot));
+        }
+        return results;
+    }
+
+    private List<ItemStack> GenerateDungeonLoot(Random rng)
+    {
+        var loot = new List<ItemStack>();
+        var numStacks = rng.Next(3, 9);
+
+        for (int i = 0; i < numStacks; i++)
+        {
+            var roll = rng.NextDouble();
+            if (roll < 0.02)
+            {
+                loot.Add(GenerateSpecialLoot(rng));
+            }
+            else if (roll < 0.10)
+            {
+                loot.Add(GenerateRareLoot(rng));
+            }
+            else if (roll < 0.30)
+            {
+                loot.Add(GenerateUncommonLoot(rng));
+            }
+            else
+            {
+                loot.Add(GenerateCommonLoot(rng));
+            }
+        }
+
+        return loot;
+    }
+
+    private static ItemStack GenerateCommonLoot(Random rng)
+    {
+        var items = new (string ItemId, int Min, int Max)[]
+        {
+            ("coal", 1, 8),
+            ("iron_ingot", 1, 5),
+            ("bread", 1, 3),
+            ("wheat", 1, 4),
+            ("torch", 1, 6),
+            ("string", 1, 4),
+            ("bone", 1, 4)
+        };
+        var (itemId, min, max) = items[rng.Next(items.Length)];
+        return new ItemStack(itemId, rng.Next(min, max + 1));
+    }
+
+    private static ItemStack GenerateUncommonLoot(Random rng)
+    {
+        var stackItems = new (string ItemId, int Min, int Max)[]
+        {
+            ("gold_ingot", 1, 3),
+            ("diamond", 1, 2),
+            ("redstone", 1, 5)
+        };
+        var singleItems = new string[]
+        {
+            "iron_sword",
+            "iron_pickaxe",
+            "bucket",
+            "saddle"
+        };
+
+        if (rng.NextDouble() < 0.6)
+        {
+            var (itemId, min, max) = stackItems[rng.Next(stackItems.Length)];
+            return new ItemStack(itemId, rng.Next(min, max + 1));
+        }
+
+        return new ItemStack(singleItems[rng.Next(singleItems.Length)], 1);
+    }
+
+    private static ItemStack GenerateRareLoot(Random rng)
+    {
+        var items = new string[]
+        {
+            "golden_apple",
+            "diamond_sword",
+            "diamond_pickaxe",
+            "book",
+            "music_disc"
+        };
+        return new ItemStack(items[rng.Next(items.Length)], 1);
+    }
+
+    private static ItemStack GenerateSpecialLoot(Random rng)
+    {
+        var items = new (string ItemId, int Min, int Max)[]
+        {
+            ("ender_pearl", 1, 1),
+            ("blaze_rod", 1, 1),
+            ("obsidian", 1, 3)
+        };
+        var (itemId, min, max) = items[rng.Next(items.Length)];
+        return new ItemStack(itemId, rng.Next(min, max + 1));
     }
 
     private ushort GetBlockAt(int x, int y, int z, int surfaceHeight)

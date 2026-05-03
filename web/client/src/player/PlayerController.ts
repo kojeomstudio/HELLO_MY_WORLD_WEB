@@ -572,8 +572,10 @@ export class PlayerController {
         const newY = this._position.y + this._velocity.y * dt;
         const newZ = this._position.z + this._velocity.z * dt;
 
+        const isSpectator = this._gameMode === 'spectator';
+
         if (this._worldManager) {
-            if (!this.checkCollision(newX, this._position.y, this._position.z)) {
+            if (isSpectator || !this.checkCollision(newX, this._position.y, this._position.z)) {
                 this._position.x = newX;
             } else if (this.checkSneakEdge(this._position.x, this._position.y, this._position.z, newX - this._position.x, 0)) {
                 this._velocity.x = 0;
@@ -581,10 +583,10 @@ export class PlayerController {
                 this._velocity.x = 0;
             }
 
-            if (!this.checkCollision(this._position.x, newY, this._position.z)) {
+            if (isSpectator || !this.checkCollision(this._position.x, newY, this._position.z)) {
                 this._position.y = newY;
                 this._onGround = false;
-            } else {
+            } else if (!isSpectator) {
                 if (this._velocity.y < 0) {
                     const bounciness = this.getBounciness();
                     if (bounciness > 0 && Math.abs(this._velocity.y) > 2) {
@@ -609,7 +611,7 @@ export class PlayerController {
                 }
             }
 
-            if (!this.checkCollision(this._position.x, this._position.y, newZ)) {
+            if (isSpectator || !this.checkCollision(this._position.x, this._position.y, newZ)) {
                 this._position.z = newZ;
             } else if (this.checkSneakEdge(this._position.x, this._position.y, this._position.z, 0, newZ - this._position.z)) {
                 this._velocity.z = 0;

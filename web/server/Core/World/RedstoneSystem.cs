@@ -11,6 +11,42 @@ public class RedstoneSystem
         (1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)
     };
 
+    private static readonly (short Dx, short Dz)[] HorizontalDirections =
+    {
+        (1, 0), (-1, 0), (0, 1), (0, -1)
+    };
+
+    private static (short Dx, short Dz) GetFacingOffset(int facing)
+    {
+        return facing switch
+        {
+            0 => (0, 1),
+            1 => (0, -1),
+            2 => (-1, 0),
+            3 => (1, 0),
+            _ => (0, 1)
+        };
+    }
+
+    private static (short Dx, short Dz) GetBackOffset(int facing)
+    {
+        var (dx, dz) = GetFacingOffset(facing);
+        return ((short)-dx, (short)-dz);
+    }
+
+    private static List<(short Dx, short Dz)> GetSideOffsets(int facing)
+    {
+        var (fdx, fdz) = GetFacingOffset(facing);
+        var sides = new List<(short Dx, short Dz)>();
+        foreach (var (dx, dz) in HorizontalDirections)
+        {
+            if (dx == fdx && dz == fdz) continue;
+            if (dx == -fdx && dz == -fdz) continue;
+            sides.Add((dx, dz));
+        }
+        return sides;
+    }
+
     public void Update(World world)
     {
         var powerMap = new Dictionary<Vector3s, int>();
@@ -79,6 +115,153 @@ public class RedstoneSystem
         }
 
         ToggleConsumers(world, powerMap);
+        UpdateRepeatersAndComparators(world, powerMap);
+    }
+
+    private void UpdateRepeatersAndComparators(World world, Dictionary<Vector3s, int> powerMap)
+    {
+        foreach (var chunkCoord in world.GetLoadedChunks())
+        {
+            var chunk = world.GetChunkIfExists(chunkCoord);
+            if (chunk == null) continue;
+
+            for (int x = 0; x < Chunk.Size; x++)
+            {
+                for (int y = 0; y < Chunk.Size; y++)
+                {
+                    for (int z = 0; z < Chunk.Size; z++)
+                    {
+                        var block = chunk.GetBlock(x, y, z);
+                        var worldX = (short)(chunkCoord.X * Chunk.Size + x);
+                        var worldY = (short)(chunkCoord.Y * Chunk.Size + y);
+                        var worldZ = (short)(chunkCoord.Z * Chunk.Size + z);
+                        var pos = new Vector3s(worldX, worldY, worldZ);
+
+                        if (block.Type == BlockType.RedstoneRepeater)
+                        {
+                            ProcessRepeater(world, pos, block, powerMap);
+                        }
+                        else if (block.Type == BlockType.RedstoneComparator)
+                        {
+                            ProcessComparator(world, pos, block, powerMap);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private void ProcessRepeater(World world, Vector3s pos, Block block, Dictionary<Vector3s, int> powerMap)
+    {
+        var facing = block.Param1 % 4;
+        var back = GetBackOffset(facing);
+        var front = GetFacingOffset(facing);
+        var backPos = new Vector3s((short)(pos.X + back.Dx), pos.Y, (short)(pos.Z + back.Dz));
+        var frontPos = new Vector3s((short)(pos.X + front.Dx), pos.Y, (short)(pos.Z + front.Dz));
+
+        var backPower = 0;
+        if (powerMap.TryGetValue(backPos, out var wirePower) && wirePower > 0)
+        {
+            backPower = wirePower;
+        }
+        var backBlock = world.GetBlock(backPos);
+        var backSourcePower = GetSourcePower(backBlock);
+        if (backSourcePower > backPower)
+        {
+            backPower = backSourcePower;
+        }
+
+        var delay = (block.Param2 & 0x3) + 1;
+        var isPowered = (block.Param2 & 0x8) != 0;
+
+        if (backPower > 0 && !isPowered)
+        {
+            var newParam2 = (byte)((block.Param2 & 0x3) | 0x8);
+            world.SetBlock(pos, new Block(BlockType.RedstoneRepeater, block.Param1, newParam2, (byte)7));
+            powerMap[frontPos] = MaxPower;
+        }
+        else if (backPower == 0 && isPowered)
+        {
+            var newParam2 = (byte)(block.Param2 & 0x3);
+            world.SetBlock(pos, new Block(BlockType.RedstoneRepeater, block.Param1, newParam2, 0));
+            powerMap.Remove(frontPos);
+        }
+        else if (isPowered)
+        {
+            powerMap[frontPos] = MaxPower;
+        }
+    }
+
+    private void ProcessComparator(World world, Vector3s pos, Block block, Dictionary<Vector3s, int> powerMap)
+    {
+        var facing = block.Param1 % 4;
+        var back = GetBackOffset(facing);
+        var front = GetFacingOffset(facing);
+        var sides = GetSideOffsets(facing);
+
+        var backPos = new Vector3s((short)(pos.X + back.Dx), pos.Y, (short)(pos.Z + back.Dz));
+        var frontPos = new Vector3s((short)(pos.X + front.Dx), pos.Y, (short)(pos.Z + front.Dz));
+
+        var backPower = 0;
+        if (powerMap.TryGetValue(backPos, out var wirePower) && wirePower > 0)
+        {
+            backPower = wirePower;
+        }
+        var backBlock = world.GetBlock(backPos);
+        var backSourcePower = GetSourcePower(backBlock);
+        if (backSourcePower > backPower)
+        {
+            backPower = backSourcePower;
+        }
+
+        var maxSidePower = 0;
+        foreach (var side in sides)
+        {
+            var sidePos = new Vector3s((short)(pos.X + side.Dx), pos.Y, (short)(pos.Z + side.Dz));
+            if (powerMap.TryGetValue(sidePos, out var sideWirePower) && sideWirePower > maxSidePower)
+            {
+                maxSidePower = sideWirePower;
+            }
+            var sideBlock = world.GetBlock(sidePos);
+            var sideSourcePower = GetSourcePower(sideBlock);
+            if (sideSourcePower > maxSidePower)
+            {
+                maxSidePower = sideSourcePower;
+            }
+        }
+
+        var outputPower = Math.Max(backPower, maxSidePower);
+        var isSubtractMode = (block.Param2 & 0x4) != 0;
+
+        if (isSubtractMode)
+        {
+            outputPower = Math.Max(backPower - maxSidePower, 0);
+        }
+
+        var isCurrentlyPowered = (block.Param2 & 0x8) != 0;
+
+        if (outputPower > 0 && !isCurrentlyPowered)
+        {
+            var newParam2 = (byte)(block.Param2 | 0x8);
+            world.SetBlock(pos, new Block(BlockType.RedstoneComparator, block.Param1, newParam2, 0));
+            if (!powerMap.TryGetValue(frontPos, out var existing) || outputPower > existing)
+            {
+                powerMap[frontPos] = outputPower;
+            }
+        }
+        else if (outputPower == 0 && isCurrentlyPowered)
+        {
+            var newParam2 = (byte)(block.Param2 & ~0x8);
+            world.SetBlock(pos, new Block(BlockType.RedstoneComparator, block.Param1, newParam2, 0));
+            powerMap.Remove(frontPos);
+        }
+        else if (outputPower > 0 && isCurrentlyPowered)
+        {
+            if (!powerMap.TryGetValue(frontPos, out var existing) || outputPower > existing)
+            {
+                powerMap[frontPos] = outputPower;
+            }
+        }
     }
 
     private void PropagatePower(World world, Vector3s source, int initialPower, Dictionary<Vector3s, int> powerMap)

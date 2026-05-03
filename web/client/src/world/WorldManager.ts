@@ -30,7 +30,8 @@ const TEXTURE_NAMES: string[] = [
     'default_wool_white', 'default_wool_red', 'default_wool_blue', 'default_wool_green',
     'default_wool_orange', 'default_wool_yellow', 'default_wool_cyan', 'default_wool_purple',
     'default_wool_black', 'default_wool_brown', 'default_wool_pink', 'default_wool_lime',
-    'default_wool_light_blue', 'default_wool_magenta', 'default_wool_gray', 'default_wool_light_gray'
+    'default_wool_light_blue', 'default_wool_magenta', 'default_wool_gray', 'default_wool_light_gray',
+    'default_repeater', 'default_comparator'
 ];
 
 const FALL_GRAVITY = 9.81;
@@ -96,6 +97,8 @@ export interface PlayerInfo {
     rightLeg: THREE.Mesh;
     leftArm: THREE.Mesh;
     rightArm: THREE.Mesh;
+    animTime: number;
+    idleTime: number;
 }
 
 export class WorldManager {
@@ -104,6 +107,7 @@ export class WorldManager {
     private blockRegistry: BlockRegistry;
     private playerMeshes: Map<string, PlayerInfo> = new Map();
     private entityMeshes: Map<string, THREE.Mesh> = new Map();
+    private entityAutoRotateSpeeds: Map<string, number> = new Map();
     private pendingChunks: Set<string> = new Set();
     private connection: HubConnection.HubConnection | null = null;
     private textureAtlas: TextureAtlas | null = null;
@@ -413,7 +417,7 @@ export class WorldManager {
         group.position.y = 0.9;
         this.renderer.addToScene(group);
 
-        this.playerMeshes.set(name, { mesh: group, label, head, leftLeg, rightLeg, leftArm, rightArm });
+        this.playerMeshes.set(name, { mesh: group, label, head, leftLeg, rightLeg, leftArm, rightArm, animTime: 0, idleTime: 0 });
     }
 
     removePlayer(name: string): void {
@@ -421,6 +425,13 @@ export class WorldManager {
         if (playerInfo) {
             this.renderer.removeFromScene(playerInfo.mesh);
             this.playerMeshes.delete(name);
+        }
+    }
+
+    setPlayerVisibility(name: string, visible: boolean): void {
+        const playerInfo = this.playerMeshes.get(name);
+        if (playerInfo) {
+            playerInfo.mesh.visible = visible;
         }
     }
 
@@ -436,16 +447,15 @@ export class WorldManager {
         playerInfo.mesh.scale.y = isSneaking ? 0.85 : 1;
     }
 
-    private playerAnimTime: number = 0;
-
     animatePlayer(name: string, isMoving: boolean, dt: number): void {
         const info = this.playerMeshes.get(name);
         if (!info) return;
 
         if (isMoving) {
-            this.playerAnimTime += dt;
+            info.animTime += dt;
+            info.idleTime = 0;
             const walkSpeed = 8;
-            const swing = Math.sin(this.playerAnimTime * walkSpeed) * 0.5236;
+            const swing = Math.sin(info.animTime * walkSpeed) * 0.5236;
             const legPivotY = -0.375 + 0.375;
             const armPivotY = 0.375 + 0.375;
 
@@ -458,18 +468,24 @@ export class WorldManager {
             info.rightArm.position.set(0.425, armPivotY, 0);
             info.rightArm.rotation.x = swing;
         } else {
-            info.leftLeg.rotation.x = 0;
-            info.rightLeg.rotation.x = 0;
-            info.leftArm.rotation.x = 0;
-            info.rightArm.rotation.x = 0;
-            info.leftLeg.position.set(-0.15, -0.375, 0);
-            info.rightLeg.position.set(0.15, -0.375, 0);
-            info.leftArm.position.set(-0.425, 0.375, 0);
-            info.rightArm.position.set(0.425, 0.375, 0);
+            info.idleTime += dt;
+            info.animTime *= 0.9;
+
+            const breathCycle = Math.sin(info.idleTime * 1.5) * 0.02;
+            const swayCycle = Math.sin(info.idleTime * 0.8) * 0.01;
+
+            info.leftLeg.rotation.x = breathCycle;
+            info.rightLeg.rotation.x = -breathCycle;
+            info.leftArm.rotation.x = -breathCycle * 0.5;
+            info.rightArm.rotation.x = breathCycle * 0.5;
+            info.leftLeg.position.set(-0.15, -0.375 + breathCycle * 0.5, swayCycle);
+            info.rightLeg.position.set(0.15, -0.375 - breathCycle * 0.5, -swayCycle);
+            info.leftArm.position.set(-0.425, 0.375 + breathCycle * 0.3, swayCycle * 0.5);
+            info.rightArm.position.set(0.425, 0.375 - breathCycle * 0.3, -swayCycle * 0.5);
         }
     }
 
-    spawnEntity(entityId: string, entityType: string, x: number, y: number, z: number, isBaby: boolean = false, entityName: string = ''): void {
+    spawnEntity(entityId: string, entityType: string, x: number, y: number, z: number, isBaby: boolean = false, entityName: string = '', visualScale: number = 1, infotext: string = '', autoRotateSpeed: number = 0): void {
         if (entityType === 'Item') {
             const geometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
             const material = new THREE.MeshLambertMaterial({ color: 0xFFAA00 });
@@ -483,6 +499,7 @@ export class WorldManager {
 
         const group = new THREE.Group();
         group.userData.entityId = entityId;
+        group.userData.bones = new Map<string, THREE.Object3D>();
 
         switch (entityName) {
             case 'Zombie': {
@@ -498,6 +515,7 @@ export class WorldManager {
                 );
                 head.position.y = 1.25;
                 group.add(head);
+                group.userData.bones.set('head', head);
                 const leftArm = new THREE.Mesh(
                     new THREE.BoxGeometry(0.25, 0.7, 0.25),
                     new THREE.MeshLambertMaterial({ color: 0x3B7A3B })
@@ -540,6 +558,7 @@ export class WorldManager {
                 );
                 head.position.y = 1.25;
                 group.add(head);
+                group.userData.bones.set('head', head);
                 const leftArm = new THREE.Mesh(
                     new THREE.BoxGeometry(0.2, 0.7, 0.2),
                     new THREE.MeshLambertMaterial({ color: 0xBBBBBB })
@@ -580,6 +599,7 @@ export class WorldManager {
                 );
                 head.position.set(0, 0.35, -0.5);
                 group.add(head);
+                group.userData.bones.set('head', head);
                 for (let i = 0; i < 4; i++) {
                     const legL = new THREE.Mesh(
                         new THREE.BoxGeometry(0.1, 0.1, 0.6),
@@ -612,6 +632,7 @@ export class WorldManager {
                 );
                 head.position.set(0, 1.0, -0.7);
                 group.add(head);
+                group.userData.bones.set('head', head);
                 for (const [dx] of [[-0.25], [0.25]]) {
                     const leg = new THREE.Mesh(
                         new THREE.BoxGeometry(0.2, 0.5, 0.2),
@@ -644,6 +665,7 @@ export class WorldManager {
                 );
                 head.position.set(0, 0.65, -0.5);
                 group.add(head);
+                group.userData.bones.set('head', head);
                 const nose = new THREE.Mesh(
                     new THREE.BoxGeometry(0.25, 0.15, 0.1),
                     new THREE.MeshLambertMaterial({ color: 0xFF8888 })
@@ -674,6 +696,7 @@ export class WorldManager {
                 );
                 head.position.set(0, 0.6, -0.25);
                 group.add(head);
+                group.userData.bones.set('head', head);
                 const beak = new THREE.Mesh(
                     new THREE.BoxGeometry(0.08, 0.05, 0.1),
                     new THREE.MeshLambertMaterial({ color: 0xFFAA00 })
@@ -716,6 +739,14 @@ export class WorldManager {
         group.position.set(x, y, z);
         if (isBaby) {
             group.scale.setScalar(0.5);
+        } else if (visualScale !== 1) {
+            group.scale.setScalar(visualScale);
+        }
+        if (infotext) {
+            group.add(this.createNameTag(infotext));
+        }
+        if (autoRotateSpeed > 0) {
+            this.entityAutoRotateSpeeds.set(entityId, autoRotateSpeed);
         }
         this.renderer.addToScene(group);
         this.entityMeshes.set(entityId, group as unknown as THREE.Mesh);
@@ -740,6 +771,24 @@ export class WorldManager {
         return sprite;
     }
 
+    setEntityBoneRotation(entityId: string, boneName: string, rotation: { x: number; y: number; z: number }): void {
+        const obj = this.entityMeshes.get(entityId);
+        if (!obj || !(obj instanceof THREE.Group)) return;
+        const bones = obj.userData.bones as Map<string, THREE.Object3D> | undefined;
+        const bone = bones?.get(boneName);
+        if (!bone) return;
+        bone.rotation.set(rotation.x, rotation.y, rotation.z);
+    }
+
+    setEntityBoneScale(entityId: string, boneName: string, scale: { x: number; y: number; z: number }): void {
+        const obj = this.entityMeshes.get(entityId);
+        if (!obj || !(obj instanceof THREE.Group)) return;
+        const bones = obj.userData.bones as Map<string, THREE.Object3D> | undefined;
+        const bone = bones?.get(boneName);
+        if (!bone) return;
+        bone.scale.set(scale.x, scale.y, scale.z);
+    }
+
     removeEntity(entityId: string): void {
         const mesh = this.entityMeshes.get(entityId);
         if (mesh) {
@@ -760,6 +809,7 @@ export class WorldManager {
                 }
             }
             this.entityMeshes.delete(entityId);
+            this.entityAutoRotateSpeeds.delete(entityId);
         }
     }
 
@@ -832,6 +882,10 @@ export class WorldManager {
             } else if (entityId.startsWith('mob_')) {
                 const bob = Math.sin(this.entityAnimTime * 2.0) * 0.002;
                 mesh.position.y += bob;
+                const rotateSpeed = this.entityAutoRotateSpeeds.get(entityId);
+                if (rotateSpeed) {
+                    mesh.rotation.y += dt * rotateSpeed;
+                }
             }
         }
 

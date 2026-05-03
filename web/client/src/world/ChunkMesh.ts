@@ -339,6 +339,7 @@ export class ChunkMesh {
     public isVegetation: boolean = false;
     public isWater: boolean = false;
     public isLava: boolean = false;
+    public hasPlantWaving: boolean = false;
 
     constructor(chunkX: number, chunkY: number, chunkZ: number, data: Uint8Array) {
         this.chunkX = chunkX;
@@ -399,6 +400,7 @@ export class ChunkMesh {
         let hasVegetationBlocks = false;
         let hasWaterBlocks = false;
         let hasLavaBlocks = false;
+        this.hasPlantWaving = false;
 
         const faceData = [
             { dir: [0, 1, 0], corners: [[0, 1, 0], [1, 1, 0], [1, 1, 1], [0, 1, 1]], normal: [0, 1, 0] },
@@ -428,14 +430,15 @@ export class ChunkMesh {
                     const isLightSourceBlock = blockRegistry.isLightSource(blockId);
 
                     const blockName = blockDef.name || '';
-                    const isVegetationBlock = blockName.includes('leaves') || blockName.includes('pine_needles') || blockName === 'default:sugar_cane';
+                    const wavingType = blockDef.waving ?? 0;
+                    const isVegetationBlock = wavingType === 2;
                     if (isVegetationBlock) {
                         hasVegetationBlocks = true;
                         this.isVegetation = true;
                     }
 
-                    const isWaterBlock = blockName.includes('water');
-                    const isLavaBlock = blockName.includes('lava');
+                    const isWaterBlock = wavingType === 3 && blockDef.liquid === true && blockName.includes('water');
+                    const isLavaBlock = wavingType === 3 && blockDef.liquid === true && blockName.includes('lava');
                     if (isWaterBlock) hasWaterBlocks = true;
                     if (isLavaBlock) hasLavaBlocks = true;
 
@@ -615,6 +618,10 @@ export class ChunkMesh {
         const solidVC = { count: solidVertexCount };
         const transVC = { count: transVertexCount };
 
+        const plantVertexIndices: number[] = [];
+        const plantMeshTypes: ('solid' | 'trans')[] = [];
+        const plantWorldPositions: [number, number, number][] = [];
+
         for (let x = 0; x < CHUNK_SIZE; x++) {
             for (let y = 0; y < CHUNK_SIZE; y++) {
                 for (let z = 0; z < CHUNK_SIZE; z++) {
@@ -684,6 +691,15 @@ export class ChunkMesh {
                             break;
                         case 'plantlike':
                             buildPlantlike(ctx, worldX, worldY, worldZ, color);
+                            if ((blockDef.waving ?? 0) === 1) {
+                                const baseVC = isTransparent ? transVertexCount : solidVertexCount;
+                                for (let vi = 0; vi < 8; vi++) {
+                                    plantVertexIndices.push(baseVC + vi);
+                                    plantMeshTypes.push(isTransparent ? 'trans' : 'solid');
+                                    plantWorldPositions.push([worldX, worldY, worldZ]);
+                                }
+                                this.hasPlantWaving = true;
+                            }
                             break;
                         case 'firelike':
                             buildFirelike(ctx, worldX, worldY, worldZ, color);
@@ -733,10 +749,25 @@ export class ChunkMesh {
                 this.transparentMesh.userData.lavaBasePositions = new Float32Array(transPositions);
             }
         }
+
+        if (this.hasPlantWaving && plantVertexIndices.length > 0) {
+            if (this.transparentMesh) {
+                this.transparentMesh.userData.isPlantWaving = true;
+                this.transparentMesh.userData.plantVertexIndices = plantVertexIndices;
+                this.transparentMesh.userData.plantWorldPositions = plantWorldPositions;
+                this.transparentMesh.userData.plantBasePositions = new Float32Array(transPositions);
+            }
+            if (this.mesh) {
+                this.mesh.userData.isPlantWaving = true;
+                this.mesh.userData.plantVertexIndices = plantVertexIndices;
+                this.mesh.userData.plantWorldPositions = plantWorldPositions;
+                this.mesh.userData.plantBasePositions = new Float32Array(solidPositions);
+            }
+        }
     }
 
     get hasAnimatedBlocks(): boolean {
-        return this.isVegetation || this.isWater || this.isLava;
+        return this.isVegetation || this.isWater || this.isLava || this.hasPlantWaving;
     }
 
     static updateAnimations(chunks: Map<string, ChunkMesh>, time: number): void {
@@ -796,6 +827,30 @@ export class ChunkMesh {
                         const baseY = basePositions[idx * 3 + 1];
                         const wx = basePositions[idx * 3];
                         posAttr.array[idx * 3 + 1] = baseY + Math.sin(time * 2.0 + wx * 0.8) * amplitude;
+                    }
+                    posAttr.needsUpdate = true;
+                }
+
+                if (mesh.userData.isPlantWaving) {
+                    const indices: number[] = mesh.userData.plantVertexIndices;
+                    const worldPositions: [number, number, number][] = mesh.userData.plantWorldPositions;
+                    const basePositions: Float32Array = mesh.userData.plantBasePositions;
+                    if (!indices || !basePositions) continue;
+                    for (let i = 0; i < indices.length; i++) {
+                        const idx = indices[i];
+                        if (idx * 3 + 2 >= posAttr.array.length) continue;
+                        if (idx * 3 + 2 >= basePositions.length) continue;
+                        const baseX = basePositions[idx * 3];
+                        const baseY = basePositions[idx * 3 + 1];
+                        const baseZ = basePositions[idx * 3 + 2];
+                        const wp = worldPositions[i];
+                        if (!wp) continue;
+                        const heightFactor = (baseY - wp[1]) * 0.7;
+                        const swayX = Math.sin(time * 2.0 + wp[0] * 0.7 + wp[2] * 0.3) * 0.04 * heightFactor;
+                        const swayZ = Math.cos(time * 1.8 + wp[0] * 0.3 + wp[2] * 0.7) * 0.04 * heightFactor;
+                        posAttr.array[idx * 3] = baseX + swayX;
+                        posAttr.array[idx * 3 + 1] = baseY + Math.sin(time * 1.5 + wp[0] * 0.5) * 0.015 * heightFactor;
+                        posAttr.array[idx * 3 + 2] = baseZ + swayZ;
                     }
                     posAttr.needsUpdate = true;
                 }
@@ -882,6 +937,43 @@ export class ChunkMesh {
         posAttr.needsUpdate = true;
     }
 
+    animatePlants(time: number): void {
+        if (!this.hasPlantWaving) return;
+
+        const targets: THREE.Mesh[] = [];
+        if (this.mesh) targets.push(this.mesh);
+        if (this.transparentMesh) targets.push(this.transparentMesh);
+
+        for (const mesh of targets) {
+            if (!mesh.userData.isPlantWaving) continue;
+            const posAttr = mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+            if (!posAttr) continue;
+
+            const indices: number[] = mesh.userData.plantVertexIndices;
+            const worldPositions: [number, number, number][] = mesh.userData.plantWorldPositions;
+            const basePositions: Float32Array = mesh.userData.plantBasePositions;
+            if (!indices || !basePositions || !worldPositions) continue;
+
+            for (let i = 0; i < indices.length; i++) {
+                const idx = indices[i];
+                if (idx * 3 + 2 >= posAttr.array.length) continue;
+                if (idx * 3 + 2 >= basePositions.length) continue;
+                const baseX = basePositions[idx * 3];
+                const baseY = basePositions[idx * 3 + 1];
+                const baseZ = basePositions[idx * 3 + 2];
+                const wp = worldPositions[i];
+                if (!wp) continue;
+                const heightFactor = (baseY - wp[1]) * 0.7;
+                const swayX = Math.sin(time * 2.0 + wp[0] * 0.7 + wp[2] * 0.3) * 0.04 * heightFactor;
+                const swayZ = Math.cos(time * 1.8 + wp[0] * 0.3 + wp[2] * 0.7) * 0.04 * heightFactor;
+                posAttr.array[idx * 3] = baseX + swayX;
+                posAttr.array[idx * 3 + 1] = baseY + Math.sin(time * 1.5 + wp[0] * 0.5) * 0.015 * heightFactor;
+                posAttr.array[idx * 3 + 2] = baseZ + swayZ;
+            }
+            posAttr.needsUpdate = true;
+        }
+    }
+
     private buildGeometry(
         positions: number[], normals: number[], colors: number[], uvs: number[],
         indices: number[], vertexCount: number, transparent: boolean,
@@ -907,7 +999,9 @@ export class ChunkMesh {
             depthWrite: !transparent
         });
 
-        return new THREE.Mesh(geometry, material);
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.userData.isChunk = true;
+        return mesh;
     }
 
 }

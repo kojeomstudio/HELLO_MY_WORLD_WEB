@@ -28,11 +28,16 @@ public class Player
     public bool IsInLiquid { get; set; }
     public bool IsDead { get; set; }
     public bool InfinitePlace { get; set; }
+    public bool Invulnerable { get; set; }
+    public bool IsInvisible { get; set; }
+    public bool MakesFootstepSound { get; set; } = true;
+    public bool CanZoom { get; set; } = true;
     public int AirTimeTicks { get; set; }
 
     public int SelectedHotbarSlot { get; set; } = 0;
     public int HotbarSize { get; set; } = 8;
     public Inventory Inventory { get; } = new();
+    public PlayerStatistics Statistics { get; } = new();
 
     public ItemStack?[] ArmorSlots { get; } = new ItemStack?[4];
     public DateTime LastDamageTime { get; set; }
@@ -50,6 +55,8 @@ public class Player
     public float? OverrideWalkSpeed { get; set; }
     public float? OverrideSprintSpeed { get; set; }
     public float? OverrideFlySpeed { get; set; }
+
+    public Dictionary<string, string> ItemColors { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     public void ClearPhysicsOverride()
     {

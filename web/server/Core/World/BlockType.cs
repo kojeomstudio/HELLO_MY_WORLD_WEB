@@ -237,5 +237,8 @@ public enum BlockType : ushort
     PackedMud = 232,
     MudBricks = 233,
     MudBrickStairs = 234,
-    MudBrickSlab = 235
+    MudBrickSlab = 235,
+    Vine = 236,
+    RedstoneRepeater = 237,
+    RedstoneComparator = 238
 }

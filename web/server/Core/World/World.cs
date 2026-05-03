@@ -1,15 +1,19 @@
 using System.Collections.Concurrent;
 using WebGameServer.Core.Game;
 using PlayerEnt = WebGameServer.Core.Player.Player;
+using ItemStack = WebGameServer.Core.Player.ItemStack;
 
 namespace WebGameServer.Core.World;
 
 public class World
 {
     private readonly ConcurrentDictionary<ChunkCoord, Chunk> _chunks = new();
+    private readonly ConcurrentQueue<(int X, int Y, int Z, List<ItemStack> Loot)> _pendingDungeonChests = new();
     private readonly IWorldGenerator _generator;
     private readonly int _seed;
     private readonly ConcurrentQueue<(ChunkCoord ChunkCoord, Vector3s LocalPos)> _liquidUpdateQueue = new();
+    private readonly BlockDefinitionManager? _blockDefs;
+    private readonly Dictionary<Vector3s, byte> _flowDistances = new();
 
     public string Name { get; }
     public int Seed => _seed;
@@ -29,12 +33,13 @@ public class World
         (0, 1), (0, -1), (1, 0), (-1, 0)
     };
 
-    public World(string name, int seed, IWorldGenerator generator)
+    public World(string name, int seed, IWorldGenerator generator, BlockDefinitionManager? blockDefs = null)
     {
         Name = name;
         _seed = seed;
         _generator = generator;
         _generator.Initialize(seed);
+        _blockDefs = blockDefs;
     }
 
     public Chunk GetChunk(ChunkCoord coord)
@@ -51,6 +56,11 @@ public class World
             if (belowChunk != null)
             {
                 LightingEngine.PropagateSunLight(this, belowChunk);
+            }
+
+            foreach (var chest in _generator.PopPendingDungeonChests())
+            {
+                _pendingDungeonChests.Enqueue((chest.X, chest.Y, chest.Z, chest.Loot));
             }
 
             return chunk;
@@ -107,6 +117,16 @@ public class World
         return _generator.GetGroundHeight(x, z);
     }
 
+    public List<(int X, int Y, int Z, List<ItemStack> Loot)> PopPendingDungeonChests()
+    {
+        var results = new List<(int X, int Y, int Z, List<ItemStack> Loot)>();
+        while (_pendingDungeonChests.TryDequeue(out var chest))
+        {
+            results.Add(chest);
+        }
+        return results;
+    }
+
     public List<ChunkCoord> GetLoadedChunks()
     {
         return _chunks.Keys.ToList();
@@ -119,33 +139,45 @@ public class World
 
     public void UpdateLiquids(int tickCount)
     {
-        if (tickCount - _lastWaterUpdateTick >= WaterFlowInterval)
+        var waterViscosity = _blockDefs?.Get((ushort)BlockType.Water)?.LiquidViscosity ?? 1;
+        var lavaViscosity = _blockDefs?.Get((ushort)BlockType.Lava)?.LiquidViscosity ?? 7;
+        var waterInterval = Math.Max(1, waterViscosity * 3);
+        var lavaInterval = Math.Max(1, lavaViscosity * 3);
+
+        if (tickCount - _lastWaterUpdateTick >= waterInterval)
         {
             _lastWaterUpdateTick = tickCount;
             ProcessLiquidFamily(BlockType.Water, BlockType.WaterFlowing);
+            ProcessLiquidFamily(BlockType.RiverWater, BlockType.RiverWaterFlowing);
         }
 
-        if (tickCount - _lastLavaUpdateTick >= LavaFlowInterval)
+        if (tickCount - _lastLavaUpdateTick >= lavaInterval)
         {
             _lastLavaUpdateTick = tickCount;
             ProcessLiquidFamily(BlockType.Lava, BlockType.LavaFlowing);
         }
 
         ProcessWaterLavaInteraction();
+
+        if (_flowDistances.Count > 10000)
+        {
+            _flowDistances.Clear();
+        }
     }
 
     private static byte GetLiquidLevel(Block block)
     {
-        return block.Type is BlockType.Water or BlockType.Lava ? MaxLiquidLevel : block.Param2;
+        return block.Type is BlockType.Water or BlockType.Lava or BlockType.RiverWater ? MaxLiquidLevel : block.Param2;
     }
 
-    private static bool IsWater(BlockType type) => type is BlockType.Water or BlockType.WaterFlowing;
+    private static bool IsWater(BlockType type) => type is BlockType.Water or BlockType.WaterFlowing or BlockType.RiverWater or BlockType.RiverWaterFlowing;
     private static bool IsLava(BlockType type) => type is BlockType.Lava or BlockType.LavaFlowing;
 
     private void ProcessLiquidFamily(BlockType sourceType, BlockType flowingType)
     {
         var processed = new HashSet<(short X, short Y, short Z)>();
         var toRemove = new List<Vector3s>();
+        var flowRange = _blockDefs?.Get((ushort)sourceType)?.LiquidRange ?? 7;
 
         foreach (var chunkCoord in _chunks.Keys)
         {
@@ -173,6 +205,7 @@ public class World
                         if (level == 0)
                         {
                             toRemove.Add(new Vector3s(worldX, worldY, worldZ));
+                            _flowDistances.Remove(new Vector3s(worldX, worldY, worldZ));
                             continue;
                         }
 
@@ -186,6 +219,7 @@ public class World
                                 : (byte)Math.Max(1, level - 1);
                             SetBlock(belowPos, new Block(flowingType, 0, newLevel));
                             processed.Add((worldX, (short)(worldY - 1), worldZ));
+                            _flowDistances[belowPos] = 1;
                             continue;
                         }
 
@@ -193,6 +227,11 @@ public class World
                         {
                             continue;
                         }
+
+                        var currentPos = new Vector3s(worldX, worldY, worldZ);
+                        var currentDist = _flowDistances.TryGetValue(currentPos, out var cd) ? cd : (byte)0;
+
+                        if (currentDist >= 8) continue;
 
                         var shuffled = HorizontalDirections
                             .OrderBy(_ => Random.Shared.Next()).ToArray();
@@ -206,17 +245,25 @@ public class World
 
                             var neighborPos = new Vector3s(nx, worldY, nz);
                             var neighbor = GetBlock(neighborPos);
+                            var newDist = (byte)(currentDist + 1);
+
+                            if (newDist > flowRange) continue;
 
                             if (neighbor.Type == BlockType.Air && level > 1)
                             {
                                 SetBlock(neighborPos, new Block(flowingType, 0, (byte)(level - 1)));
                                 processed.Add((nx, worldY, nz));
+                                _flowDistances[neighborPos] = newDist;
                             }
                             else if (neighbor.Type == flowingType && neighbor.Param2 < level)
                             {
                                 var avg = (byte)((level + neighbor.Param2) / 2);
                                 SetBlock(neighborPos, new Block(flowingType, 0, avg));
                                 processed.Add((nx, worldY, nz));
+                                if (newDist < (_flowDistances.TryGetValue(neighborPos, out var ed) ? ed : byte.MaxValue))
+                                {
+                                    _flowDistances[neighborPos] = newDist;
+                                }
                             }
                         }
                     }
@@ -246,13 +293,16 @@ public class World
                     for (int z = 0; z < Chunk.Size; z++)
                     {
                         var block = chunk.GetBlock(x, y, z);
-                        if (!IsWater(block.Type)) continue;
+                        if (!IsWater(block.Type) && !IsLava(block.Type)) continue;
 
                         var worldX = (short)(chunkCoord.X * Chunk.Size + x);
                         var worldY = (short)(chunkCoord.Y * Chunk.Size + y);
                         var worldZ = (short)(chunkCoord.Z * Chunk.Size + z);
 
                         if (processed.Contains((worldX, worldY, worldZ))) continue;
+
+                        var isWater = IsWater(block.Type);
+                        var isWaterSource = block.Type is BlockType.Water or BlockType.RiverWater;
 
                         foreach (var (dx, dz) in HorizontalDirections)
                         {
@@ -264,14 +314,32 @@ public class World
                             var neighborPos = new Vector3s(nx, worldY, nz);
                             var neighbor = GetBlock(neighborPos);
 
-                            if (neighbor.Type is BlockType.Lava or BlockType.LavaFlowing)
+                            if (isWater && neighbor.Type is BlockType.Lava or BlockType.LavaFlowing)
                             {
-                                var resultType = (block.Type == BlockType.Water && neighbor.Type == BlockType.Lava)
+                                var resultType = isWaterSource && neighbor.Type == BlockType.Lava
                                     ? BlockType.Obsidian
                                     : BlockType.Cobblestone;
 
                                 SetBlock(neighborPos, new Block(resultType));
                                 SetBlock(new Vector3s(worldX, worldY, worldZ), Block.Air);
+                                _flowDistances.Remove(new Vector3s(worldX, worldY, worldZ));
+                                _flowDistances.Remove(neighborPos);
+                                processed.Add((worldX, worldY, worldZ));
+                                processed.Add((nx, worldY, nz));
+                                break;
+                            }
+
+                            if (!isWater && neighbor.Type is BlockType.Water or BlockType.WaterFlowing or BlockType.RiverWater or BlockType.RiverWaterFlowing)
+                            {
+                                var isNeighborSource = neighbor.Type is BlockType.Water or BlockType.RiverWater;
+                                var resultType = block.Type == BlockType.Lava && isNeighborSource
+                                    ? BlockType.Obsidian
+                                    : BlockType.Stone;
+
+                                SetBlock(new Vector3s(worldX, worldY, worldZ), new Block(resultType));
+                                SetBlock(neighborPos, Block.Air);
+                                _flowDistances.Remove(new Vector3s(worldX, worldY, worldZ));
+                                _flowDistances.Remove(neighborPos);
                                 processed.Add((worldX, worldY, worldZ));
                                 processed.Add((nx, worldY, nz));
                                 break;

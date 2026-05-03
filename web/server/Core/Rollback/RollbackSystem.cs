@@ -84,12 +84,18 @@ public class RollbackSystem
 
     public List<BlockChangeRecord> RollbackArea(int x1, int y1, int z1, int x2, int y2, int z2)
     {
+        return RollbackArea(x1, y1, z1, x2, y2, z2, int.MaxValue);
+    }
+
+    public List<BlockChangeRecord> RollbackArea(int x1, int y1, int z1, int x2, int y2, int z2, int seconds)
+    {
         var minX = Math.Min(x1, x2);
         var maxX = Math.Max(x1, x2);
         var minY = Math.Min(y1, y2);
         var maxY = Math.Max(y1, y2);
         var minZ = Math.Min(z1, z2);
         var maxZ = Math.Max(z1, z2);
+        var cutoff = DateTime.UtcNow.AddSeconds(-seconds);
 
         var rolledBack = new List<BlockChangeRecord>();
 
@@ -103,7 +109,8 @@ public class RollbackSystem
 
                 if (record.X >= minX && record.X <= maxX
                     && record.Y >= minY && record.Y <= maxY
-                    && record.Z >= minZ && record.Z <= maxZ)
+                    && record.Z >= minZ && record.Z <= maxZ
+                    && record.Timestamp >= cutoff)
                 {
                     rolledBack.Add(record);
                 }

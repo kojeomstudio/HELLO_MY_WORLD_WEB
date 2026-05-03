@@ -29,9 +29,43 @@ public class Entity
     public DateTime LastUpdate { get; set; } = DateTime.UtcNow;
     public bool IsInLiquid { get; set; }
 
+    public Guid? AttachedTo { get; set; }
+    public Vector3 AttachmentOffset { get; set; } = Vector3.Zero;
+    public Vector3 AttachmentRotation { get; set; } = Vector3.Zero;
+    public List<Guid> AttachedChildren { get; } = new();
+
+    public bool IsAttached => AttachedTo.HasValue;
+
     public Entity(EntityType type)
     {
         Type = type;
+    }
+
+    public void AttachTo(Guid parentId, Vector3 offset, Vector3 rotation)
+    {
+        AttachedTo = parentId;
+        AttachmentOffset = offset;
+        AttachmentRotation = rotation;
+    }
+
+    public void Detach()
+    {
+        AttachedTo = null;
+        AttachmentOffset = Vector3.Zero;
+        AttachmentRotation = Vector3.Zero;
+    }
+
+    public void AddChild(Guid childId)
+    {
+        if (!AttachedChildren.Contains(childId))
+        {
+            AttachedChildren.Add(childId);
+        }
+    }
+
+    public void RemoveChild(Guid childId)
+    {
+        AttachedChildren.Remove(childId);
     }
 
     public virtual void Update(float dt)
@@ -163,6 +197,10 @@ public class MobEntity : Entity
     public MobState State { get; set; } = MobState.Wander;
     public bool IsHurt { get; private set; }
     public bool MakesFootstepSound { get; set; }
+    public float VisualScale { get; set; } = 1.0f;
+    public string Infotext { get; set; } = "";
+    public float AutoRotateSpeed { get; set; }
+    public bool MakesFootstepSoundClient { get; set; }
     public Dictionary<string, int> ArmorGroups { get; set; } = new();
     public string? Nametag { get; set; }
     public string? NametagColor { get; set; }
@@ -173,7 +211,10 @@ public class MobEntity : Entity
     private const int HurtFlashDurationMs = 300;
     private float _wanderAngle;
     private float _wanderTimer;
+    private float _wanderDirChangeTimer;
     private List<Vector3>? _currentPath;
+    private float _idleLookTimer;
+    private float _idleLookYaw;
 
     public MobEntity(string mobType, Vector3 position)
         : base(EntityType.Mob)
@@ -193,6 +234,10 @@ public class MobEntity : Entity
             AttackCooldownMs = (int)(def.AttackCooldown * 1000);
             IsHostile = def.Hostile;
             MakesFootstepSound = def.MakesFootstepSound;
+            VisualScale = def.VisualScale;
+            Infotext = def.Infotext;
+            AutoRotateSpeed = def.AutoRotateSpeed;
+            MakesFootstepSoundClient = def.MakesFootstepSound;
             ArmorGroups = new Dictionary<string, int>(def.ArmorGroups);
             Nametag = def.Nametag;
             NametagColor = def.NametagColor;
@@ -279,11 +324,19 @@ public class MobEntity : Entity
                     State = MobState.Chase;
                     break;
                 }
+                _idleLookTimer -= dt;
+                if (_idleLookTimer <= 0)
+                {
+                    _idleLookYaw = Yaw + (Random.Shared.NextSingle() - 0.5f) * 1.0f;
+                    _idleLookTimer = 2.0f + Random.Shared.NextSingle() * 4.0f;
+                }
+                Yaw += (_idleLookYaw - Yaw) * Math.Min(1.0f, dt * 2.0f);
                 _wanderTimer -= dt;
                 if (_wanderTimer <= 0)
                 {
                     State = MobState.Wander;
                     _wanderAngle = Random.Shared.NextSingle() * MathF.PI * 2;
+                    _wanderDirChangeTimer = 1.0f + Random.Shared.NextSingle() * 2.0f;
                     _wanderTimer = 2.0f + Random.Shared.NextSingle() * 3.0f;
                 }
                 Velocity = new Vector3(0, Velocity.Y, 0);
@@ -295,12 +348,20 @@ public class MobEntity : Entity
                     State = MobState.Chase;
                     break;
                 }
+                _wanderDirChangeTimer -= dt;
+                if (_wanderDirChangeTimer <= 0)
+                {
+                    _wanderAngle += (Random.Shared.NextSingle() - 0.5f) * 1.5f;
+                    _wanderDirChangeTimer = 1.5f + Random.Shared.NextSingle() * 2.0f;
+                }
                 _wanderTimer -= dt;
                 if (_wanderTimer <= 0)
                 {
                     State = MobState.Idle;
                     _wanderTimer = 1.0f + Random.Shared.NextSingle() * 2.0f;
+                    _idleLookTimer = 0;
                 }
+                Yaw += (_wanderAngle - Yaw) * Math.Min(1.0f, dt * 3.0f);
                 Velocity = new Vector3(
                     MathF.Cos(_wanderAngle) * Speed * 0.5f,
                     Velocity.Y,
@@ -389,11 +450,27 @@ public class MobEntity : Entity
                 if (fleeLen > 0)
                 {
                     fleeDir = fleeDir.Normalized;
-                    Yaw = MathF.Atan2(fleeDir.X, fleeDir.Z);
-                    Velocity = new Vector3(
-                        fleeDir.X * Speed * 1.2f,
-                        Velocity.Y,
-                        fleeDir.Z * Speed * 1.2f);
+                    var fleeTarget = Position + fleeDir * 8.0f;
+                    var fleePath = FindPath?.Invoke(Position, fleeTarget);
+
+                    if (fleePath != null && fleePath.Count > 1)
+                    {
+                        var pathDir = fleePath[1] - Position;
+                        pathDir = pathDir.Normalized;
+                        Velocity = new Vector3(
+                            pathDir.X * Speed * 1.3f,
+                            Velocity.Y,
+                            pathDir.Z * Speed * 1.3f);
+                        Yaw = MathF.Atan2(pathDir.X, pathDir.Z);
+                    }
+                    else
+                    {
+                        Yaw = MathF.Atan2(fleeDir.X, fleeDir.Z);
+                        Velocity = new Vector3(
+                            fleeDir.X * Speed * 1.3f,
+                            Velocity.Y,
+                            fleeDir.Z * Speed * 1.3f);
+                    }
                 }
                 break;
         }

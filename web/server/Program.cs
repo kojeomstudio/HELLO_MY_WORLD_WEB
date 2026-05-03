@@ -93,6 +93,8 @@ builder.Services.AddSingleton<PrivilegeSystem>(sp =>
 builder.Services.AddSingleton<ActiveBlockModifierSystem>(sp =>
 {
     var system = new ActiveBlockModifierSystem();
+    var blockDefinitions = sp.GetRequiredService<BlockDefinitionManager>();
+    var entityManager = sp.GetRequiredService<EntityManager>();
 
     static float GetAbmFloat(JsonElement? mods, string name, string prop, float defaultVal)
     {
@@ -334,6 +336,218 @@ builder.Services.AddSingleton<ActiveBlockModifierSystem>(sp =>
         }
     });
 
+    system.Register(new ActiveBlockModifier
+    {
+        Name = "snow_spread",
+        Interval = GetAbmInt(abmModifiers, "snow_spread", "interval", 120),
+        Chance = GetAbmFloat(abmModifiers, "snow_spread", "chance", 0.02f),
+        Action = (blockDef, pos, world) =>
+        {
+            if (blockDef.Name != "snow_layer") return false;
+            if (blockDef.Light > 0) return false;
+
+            var above = new Vector3s(pos.X, (short)(pos.Y + 1), pos.Z);
+            var aboveBlock = world.GetBlock(above);
+            var aboveDef = blockDefinitions.Get((ushort)aboveBlock.Type);
+            if (aboveDef != null && aboveDef.Solid && aboveDef.Name != "snow_layer" && aboveDef.Name != "snowblock")
+                return false;
+            if (aboveBlock.Type != BlockType.Air && aboveBlock.Type != BlockType.SnowLayer) return false;
+
+            var offsets = new (int, int)[]
+            {
+                (1, 0), (-1, 0), (0, 1), (0, -1)
+            };
+            var idx = Random.Shared.Next(offsets.Length);
+            var (dx, dz) = offsets[idx];
+            var spreadPos = new Vector3s((short)(pos.X + dx), pos.Y, (short)(pos.Z + dz));
+            var target = world.GetBlock(spreadPos);
+            if (target.Type == BlockType.Air)
+            {
+                world.SetBlock(spreadPos, new Block(BlockType.SnowLayer));
+                return true;
+            }
+            return false;
+        }
+    });
+
+    system.Register(new ActiveBlockModifier
+    {
+        Name = "grass_spread_aggressive",
+        Interval = GetAbmInt(abmModifiers, "grass_spread_aggressive", "interval", 12),
+        Chance = GetAbmFloat(abmModifiers, "grass_spread_aggressive", "chance", 0.15f),
+        Action = (blockDef, pos, world) =>
+        {
+            if (blockDef.Name != "grass") return false;
+            var above = new Vector3s(pos.X, (short)(pos.Y + 1), pos.Z);
+            if (world.GetBlock(above).Type != BlockType.Air) return false;
+
+            var dx = Random.Shared.Next(-1, 2);
+            var dz = Random.Shared.Next(-1, 2);
+            var spreadPos = new Vector3s((short)(pos.X + dx), pos.Y, (short)(pos.Z + dz));
+            var target = world.GetBlock(spreadPos);
+            if (target.Type != BlockType.Dirt) return false;
+
+            var targetAbove = new Vector3s(spreadPos.X, (short)(spreadPos.Y + 1), spreadPos.Z);
+            var targetAboveBlock = world.GetBlock(targetAbove);
+            if (targetAboveBlock.Type != BlockType.Air) return false;
+
+            world.SetBlock(spreadPos, new Block(BlockType.Grass));
+            return true;
+        }
+    });
+
+    system.Register(new ActiveBlockModifier
+    {
+        Name = "vine_growth",
+        Interval = GetAbmInt(abmModifiers, "vine_growth", "interval", 30),
+        Chance = GetAbmFloat(abmModifiers, "vine_growth", "chance", 0.1f),
+        Action = (blockDef, pos, world) =>
+        {
+            if (blockDef.Name != "vine") return false;
+            if (Random.Shared.NextSingle() < 0.5f)
+            {
+                var below = new Vector3s(pos.X, (short)(pos.Y - 1), pos.Z);
+                var belowBlock = world.GetBlock(below);
+                if (belowBlock.Type == BlockType.Air)
+                {
+                    int vineLength = 1;
+                    for (int dy = 1; dy <= 5; dy++)
+                    {
+                        var checkPos = new Vector3s(pos.X, (short)(pos.Y - dy), pos.Z);
+                        if (world.GetBlock(checkPos).Type == BlockType.Vine)
+                            vineLength++;
+                        else
+                            break;
+                    }
+                    if (vineLength < 7)
+                    {
+                        world.SetBlock(below, new Block(BlockType.Vine));
+                        return true;
+                    }
+                }
+            }
+            else
+            {
+                var dx = Random.Shared.Next(-1, 2);
+                var dz = Random.Shared.Next(-1, 2);
+                var spreadPos = new Vector3s((short)(pos.X + dx), pos.Y, (short)(pos.Z + dz));
+                var target = world.GetBlock(spreadPos);
+                if (target.Type != BlockType.Air) return false;
+
+                var sidePos = new Vector3s((short)(pos.X - dx), pos.Y, (short)(pos.Z - dz));
+                var sideBlock = world.GetBlock(sidePos);
+                var sideDef = blockDefinitions.Get((ushort)sideBlock.Type);
+                if (sideDef != null && sideDef.Solid && !sideDef.BuildableTo)
+                {
+                    world.SetBlock(spreadPos, new Block(BlockType.Vine));
+                    return true;
+                }
+            }
+            return false;
+        }
+    });
+
+    system.Register(new ActiveBlockModifier
+    {
+        Name = "coral_spread",
+        Interval = GetAbmInt(abmModifiers, "coral_spread", "interval", 60),
+        Chance = GetAbmFloat(abmModifiers, "coral_spread", "chance", 0.03f),
+        Action = (blockDef, pos, world) =>
+        {
+            if (blockDef.Name != "coral_block") return false;
+            var above = new Vector3s(pos.X, (short)(pos.Y + 1), pos.Z);
+            var aboveBlock = world.GetBlock(above);
+            if (aboveBlock.Type != BlockType.Water) return false;
+
+            var dx = Random.Shared.Next(-1, 2);
+            var dz = Random.Shared.Next(-1, 2);
+            var spreadPos = new Vector3s((short)(pos.X + dx), pos.Y, (short)(pos.Z + dz));
+            var target = world.GetBlock(spreadPos);
+            if (target.Type != BlockType.Air) return false;
+
+            var targetAbove = new Vector3s(spreadPos.X, (short)(spreadPos.Y + 1), spreadPos.Z);
+            var targetAboveBlock = world.GetBlock(targetAbove);
+            if (targetAboveBlock.Type != BlockType.Water) return false;
+
+            world.SetBlock(spreadPos, new Block(BlockType.CoralBlock));
+            return true;
+        }
+    });
+
+    system.Register(new ActiveBlockModifier
+    {
+        Name = "coral_death",
+        Interval = GetAbmInt(abmModifiers, "coral_death", "interval", 45),
+        Chance = GetAbmFloat(abmModifiers, "coral_death", "chance", 0.05f),
+        Action = (blockDef, pos, world) =>
+        {
+            if (blockDef.Name != "coral_block") return false;
+            var above = new Vector3s(pos.X, (short)(pos.Y + 1), pos.Z);
+            var aboveBlock = world.GetBlock(above);
+
+            if (aboveBlock.Type != BlockType.Water && aboveBlock.Type != BlockType.WaterFlowing && aboveBlock.Type != BlockType.RiverWater)
+            {
+                world.SetBlock(pos, new Block(BlockType.DeadCoralBlock));
+                return true;
+            }
+            return false;
+        }
+    });
+
+    system.Register(new ActiveBlockModifier
+    {
+        Name = "mud_formation",
+        Interval = GetAbmInt(abmModifiers, "mud_formation", "interval", 50),
+        Chance = GetAbmFloat(abmModifiers, "mud_formation", "chance", 0.04f),
+        Action = (blockDef, pos, world) =>
+        {
+            if (blockDef.Name != "dirt") return false;
+            bool hasWater = false;
+            for (int dx = -1; dx <= 1 && !hasWater; dx++)
+            {
+                for (int dz = -1; dz <= 1 && !hasWater; dz++)
+                {
+                    for (int dy = -1; dy <= 1 && !hasWater; dy++)
+                    {
+                        if (dx == 0 && dy == 0 && dz == 0) continue;
+                        var checkPos = new Vector3s((short)(pos.X + dx), (short)(pos.Y + dy), (short)(pos.Z + dz));
+                        var check = world.GetBlock(checkPos);
+                        if (check.Type is BlockType.Water or BlockType.WaterFlowing or BlockType.RiverWater)
+                            hasWater = true;
+                    }
+                }
+            }
+            if (hasWater)
+            {
+                world.SetBlock(pos, new Block(BlockType.Mud));
+                return true;
+            }
+            return false;
+        }
+    });
+
+    system.Register(new ActiveBlockModifier
+    {
+        Name = "attached_node_check",
+        Interval = GetAbmInt(abmModifiers, "attached_node_check", "interval", 5),
+        Chance = 1.0f,
+        Action = (blockDef, pos, world) =>
+        {
+            if (!blockDef.AttachedNode) return false;
+
+            var below = new Vector3s(pos.X, (short)(pos.Y - 1), pos.Z);
+            var belowBlock = world.GetBlock(below);
+            var belowDef = blockDefinitions.Get((ushort)belowBlock.Type);
+            if (belowDef == null || !belowDef.Solid) return true;
+
+            world.SetBlock(pos, Block.Air);
+            var itemEnt = new ItemEntity(blockDef.Drops ?? blockDef.Name ?? "", 1,
+                new Vector3(pos.X + 0.5f, pos.Y + 0.5f, pos.Z + 0.5f));
+            entityManager.Add(itemEnt);
+            return true;
+        }
+    });
+
     return system;
 });
 builder.Services.AddSingleton<KnockbackSystem>();
@@ -425,8 +639,47 @@ builder.Services.AddSingleton<ChatCommandManager>(sp =>
         (playerName, gravity, jump, walk, sprint, fly) => { gameServer.SetPlayerPhysicsOverride(playerName, gravity, jump, walk, sprint, fly); },
         (playerName) => { gameServer.ClearPlayerPhysicsOverride(playerName); },
         (playerName) => { gameServer.SendPhysicsParamsToPlayer(playerName); },
+        (targetName, flagName) =>
+        {
+            var player = gameServer.GetPlayer(targetName);
+            if (player == null) return null;
+            var flagLabel = flagName switch
+            {
+                "invisible" => player.IsInvisible = !player.IsInvisible,
+                "footstep" => player.MakesFootstepSound = !player.MakesFootstepSound,
+                "zoom" => player.CanZoom = !player.CanZoom,
+                _ => false
+            };
+            var stateStr = flagLabel ? "ON" : "OFF";
+            var flagDisplayName = flagName switch
+            {
+                "invisible" => "invisible",
+                "footstep" => "footstep sound",
+                "zoom" => "zoom",
+                _ => flagName
+            };
+            return $"FLAG_UPDATE:{targetName}:{player.IsInvisible}:{player.MakesFootstepSound}:{player.CanZoom}:{flagDisplayName} is now {stateStr} for {targetName}";
+        },
         (playerName, x, y, z, color, name) => { gameServer.BroadcastWaypoint(playerName, x, y, z, name, color); },
-        () => { gameServer.ClearMobs(); });
+        () => { gameServer.ClearMobs(); },
+        (playerName) =>
+        {
+            var player = gameServer.GetPlayer(playerName);
+            return player?.Statistics;
+        },
+        () =>
+        {
+            var worldDataPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "data", "worlds", "default");
+            if (!Directory.Exists(worldDataPath))
+                worldDataPath = Path.Combine(Directory.GetCurrentDirectory(), "data", "worlds", "default");
+            return worldDataPath;
+        },
+        (playerName, seconds) => gameServer.PerformRollback(playerName, seconds),
+        (x1, y1, z1, x2, y2, z2, seconds) => gameServer.PerformAreaRollback(x1, y1, z1, x2, y2, z2, seconds),
+        () => gameServer.DefaultWorld.Seed,
+        () => gameServer.DefaultWorld.Name,
+        () => gameServer.DefaultWorld.GetLoadedChunks().Count,
+        () => entityManager.Count);
 });
 builder.Services.AddSingleton<CraftingSystem>(sp =>
 {
@@ -558,11 +811,13 @@ if (!Directory.Exists(worldDataPath))
     worldDataPath = Path.Combine(Directory.GetCurrentDirectory(), "data", "worlds", "default");
 Directory.CreateDirectory(worldDataPath);
 gameServer.DefaultWorld.Load(worldDataPath);
+gameServer.LoadEntities(worldDataPath);
 
 app.Lifetime.ApplicationStopping.Register(() =>
 {
     gameServer.SaveAllMetadata();
     gameServer.DefaultWorld.Save(worldDataPath);
+    gameServer.SaveEntities(worldDataPath);
     privilegeSystem.Save();
     var areaProtection = app.Services.GetRequiredService<AreaProtectionSystem>();
     var protectionSavePath = Path.Combine(dataDir, "protection");

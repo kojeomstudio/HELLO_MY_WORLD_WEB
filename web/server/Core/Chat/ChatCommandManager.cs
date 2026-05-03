@@ -1,6 +1,7 @@
 using WebGameServer.Core.Entities;
 using WebGameServer.Core.Player;
 using WebGameServer.Core.Protection;
+using WebGameServer.Core.World;
 
 namespace WebGameServer.Core.Chat;
 
@@ -55,8 +56,17 @@ public class ChatCommandManager
     private readonly Action<string, float?, float?, float?, float?, float?>? _setPhysicsOverride;
     private readonly Action<string>? _clearPhysicsOverride;
     private readonly Action<string>? _sendPhysicsParams;
+    private readonly Func<string, string, string?>? _togglePlayerFlag;
     private readonly Action<string, float, float, float, string, string>? _addWaypoint;
     private readonly Action? _killAllMobs;
+    private readonly Func<string, PlayerStatistics?>? _getPlayerStatistics;
+    private readonly Func<string>? _getWorldDataPath;
+    private readonly Func<string, int, int>? _rollbackPlayer;
+    private readonly Func<int, int, int, int, int, int, int, int>? _rollbackArea;
+    private readonly Func<int>? _getWorldSeed;
+    private readonly Func<string>? _getWorldName;
+    private readonly Func<int>? _getLoadedChunkCount;
+    private readonly Func<int>? _getEntityCount;
 
     public ChatCommandManager(
         Func<long> getGameTime,
@@ -89,8 +99,17 @@ public class ChatCommandManager
         Action<string, float?, float?, float?, float?, float?>? setPhysicsOverride = null,
         Action<string>? clearPhysicsOverride = null,
         Action<string>? sendPhysicsParams = null,
+        Func<string, string, string?>? togglePlayerFlag = null,
         Action<string, float, float, float, string, string>? addWaypoint = null,
-        Action? killAllMobs = null)
+        Action? killAllMobs = null,
+        Func<string, PlayerStatistics?>? getPlayerStatistics = null,
+        Func<string>? getWorldDataPath = null,
+        Func<string, int, int>? rollbackPlayer = null,
+        Func<int, int, int, int, int, int, int, int>? rollbackArea = null,
+        Func<int>? getWorldSeed = null,
+        Func<string>? getWorldName = null,
+        Func<int>? getLoadedChunkCount = null,
+        Func<int>? getEntityCount = null)
     {
         _getGameTime = getGameTime;
         _getTps = getTps;
@@ -122,8 +141,17 @@ public class ChatCommandManager
         _setPhysicsOverride = setPhysicsOverride;
         _clearPhysicsOverride = clearPhysicsOverride;
         _sendPhysicsParams = sendPhysicsParams;
+        _togglePlayerFlag = togglePlayerFlag;
         _addWaypoint = addWaypoint;
         _killAllMobs = killAllMobs;
+        _getPlayerStatistics = getPlayerStatistics;
+        _getWorldDataPath = getWorldDataPath;
+        _rollbackPlayer = rollbackPlayer;
+        _rollbackArea = rollbackArea;
+        _getWorldSeed = getWorldSeed;
+        _getWorldName = getWorldName;
+        _getLoadedChunkCount = getLoadedChunkCount;
+        _getEntityCount = getEntityCount;
         RegisterBuiltInCommands();
     }
 
@@ -559,6 +587,21 @@ public class ChatCommandManager
                 return Task.FromResult($"Physics reset to defaults for {target}");
             }, "server"));
 
+        Register(new ChatCommand("toggleflag", "Toggle a player flag", Array.Empty<string>(),
+            (playerName, args) =>
+            {
+                if (_togglePlayerFlag == null) return Task.FromResult("Toggle flag command is not available.");
+                if (args.Length < 2) return Task.FromResult("Usage: /toggleflag <player> <flag>");
+                var target = args[0];
+                var flag = args[1].ToLowerInvariant();
+                var validFlags = new[] { "invisible", "footstep", "zoom" };
+                if (!validFlags.Contains(flag))
+                    return Task.FromResult($"Invalid flag '{flag}'. Valid flags: {string.Join(", ", validFlags)}");
+                var result = _togglePlayerFlag(target, flag);
+                if (result == null) return Task.FromResult($"Player '{target}' not found or offline.");
+                return Task.FromResult(result);
+            }, "server"));
+
         Register(new ChatCommand("detached", "Create a detached inventory", Array.Empty<string>(),
             (playerName, args) =>
             {
@@ -651,6 +694,31 @@ public class ChatCommandManager
                 return Task.FromResult($"Day {totalDays}");
             }));
 
+        Register(new ChatCommand("worldinfo", "Show world information", new[] { "world" },
+            (_playerName, _args) =>
+            {
+                var seed = _getWorldSeed?.Invoke() ?? 0;
+                var name = _getWorldName?.Invoke() ?? "unknown";
+                var chunks = _getLoadedChunkCount?.Invoke() ?? 0;
+                var entities = _getEntityCount?.Invoke() ?? 0;
+                var players = _getOnlinePlayers?.Invoke();
+                var playerCount = players?.Length ?? 0;
+                var uptimeMs = _getGameTime();
+                var uptime = TimeSpan.FromMilliseconds(uptimeMs);
+                var uptimeStr = $"{uptime.Days}d {uptime.Hours}h {uptime.Minutes}m {uptime.Seconds}s";
+                var lines = new List<string>
+                {
+                    $"--- World Info ---",
+                    $"World: {name}",
+                    $"Seed: {seed}",
+                    $"Loaded chunks: {chunks}",
+                    $"Active entities: {entities}",
+                    $"Online players: {playerCount}",
+                    $"Server uptime: {uptimeStr}"
+                };
+                return Task.FromResult(string.Join("\n", lines));
+            }));
+
         Register(new ChatCommand("mods", "List ported game features", Array.Empty<string>(),
             (_playerName, _args) =>
             {
@@ -712,6 +780,134 @@ public class ChatCommandManager
                     return Task.FromResult("Usage: /getblock <x> <y> <z>");
                 return Task.FromResult($"GETBLOCK:{args[0]}:{args[1]}:{args[2]}");
             }, "interact"));
+
+        Register(new ChatCommand("setsky", "Set sky rendering parameters", new[] { "sky" },
+            (playerName, args) =>
+            {
+                if (args.Length == 0)
+                    return Task.FromResult("Usage: /setsky <sun|moon|stars|fog|reset> [value]");
+                var sub = args[0].ToLowerInvariant();
+                if (sub == "reset")
+                    return Task.FromResult("SKY_SET:reset");
+                if (args.Length < 2)
+                    return Task.FromResult("Usage: /setsky <sun|moon|stars|fog|reset> [value]");
+                return sub switch
+                {
+                    "sun" => Task.FromResult($"SKY_SET:sunColor:{args[1]}"),
+                    "moon" => Task.FromResult($"SKY_SET:moonColor:{args[1]}"),
+                    "stars" => Task.FromResult($"SKY_SET:starsCount:{args[1]}"),
+                    "fog" => Task.FromResult($"SKY_SET:fogColor:{args[1]}"),
+                    _ => Task.FromResult("Unknown subcommand. Use: sun, moon, stars, fog, reset")
+                };
+            }, "server"));
+
+        Register(new ChatCommand("stats", "Show player statistics", new[] { "scoreboard" },
+            (playerName, args) =>
+            {
+                if (_getPlayerStatistics == null) return Task.FromResult("Statistics command is not available.");
+                var target = args.Length > 0 ? args[0] : playerName;
+                var stats = _getPlayerStatistics(target);
+                if (stats == null) return Task.FromResult($"Player '{target}' not found or offline.");
+                var playTime = TimeSpan.FromTicks(stats.PlayTimeTicks * (TimeSpan.TicksPerSecond / 20));
+                var lines = new List<string>
+                {
+                    $"--- {target} Stats ---",
+                    $"Blocks Mined: {stats.BlocksMined}",
+                    $"Blocks Placed: {stats.BlocksPlaced}",
+                    $"Distance Walked: {stats.DistanceWalked}",
+                    $"Players Killed: {stats.PlayersKilled}",
+                    $"Mobs Killed: {stats.MobsKilled}",
+                    $"Deaths: {stats.Deaths}",
+                    $"Items Crafted: {stats.ItemsCrafted}",
+                    $"Damage Taken: {stats.DamageTaken}",
+                    $"Damage Dealt: {stats.DamageDealt}",
+                    $"Play Time: {playTime.Hours}h {playTime.Minutes}m {playTime.Seconds}s"
+                };
+                return Task.FromResult(string.Join("\n", lines));
+            }));
+
+        Register(new ChatCommand("color", "Set a color tint for an inventory item", Array.Empty<string>(),
+            (playerName, args) =>
+            {
+                if (args.Length < 2) return Task.FromResult("Usage: /color <item> <hex_color>");
+                var itemId = args[0].ToLowerInvariant();
+                var color = args[1];
+                if (!color.StartsWith('#')) color = '#' + color;
+                if (!System.Text.RegularExpressions.Regex.IsMatch(color, @"^#[0-9a-fA-F]{3,8}$"))
+                    return Task.FromResult("Invalid hex color. Use format: #RRGGBB");
+                return Task.FromResult($"COLOR_SET:{itemId}:{color}");
+            }, "interact"));
+
+        Register(new ChatCommand("uncolor", "Remove color tint from an inventory item", Array.Empty<string>(),
+            (playerName, args) =>
+            {
+                if (args.Length == 0) return Task.FromResult("Usage: /uncolor <item>");
+                var itemId = args[0].ToLowerInvariant();
+                return Task.FromResult($"COLOR_CLEAR:{itemId}");
+            }, "interact"));
+
+        Register(new ChatCommand("fov", "Set player field of view", Array.Empty<string>(),
+            (playerName, args) =>
+            {
+                if (args.Length < 2) return Task.FromResult("Usage: /fov <player> <degrees>");
+                var target = args[0];
+                if (!float.TryParse(args[1], out var fov))
+                    return Task.FromResult("Invalid FOV value. Must be a number.");
+                fov = Math.Clamp(fov, 30f, 110f);
+                return Task.FromResult($"FOV_SET:{target}:{fov}");
+            }, "server"));
+
+        Register(new ChatCommand("backup", "Create a world backup", Array.Empty<string>(),
+            (_, _) =>
+            {
+                if (_getWorldDataPath == null) return Task.FromResult("Backup command is not available.");
+                var worldDir = _getWorldDataPath();
+                var backupPath = WorldBackup.CreateBackup(worldDir);
+                return Task.FromResult(backupPath != null
+                    ? $"Backup created: {backupPath}"
+                    : "Failed to create backup.");
+            }, "server"));
+
+        Register(new ChatCommand("restore", "Restore the most recent world backup", Array.Empty<string>(),
+            (_, _) =>
+            {
+                if (_getWorldDataPath == null) return Task.FromResult("Restore command is not available.");
+                var worldDir = _getWorldDataPath();
+                var backups = WorldBackup.ListBackups();
+                if (backups.Count == 0) return Task.FromResult("No backups available to restore.");
+                var latest = backups[0];
+                var success = WorldBackup.RestoreBackup(latest, worldDir);
+                return Task.FromResult(success
+                    ? $"Restored from backup: {latest}"
+                    : "Failed to restore backup.");
+            }, "server"));
+
+        Register(new ChatCommand("rollback", "Rollback block changes by a player within a time window", Array.Empty<string>(),
+            (playerName, args) =>
+            {
+                if (_rollbackPlayer == null) return Task.FromResult("Rollback command is not available.");
+                if (args.Length < 2) return Task.FromResult("Usage: /rollback <player> <seconds>");
+                var targetPlayer = args[0];
+                if (!int.TryParse(args[1], out var seconds) || seconds <= 0)
+                    return Task.FromResult("Seconds must be a positive number.");
+                var rolledBack = _rollbackPlayer(targetPlayer, seconds);
+                return Task.FromResult($"Rolled back {rolledBack} block changes by {targetPlayer} in the last {seconds}s.");
+            }, "rollback"));
+
+        Register(new ChatCommand("rollbacktell", "Rollback block changes in an area within a time window", Array.Empty<string>(),
+            (playerName, args) =>
+            {
+                if (_rollbackArea == null) return Task.FromResult("Rollback tell command is not available.");
+                if (args.Length < 7) return Task.FromResult("Usage: /rollbacktell <x1> <y1> <z1> <x2> <y2> <z2> <seconds>");
+                if (!int.TryParse(args[0], out var x1) || !int.TryParse(args[1], out var y1) ||
+                    !int.TryParse(args[2], out var z1) || !int.TryParse(args[3], out var x2) ||
+                    !int.TryParse(args[4], out var y2) || !int.TryParse(args[5], out var z2))
+                    return Task.FromResult("Invalid coordinates. Usage: /rollbacktell <x1> <y1> <z1> <x2> <y2> <z2> <seconds>");
+                if (!int.TryParse(args[6], out var seconds) || seconds <= 0)
+                    return Task.FromResult("Seconds must be a positive number.");
+                var rolledBack = _rollbackArea(x1, y1, z1, x2, y2, z2, seconds);
+                return Task.FromResult($"Rolled back {rolledBack} block changes in ({x1},{y1},{z1})-({x2},{y2},{z2}) in the last {seconds}s.");
+            }, "rollback"));
     }
 
     public void RegisterExternalCommand(ChatCommand command)

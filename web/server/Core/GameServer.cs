@@ -395,6 +395,11 @@ public class GameServer
             DefaultWorld.UnloadDistantChunks(playersDict, _config.World.RenderDistance);
         }
 
+        if (_tickCount % 20 == 0)
+        {
+            PopulateDungeonChests();
+        }
+
         if (_tickCount % _config.Network.TimeBroadcastInterval == 0 && _hubContext != null)
         {
             _ = _hubContext.Clients.All.OnTimeUpdate(GameTime, TimeSpeed, DayNight.SkyBrightness);
@@ -404,6 +409,11 @@ public class GameServer
     private void UpdatePlayer(PlayerEnt player)
     {
         if (player.IsDead)
+        {
+            return;
+        }
+
+        if (player.Mode == GameMode.Spectator)
         {
             return;
         }
@@ -509,6 +519,7 @@ public class GameServer
         if (player.IsDead || player.Mode == GameMode.Creative) return;
 
         player.TakeDamage(amount);
+        player.Statistics.AddDamageTaken((int)Math.Ceiling(amount));
 
         if (_hubContext != null)
         {
@@ -520,6 +531,7 @@ public class GameServer
 
         if (player.IsDead)
         {
+            player.Statistics.IncrementDeaths();
             var deathMessage = $"{player.Name} died from {source}";
             if (_hubContext != null)
             {
@@ -577,6 +589,7 @@ public class GameServer
     {
         var player = GetPlayer(playerName);
         if (player == null) return;
+        size = Math.Clamp(size, 1, 9);
         player.HotbarSize = size;
     }
 
@@ -619,6 +632,18 @@ public class GameServer
         var player = GetPlayer(playerName);
         if (player == null) return false;
         player.Mode = mode;
+
+        if (mode == GameMode.Spectator)
+        {
+            player.IsFlying = true;
+            player.Invulnerable = true;
+            player.Velocity = Vector3.Zero;
+        }
+        else
+        {
+            player.Invulnerable = false;
+        }
+
         return true;
     }
 
@@ -626,6 +651,12 @@ public class GameServer
     {
         var player = GetPlayer(playerName);
         if (player == null) return false;
+        if (float.IsNaN(position.X) || float.IsInfinity(position.X) || float.IsNaN(position.Y) || float.IsInfinity(position.Y) || float.IsNaN(position.Z) || float.IsInfinity(position.Z)) return false;
+        var borderSize = WorldBorderSize > 0 ? WorldBorderSize : 1000;
+        position = new Vector3(
+            Math.Clamp(position.X, -borderSize, borderSize),
+            Math.Clamp(position.Y, -64, 320),
+            Math.Clamp(position.Z, -borderSize, borderSize));
         player.Position = position;
         player.Velocity = Vector3.Zero;
         player.FallDistance = 0;
@@ -714,7 +745,7 @@ public class GameServer
         var liquidCheckY = (short)Math.Floor(player.Position.Y - _physicsEngine.PlayerHeight * 0.5);
         var liquidBlock = DefaultWorld.GetBlock(
             new Vector3s((short)player.Position.X, liquidCheckY, (short)player.Position.Z));
-        player.IsInLiquid = liquidBlock.Type is BlockType.Water or BlockType.WaterFlowing or BlockType.Lava or BlockType.LavaFlowing;
+        player.IsInLiquid = liquidBlock.Type is BlockType.Water or BlockType.WaterFlowing or BlockType.Lava or BlockType.LavaFlowing or BlockType.RiverWater or BlockType.RiverWaterFlowing;
 
         if (!player.IsFlying && player.Mode != GameMode.Creative && player.Mode != GameMode.Spectator)
         {
@@ -820,6 +851,24 @@ public class GameServer
         return loaded;
     }
 
+    private void PopulateDungeonChests()
+    {
+        var chests = DefaultWorld.PopPendingDungeonChests();
+        foreach (var (x, y, z, loot) in chests)
+        {
+            var posKey = $"{x},{y},{z}";
+            var inv = new ItemStack?[27];
+            var slot = 0;
+            foreach (var item in loot)
+            {
+                if (slot >= 27) break;
+                inv[slot++] = item;
+            }
+            _chestInventories[posKey] = inv;
+            _blockMetadataDatabase.SaveChestInventory(posKey, inv);
+        }
+    }
+
     public ItemStack?[]? GetChestInventory(string posKey)
     {
         return _chestInventories.TryGetValue(posKey, out var inv) ? inv : null;
@@ -832,6 +881,7 @@ public class GameServer
 
     public bool MoveItemToChest(PlayerEnt player, string posKey, int slotIndex, int chestSlot)
     {
+        if (slotIndex < 0 || slotIndex >= player.Inventory.Size) return false;
         var item = player.Inventory[slotIndex];
         if (item == null) return false;
 
@@ -893,6 +943,7 @@ public class GameServer
         if (item == null) return false;
 
         var targetSlot = slotIndex >= 0 ? slotIndex : -1;
+        if (slotIndex >= 0 && slotIndex >= player.Inventory.Size) return false;
 
         if (targetSlot < 0)
         {
@@ -912,6 +963,8 @@ public class GameServer
         }
 
         if (targetSlot < 0) return false;
+
+        if (targetSlot >= player.Inventory.Size) return false;
 
         if (player.Inventory[targetSlot] != null && player.Inventory[targetSlot]!.ItemId == item.ItemId)
         {
@@ -1123,6 +1176,23 @@ public class GameServer
         }
         var timers = _nodeTimerSystem.GetAllTimers();
         _blockMetadataDatabase.SaveAllNodeTimers(timers);
+    }
+
+    public void SaveEntities(string worldDir)
+    {
+        var filePath = Path.Combine(worldDir, "entities.json");
+        EntityPersistence.Save(_entityManager.GetAll(), filePath);
+    }
+
+    public void LoadEntities(string worldDir)
+    {
+        var filePath = Path.Combine(worldDir, "entities.json");
+        var entities = EntityPersistence.Load(filePath, (mobType, pos) => new MobEntity(mobType, pos));
+        if (entities == null) return;
+        foreach (var entity in entities)
+        {
+            _entityManager.Add(entity);
+        }
     }
 
     public void DropPlayerInventory(PlayerEnt player)
@@ -1372,6 +1442,33 @@ public class GameServer
     public int ClearMobs()
     {
         return _entityManager.ClearMobs();
+    }
+
+    public int PerformRollback(string playerName, int seconds)
+    {
+        var records = _rollbackSystem.Rollback(playerName, seconds);
+        ApplyRollbackRecords(records);
+        return records.Count;
+    }
+
+    public int PerformAreaRollback(int x1, int y1, int z1, int x2, int y2, int z2, int seconds)
+    {
+        var records = _rollbackSystem.RollbackArea(x1, y1, z1, x2, y2, z2, seconds);
+        ApplyRollbackRecords(records);
+        return records.Count;
+    }
+
+    private void ApplyRollbackRecords(List<BlockChangeRecord> records)
+    {
+        if (_hubContext == null) return;
+
+        foreach (var record in records)
+        {
+            var oldBlock = Block.FromPacked(record.OldBlockData);
+            var pos = new Vector3s((short)record.X, (short)record.Y, (short)record.Z);
+            DefaultWorld.SetBlock(pos, oldBlock);
+            _ = _hubContext.Clients.All.OnBlockUpdate(record.X, record.Y, record.Z, record.OldBlockData);
+        }
     }
 
     public void BroadcastWaypoint(string playerName, float x, float y, float z, string name, string color)

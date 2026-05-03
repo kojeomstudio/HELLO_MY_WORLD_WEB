@@ -1,6 +1,7 @@
 import * as HubConnection from '@microsoft/signalr';
 import { SettingsPanel } from './SettingsPanel';
 import { CraftingGridUI } from './CraftingGridUI';
+import type { ItemRegistry } from '../world/ItemRegistry';
 
 interface CreativeInventoryEntry {
     id: number;
@@ -39,6 +40,7 @@ export class UIManager {
     private detachedOverlay: HTMLElement | null = null;
     private waypoints: Array<{ x: number; y: number; z: number; name: string; color: string }> = [];
     private waypointUpdateInterval: number = 0;
+    private itemRegistry: ItemRegistry | null = null;
     private hudFlags: Record<string, boolean> = {
         hotbar: true,
         healthbar: true,
@@ -58,6 +60,10 @@ export class UIManager {
         this.settingsPanel = new SettingsPanel();
         this.initCraftingGrid();
         this.setupHotbar();
+    }
+
+    setItemRegistry(registry: ItemRegistry): void {
+        this.itemRegistry = registry;
     }
 
     setConnection(connection: HubConnection.HubConnection): void {
@@ -195,6 +201,12 @@ export class UIManager {
                 }
                 if (item.metadata) {
                     slot.style.borderBottom = '2px solid #00ff00';
+                }
+                const itemColor = item.color || this.itemRegistry?.getItemColor(item.itemId);
+                if (itemColor) {
+                    slot.style.backgroundColor = itemColor;
+                } else {
+                    slot.style.backgroundColor = '';
                 }
             } else {
                 slot.innerHTML = `<span style="font-size:12px;color:#aaa">${i + 1}</span>`;
@@ -756,15 +768,42 @@ export class UIManager {
         header.appendChild(title);
         header.appendChild(closeBtn);
 
+        const searchWrapper = document.createElement('div');
+        searchWrapper.style.cssText = 'position:relative;margin-bottom:4px;';
+
         const searchInput = document.createElement('input');
+        searchInput.id = 'creative-search-input';
         searchInput.type = 'text';
-        searchInput.placeholder = 'Search blocks...';
-        searchInput.style.cssText = 'width:100%;padding:8px;margin-bottom:12px;background:rgba(0,0,0,0.4);border:1px solid #555;border-radius:4px;color:white;font-size:14px;outline:none;box-sizing:border-box;';
+        searchInput.placeholder = 'Search by name or ID...';
+        searchInput.style.cssText = 'width:100%;padding:8px 32px 8px 8px;background:rgba(0,0,0,0.4);border:1px solid #555;border-radius:4px;color:white;font-size:14px;outline:none;box-sizing:border-box;';
+
+        const clearBtn = document.createElement('button');
+        clearBtn.id = 'creative-search-clear';
+        clearBtn.style.cssText = 'position:absolute;right:6px;top:50%;transform:translateY(-50%);cursor:pointer;background:none;border:none;color:#888;font-size:18px;display:none;padding:0 4px;line-height:1;';
+        clearBtn.textContent = '\u00D7';
+        clearBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            this.creativeFilter = '';
+            this.creativePage = 0;
+            clearBtn.style.display = 'none';
+            resultCount.style.display = 'none';
+            this.renderCreativeGrid();
+            searchInput.focus();
+        });
+
+        const resultCount = document.createElement('span');
+        resultCount.id = 'creative-result-count';
+        resultCount.style.cssText = 'display:none;font-size:12px;color:#aaa;margin-bottom:8px;';
+
         searchInput.addEventListener('input', () => {
             this.creativeFilter = searchInput.value.toLowerCase();
             this.creativePage = 0;
+            clearBtn.style.display = this.creativeFilter ? 'block' : 'none';
             this.renderCreativeGrid();
         });
+
+        searchWrapper.appendChild(searchInput);
+        searchWrapper.appendChild(clearBtn);
 
         const gridContainer = document.createElement('div');
         gridContainer.id = 'creative-grid-container';
@@ -806,7 +845,8 @@ export class UIManager {
         });
 
         this.creativeInventoryUI.appendChild(header);
-        this.creativeInventoryUI.appendChild(searchInput);
+        this.creativeInventoryUI.appendChild(searchWrapper);
+        this.creativeInventoryUI.appendChild(resultCount);
         this.creativeInventoryUI.appendChild(gridContainer);
         this.creativeInventoryUI.appendChild(pageControls);
         document.body.appendChild(this.creativeOverlay);
@@ -822,12 +862,44 @@ export class UIManager {
 
         let filtered = this.creativeEntries;
         if (this.creativeFilter) {
-            filtered = this.creativeEntries.filter(b => b.name.toLowerCase().includes(this.creativeFilter));
+            const numericMatch = this.creativeFilter.match(/^\d+$/);
+            const hasNumericQuery = numericMatch !== null;
+            filtered = this.creativeEntries.filter(b => {
+                const nameMatch = b.name.toLowerCase().includes(this.creativeFilter);
+                if (nameMatch) return true;
+                if (hasNumericQuery) {
+                    return String(b.id).startsWith(numericMatch![0]);
+                }
+                return false;
+            });
         }
 
         const itemsPerPage = 32;
         const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
         if (this.creativePage >= totalPages) this.creativePage = totalPages - 1;
+
+        const resultCountEl = document.getElementById('creative-result-count');
+        if (resultCountEl) {
+            if (this.creativeFilter) {
+                resultCountEl.style.display = 'block';
+                resultCountEl.textContent = `${filtered.length} result${filtered.length !== 1 ? 's' : ''}`;
+            } else {
+                resultCountEl.style.display = 'none';
+            }
+        }
+
+        if (filtered.length === 0) {
+            const noResults = document.createElement('div');
+            noResults.style.cssText = 'text-align:center;color:#888;font-size:14px;padding:32px 0;';
+            noResults.textContent = 'No matching blocks found';
+            container.appendChild(noResults);
+
+            const pageInfo = document.getElementById('creative-page-info');
+            if (pageInfo) {
+                pageInfo.textContent = '0 / 1 (0 items)';
+            }
+            return;
+        }
 
         const start = this.creativePage * itemsPerPage;
         const pageItems = filtered.slice(start, start + itemsPerPage);
@@ -853,7 +925,12 @@ export class UIManager {
 
             const label = document.createElement('span');
             label.style.cssText = 'font-size:8px;color:#ccc;margin-top:2px;text-align:center;line-height:1.1;max-width:48px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
-            label.textContent = entry.name.replace(/_/g, ' ');
+            const displayName = entry.name.replace(/_/g, ' ');
+            if (this.creativeFilter) {
+                label.innerHTML = this.highlightMatch(displayName, this.creativeFilter);
+            } else {
+                label.textContent = displayName;
+            }
             slot.appendChild(label);
 
             slot.addEventListener('mouseenter', () => {
@@ -983,6 +1060,20 @@ export class UIManager {
 
     private formatItemName(itemId: string): string {
         return itemId.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    }
+
+    private highlightMatch(text: string, query: string): string {
+        const lowerText = text.toLowerCase();
+        const index = lowerText.indexOf(query);
+        if (index === -1) return text;
+        const before = text.slice(0, index);
+        const match = text.slice(index, index + query.length);
+        const after = text.slice(index + query.length);
+        return `${this.escapeHtml(before)}<mark style="background:#ffdd44;color:#333;border-radius:2px;padding:0 1px;">${this.escapeHtml(match)}</mark>${this.escapeHtml(after)}`;
+    }
+
+    private escapeHtml(text: string): string {
+        return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
     private static armorSlotNames = ['Helmet', 'Chestplate', 'Leggings', 'Boots'];
@@ -1357,5 +1448,42 @@ export class UIManager {
             }
             this.waypointOverlay.appendChild(div);
         }
+    }
+
+    createDropdown(container: HTMLElement, options: string[], selectedIndex: number, onChange: (index: number) => void): HTMLSelectElement {
+        const select = document.createElement('select');
+        select.style.cssText = 'width:100%;padding:6px 8px;background:rgba(0,0,0,0.6);border:1px solid #555;border-radius:4px;color:white;font-size:13px;outline:none;cursor:pointer;box-sizing:border-box;';
+        for (let i = 0; i < options.length; i++) {
+            const option = document.createElement('option');
+            option.value = String(i);
+            option.textContent = options[i];
+            option.style.cssText = 'background:#2a2a2a;color:white;';
+            select.appendChild(option);
+        }
+        select.selectedIndex = selectedIndex;
+        select.addEventListener('change', () => {
+            onChange(select.selectedIndex);
+        });
+        container.appendChild(select);
+        return select;
+    }
+
+    createScrollbar(container: HTMLElement, min: number, max: number, value: number, onChange: (value: number) => void): HTMLInputElement {
+        const input = document.createElement('input');
+        input.type = 'range';
+        input.min = String(min);
+        input.max = String(max);
+        input.value = String(value);
+        input.style.cssText = 'width:100%;height:8px;appearance:none;background:rgba(0,0,0,0.6);border:1px solid #555;border-radius:4px;outline:none;cursor:pointer;';
+        const style = document.createElement('style');
+        const id = 'scrollbar-' + Date.now();
+        input.id = id;
+        style.textContent = `#${id}::-webkit-slider-thumb{appearance:none;width:14px;height:14px;background:#888;border:1px solid #aaa;border-radius:50%;cursor:pointer;}#${id}::-moz-range-thumb{width:14px;height:14px;background:#888;border:1px solid #aaa;border-radius:50%;cursor:pointer;}`;
+        document.head.appendChild(style);
+        input.addEventListener('input', () => {
+            onChange(Number(input.value));
+        });
+        container.appendChild(input);
+        return input;
     }
 }

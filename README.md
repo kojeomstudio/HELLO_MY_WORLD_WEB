@@ -5,13 +5,14 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 ## Features
 
 - **Voxel World**: Procedurally generated 3D world with noise-based terrain, caves, ores, schematic-based trees (oak, pine, jungle, birch, cactus), rivers, multi-room dungeons, and 10 biomes (grassland, forest, desert, snow, taiga, jungle, savanna, mountains, swamp, ocean) selected via heat/humidity noise
-- **161 Block Types**: Including stone variants, 9 ore types (diamond, gold, iron, coal, redstone, emerald, lapis, copper), wood types (oak, jungle, pine), stairs/slabs, fences, walls, glass panes, doors, decorative blocks, flowers, mushrooms, utility blocks, light sources, fire, cobweb, Nether/End blocks, redstone components, and all wood variants (spruce/birch/jungle/acacia/dark oak doors, fences, planks)
-- **226 Block Definitions**: Full block enum (IDs 0-235) with complete defaults in code and JSON data override. Fixed: duplicate ID 117 resolved (LitPumpkin=117, JackOLantern=212), Pumpking typo corrected to Pumpkin
+- **162 Block Types**: Including stone variants, 9 ore types (diamond, gold, iron, coal, redstone, emerald, lapis, copper), wood types (oak, jungle, pine), stairs/slabs, fences, walls, glass panes, doors, decorative blocks, flowers, mushrooms, utility blocks, light sources, fire, cobweb, vine, Nether/End blocks, redstone components, mud/mud brick blocks, and all wood variants (spruce/birch/jungle/acacia/dark oak doors, fences, planks)
+- **226 Block Definitions**: Full block enum (IDs 0-238) with complete defaults in code and JSON data override
 - **220+ Items**: Tools (wood/stone/iron/diamond/gold/steel/mese/titanium), special weapons (fire sword, ice sword, blood sword, heal sword, elemental sword, daggers), steel shears, alchemy ingredients, crafting materials, armor (leather/iron/gold/diamond), food, resources, utility items, and fishing/breeding drops
 - **Crafting System**: 166+ recipes including shaped crafting, tool creation, special weapon recipes, ore block storage, copper processing, decoration recipes, gold tool recipes, titanium recipes, armor, building blocks, food, and tool repair. Grid-based crafting system with pattern offset matching and item group support.
 - **Fuel Registry**: Configurable fuel items with burn times loaded from `items.json` (coal, charcoal, wood, lava bucket, etc.)
 - **Smelting System**: 20 smelting recipes via furnace with fuel consumption, correct ore-to-ingot and food mappings
-- **Redstone System**: Power propagation through wires, source blocks (torch, lever, button, pressure plate), consumer toggling (lamps)
+- **Redstone System**: Power propagation through wires, source blocks (torch, lever, button, pressure plate), consumer toggling (lamps), repeaters (4-tick delay, signal boost), comparators (compare/subtract modes)
+- **Liquid System**: Viscosity-based flow speed, range-limited horizontal spread, river water support, infinite source renewal, water-lava interaction (obsidian/cobblestone/stone)
 - **Fishing System**: Cast, wait, bite, reel phases with catch probabilities (fish/junk/treasure)
 - **Breeding System**: Feed animals to breed with baby mob growth
 - **Area Protection**: Advanced claim-based area protection with ownership, transfer, bypass grants, and JSON persistence
@@ -34,12 +35,12 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Sky Rendering**: Gradient sky dome with sunrise/sunset color transitions, sun positioning, moon, and star field
 - **Weather**: Rain and snow particle systems with day/night color transitions, cyclable weather modes, server-driven weather broadcasting
 - **Multiplayer**: Real-time multiplayer via SignalR WebSocket with chat, player list
-- **Chat Commands**: 45+ commands with privilege enforcement
+- **Chat Commands**: 55+ commands with privilege enforcement
 - **Privilege System**: 19 privileges fully loaded from JSON with per-command privilege checks
 - **Password Authentication**: PBKDF2 (100k iterations, SHA-256) with per-user random salts, constant-time comparison, legacy SHA-256 migration support
 - **Inventory UI**: Hotbar, main inventory, crafting, furnace, chest, creative inventory, armor
 - **Minimap**: 3 modes (surface, radar, normal) with player direction indicator
-- **Active Block Modifiers**: Sand/gravel falling, farmland decay, grass spreading, dirt-to-grass, ice melting, fire spread, cactus/sugar cane growth, mushroom spreading
+- **Active Block Modifiers**: Sand/gravel falling, farmland decay, grass spreading (aggressive), dirt-to-grass, ice melting, fire spread, cactus/sugar cane growth, mushroom spreading, snow spread, attached node drop check, vine growth, coral spread/coral death, mud formation
 - **Agriculture**: Farmable crops (wheat, carrot, potato), farmland hydration
 - **Persistence**: Player data, world chunks, block metadata, chest inventories, node timers, and player privileges saved to disk
 - **Server-Authoritative Physics**: Anti-cheat with speed validation, teleport detection, noclip prevention, position correction
@@ -84,7 +85,33 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **New Blocks**: Mud, packed_mud, mud_bricks, mud_brick_stairs, mud_brick_slab; cobweb now has move resistance
 - **Mob Nametags**: Server-defined nametags with configurable colors for all mob types
 - **Mob Footstep Sounds**: `makesFootstepSound` flag per mob type for footstep audio
-- **New Commands**: `/spawnmob <type> [x y z]`, `/killmobs`, `/getblock <x> <y> <z>`, `/setclouds <param> <value>`
+- **New Commands**: `/spawnmob <type> [x y z]`, `/killmobs`, `/getblock <x> <y> <z>`, `/setclouds <param> <value>`, `/setsky <sun|moon|stars|fog|reset>`, `/stats [player]`, `/worldinfo`, `/backup`, `/restore`, `/fov <player> <degrees>`, `/color <item> <hex>`, `/toggleflag <player> <flag>`, `/rollback <player> <seconds>`, `/rollbacktell <area> <seconds>`
+- **Waving Animation**: Data-driven plant/leaf/liquid waving via block `waving` property; plantlike blocks sway with height-based X/Z displacement
+- **Player Idle Animation**: Per-player breathing/swaying animation when standing still; smooth transitions between idle/walk
+- **Entity Attachment**: Parent-child entity relationships with offset/rotation for riders and mounted entities
+- **Advanced Mob AI**: Flee with pathfinding, idle look-around behavior, random direction changes during wander
+- **Entity Visual Properties**: VisualScale, Infotext labels, AutoRotateSpeed per mob; configurable in mobs.json
+- **Entity Persistence**: Mobs and items saved/loaded to disk on world save/load
+- **Biome-Aware Mob Spawning**: Passive mobs spawn in biome-appropriate areas; hostile mobs boosted in dark areas
+- **Spectator Mode**: No collision, invulnerable, flying; toggle via `/gamemode sp`
+- **Player Statistics**: Track blocks mined/placed, distance walked, kills, deaths, crafting, damage (view via `/stats`)
+- **Positional Audio**: 3D sound with distance attenuation (16-block max) and stereo panning
+- **Security Hardening**: InteractBlock privilege/protection/range checks, UseBucket protection, teleport coordinate validation, inventory slot bounds, NaN validation
+- **Raycast API**: Server-side DDA voxel traversal for interaction range validation
+- **Sky Parameters**: Server-driven sun/moon/stars/fog color via `/setsky` command
+- **World Backup**: Periodic auto-backup every 30 minutes, `/backup` and `/restore` commands
+- **Player Flags**: Invisible (hidden from other players), footstep sounds, zoom toggle per player
+- **Dungeon Loot Tables**: Tiered loot (common/uncommon/rare/special) with varied items
+- **Redstone Repeater/Comparator**: New redstone components with delay and signal comparison
+- **Creative Search**: Real-time search by name or block ID with result highlighting
+- **Frustum Culling**: Camera frustum-based chunk visibility culling for performance
+- **Modding API**: Client-side mod loading system with lifecycle hooks and game API
+- **Mod Channels**: Server-side inter-mod communication framework
+- **i18n Framework**: Internationalization support with English/Korean translations
+- **Formspec Components**: Reusable dropdown and scrollbar UI components
+- **Item Color Tinting**: `/color` command to dye inventory items with hex colors
+- **Bone Manipulation**: Server-driven entity bone rotation/scale (head tracking)
+- **Per-Player FOV**: Server-driven FOV override via `/fov` command
 
 ## Architecture
 
@@ -150,7 +177,7 @@ web/
 │       ├── GameHub.cs            # SignalR hub
 │       └── GameLoopService.cs    # Background game loop
 ├── data/                # JSON configuration
-│   ├── blocks.json       # 236 block definitions (IDs 0-235, full defaults in code)
+│   ├── blocks.json       # 237 block definitions (IDs 0-236, full defaults in code)
 │   ├── items.json        # 220+ items, 166+ recipes, food values, tool capabilities
 │   ├── mobs.json         # 6 mob definitions
 │   ├── tools.json        # 8 tool material definitions
@@ -337,6 +364,17 @@ The Vite dev server proxies `/game` to the server.
 | /killmobs | Kill all mob entities |
 | /getblock <x> <y> <z> | Get block info at coordinates |
 | /setclouds <param> <value> | Set cloud params (density, thickness, height, speed, reset) |
+| `/setsky <sub> <value>` | Set sky params (sun, moon, stars, fog, reset) |
+| `/stats [player]` | Show player statistics |
+| `/worldinfo` | Show world seed, chunks, entities, uptime |
+| `/backup` | Create world backup |
+| `/restore` | Restore recent backup |
+| `/fov <player> <deg>` | Set player FOV (30-110) |
+| `/color <item> <hex>` | Tint an item color |
+| `/toggleflag <p> <flag>` | Toggle player flags (invisible, footstep, zoom) |
+| `/rollback <p> <secs>` | Rollback player block changes |
+| `/rollbacktell <area> <s>` | Rollback area block changes |
+| `/gamemode [s/c/a/sp]` | Set game mode (sp=spectator) |
 
 ## Ported from minetest_sub_project
 
@@ -353,7 +391,7 @@ This project is a web port of the Luanti (formerly Minetest) voxel game engine, 
 - **Mob AI**: 5-state machine (Idle/Wander/Chase/Attack/Flee) with hostile/passive distinction
 - **Pathfinding**: A* pathfinding matching minetest's pathfinder.cpp, wired to mob AI for intelligent navigation
 - **Dungeons**: Multi-room procedural dungeons with corridors matching minetest's dungeongen
-- **ABMs**: Falling nodes, grass spreading, farmland decay, ice melting, fire spread, crop growth (configurable via `data/abm_config.json`)
+- **ABMs**: Falling nodes, grass spreading, farmland decay, ice melting, fire spread, crop growth, vine growth, coral spread/death, mud formation (configurable via `data/abm_config.json`)
 - **Liquid Physics**: Water/lava flow with level system, lava-water interaction
 - **Day/Night Cycle**: Matching minetest's 24000-tick cycle
 - **Textures**: 89+ block textures from minetest devtest with nearest-neighbor filtering

@@ -34,7 +34,7 @@ public interface IGameClient
     Task OnHealthUpdate(float health, float maxHealth);
     Task OnInventoryUpdate(object[] items);
     Task OnTimeUpdate(long time, float speed, float skyBrightness);
-    Task OnEntitySpawned(Guid entityId, string entityType, string entityName, float x, float y, float z, bool isBaby);
+    Task OnEntitySpawned(Guid entityId, string entityType, string entityName, float x, float y, float z, bool isBaby, float visualScale, string infotext, float autoRotateSpeed);
     Task OnEntityDespawned(Guid entityId);
     Task OnEntityUpdate(Guid entityId, float x, float y, float z);
     Task OnCraftResult(string itemId, int count);
@@ -63,6 +63,9 @@ public interface IGameClient
     Task OnWaypoint(float x, float y, float z, string name, string color);
     Task OnLightingUpdate(float shadowIntensity, float exposureMin, float exposureMax, float ambientBoost, float bloomStrength);
     Task OnHudFlag(string flag, bool enabled);
+    Task OnSkyParams(object parameters);
+    Task OnPlayerFlags(string playerName, bool isInvisible, bool makesFootstepSound, bool canZoom);
+    Task OnItemColorUpdate(string itemId, string color);
 }
 
 public class GameHub : Hub<IGameClient>
@@ -260,7 +263,12 @@ public class GameHub : Hub<IGameClient>
         }
 
         await Clients.All.OnPlayerJoined(playerName);
+        await Clients.All.OnPlayerFlags(playerName, player.IsInvisible, player.MakesFootstepSound, player.CanZoom);
         await Clients.Caller.OnPlayerListUpdate(_gameServer.OnlinePlayers.Select(p => p.Name).ToArray());
+        foreach (var existingPlayer in _gameServer.OnlinePlayers.Where(p => p.Name != playerName))
+        {
+            await Clients.Caller.OnPlayerFlags(existingPlayer.Name, existingPlayer.IsInvisible, existingPlayer.MakesFootstepSound, existingPlayer.CanZoom);
+        }
         await Clients.Caller.OnHealthUpdate(player.Health, player.MaxHealth);
         await SendInventoryUpdate(player);
         await SendArmorUpdate(player);
@@ -307,6 +315,11 @@ public class GameHub : Hub<IGameClient>
 
         _gameServer.UpdatePlayerPosition(Context.ConnectionId, new Vector3(x, y, z), new Vector3(vx, vy, vz), yaw, pitch);
         player.IsSneaking = isSneaking;
+
+        if (player.IsInvisible)
+        {
+            return;
+        }
 
         var nearbyPlayers = _gameServer.GetPlayersInRange(player.Position, 64);
         foreach (var nearby in nearbyPlayers)
@@ -389,6 +402,99 @@ public class GameHub : Hub<IGameClient>
                     {
                         await Clients.Caller.OnChatMessage("Server", $"Player '{targetName}' not found.", "system");
                     }
+                }
+                else if (result.StartsWith("SKY_SET:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var paramStr = result.Substring(8);
+                    if (paramStr.Equals("reset", StringComparison.OrdinalIgnoreCase))
+                    {
+                        await Clients.Caller.OnSkyParams(new { reset = true });
+                        await Clients.Caller.OnChatMessage("Server", "Sky parameters reset to defaults.", "system");
+                    }
+                    else
+                    {
+                        var colonIdx = paramStr.IndexOf(':');
+                        if (colonIdx > 0)
+                        {
+                            var key = paramStr.Substring(0, colonIdx);
+                            var value = paramStr.Substring(colonIdx + 1);
+                            switch (key)
+                            {
+                                case "sunColor":
+                                    await Clients.Caller.OnSkyParams(new { sunColor = value });
+                                    await Clients.Caller.OnChatMessage("Server", $"Sun color set to {value}", "system");
+                                    break;
+                                case "moonColor":
+                                    await Clients.Caller.OnSkyParams(new { moonColor = value });
+                                    await Clients.Caller.OnChatMessage("Server", $"Moon color set to {value}", "system");
+                                    break;
+                                case "starsCount":
+                                    if (int.TryParse(value, out var count) && count > 0)
+                                    {
+                                        await Clients.Caller.OnSkyParams(new { starsCount = count });
+                                        await Clients.Caller.OnChatMessage("Server", $"Star count set to {count}", "system");
+                                    }
+                                    else
+                                    {
+                                        await Clients.Caller.OnChatMessage("Server", "Invalid star count.", "system");
+                                    }
+                                    break;
+                                case "fogColor":
+                                    await Clients.Caller.OnSkyParams(new { fogColor = value });
+                                    await Clients.Caller.OnChatMessage("Server", $"Fog color set to {value}", "system");
+                                    break;
+                            }
+                        }
+                    }
+                }
+                else if (result.StartsWith("FOV_SET:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var parts = result.Substring(8).Split(':');
+                    if (parts.Length == 2 && float.TryParse(parts[1], out var fov))
+                    {
+                        var targetPlayer = _gameServer.GetPlayer(parts[0]);
+                        if (targetPlayer != null)
+                        {
+                            await Clients.Client(targetPlayer.ConnectionId).OnFov(fov, 0.5f);
+                            await Clients.Caller.OnChatMessage("Server", $"FOV set to {fov} for {parts[0]}", "system");
+                        }
+                        else
+                        {
+                            await Clients.Caller.OnChatMessage("Server", $"Player '{parts[0]}' not found or offline.", "system");
+                        }
+                    }
+                }
+                else if (result.StartsWith("COLOR_SET:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var parts = result.Substring(10).Split(':');
+                    if (parts.Length == 2)
+                    {
+                        var itemId = parts[0];
+                        var color = parts[1];
+                        player.ItemColors[itemId] = color;
+                        await Clients.Caller.OnItemColorUpdate(itemId, color);
+                        await Clients.Caller.OnChatMessage("Server", $"Color set for {itemId}: {color}", "system");
+                    }
+                }
+                else if (result.StartsWith("COLOR_CLEAR:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var itemId = result.Substring(12);
+                    player.ItemColors.Remove(itemId);
+                    await Clients.Caller.OnItemColorUpdate(itemId, "");
+                    await Clients.Caller.OnChatMessage("Server", $"Color removed from {itemId}", "system");
+                }
+                else if (result.StartsWith("FLAG_UPDATE:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var parts = result.Substring(12).Split(':');
+                    if (parts.Length >= 6 &&
+                        bool.TryParse(parts[1], out var isInvisible) &&
+                        bool.TryParse(parts[2], out var makesFootstep) &&
+                        bool.TryParse(parts[3], out var canZoom))
+                    {
+                        await Clients.All.OnPlayerFlags(parts[0], isInvisible, makesFootstep, canZoom);
+                    }
+                    var flagMessage = string.Join(':', parts[5..]);
+                    await Clients.Caller.OnChatMessage("Server", flagMessage, "system");
                 }
                 else
                 {
@@ -563,6 +669,21 @@ public class GameHub : Hub<IGameClient>
             }
         }
 
+        var existingBlock = _gameServer.DefaultWorld.GetBlock(new Vector3s((short)x, (short)y, (short)z));
+        var existingDef = _blockDefinitionManager.Get((ushort)existingBlock.Type);
+
+        if (existingBlock.Type != BlockType.Air)
+        {
+            var isTargetBuildableTo = existingDef != null && existingDef.BuildableTo;
+            var isTargetLiquid = existingDef != null && existingDef.Liquid;
+            var isTargetAttachedNode = existingDef != null && existingDef.AttachedNode;
+
+            if (!isTargetBuildableTo && !isTargetLiquid && !isTargetAttachedNode)
+            {
+                return;
+            }
+        }
+
         var newBlock = new Block((BlockType)blockType);
         _gameServer.Rollback.RecordChange(x, y, z,
             _gameServer.DefaultWorld.GetBlock(new Vector3s((short)x, (short)y, (short)z)).ToPacked(),
@@ -570,6 +691,7 @@ public class GameHub : Hub<IGameClient>
         _gameServer.DefaultWorld.SetBlock(new Vector3s((short)x, (short)y, (short)z), newBlock);
         await Clients.All.OnBlockUpdate(x, y, z, newBlock.ToPacked());
         _ = PlayBlockSound(blockType, "place", x + 0.5f, y + 0.5f, z + 0.5f);
+        player.Statistics.IncrementPlaced();
     }
 
     public async Task DigBlock(int x, int y, int z)
@@ -629,6 +751,9 @@ public class GameHub : Hub<IGameClient>
         _gameServer.DefaultWorld.SetBlock(blockPos, Block.Air);
         await Clients.All.OnBlockUpdate(x, y, z, 0);
         _ = PlayBlockSound((ushort)oldBlock.Type, "dig", x + 0.5f, y + 0.5f, z + 0.5f);
+        player.Statistics.IncrementMined();
+
+        DropAttachedNeighbors(x, y, z);
 
         if (player.Mode == GameMode.Creative || player.Mode == GameMode.Spectator)
         {
@@ -708,6 +833,9 @@ public class GameHub : Hub<IGameClient>
 
         var player = GetAuthenticatedPlayer();
         if (player == null) return false;
+
+        if (!_areaProtection.CanInteract(player.Name, x, y, z)
+            && !_gameServer.Privileges.HasPrivilege(player.Name, "protection_bypass")) return false;
 
         var hotbarItem = player.GetSelectedHotbarItem();
         if (hotbarItem == null) return false;
@@ -920,6 +1048,13 @@ public class GameHub : Hub<IGameClient>
         if (!CheckRateLimit(Context.ConnectionId, "interact_block", 300)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
+        if (!_gameServer.Privileges.HasPrivilege(player.Name, "interact")) return;
+
+        var eyePos = player.Position + new Vector3(0, 1.6f, 0);
+        var targetCenter = new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
+        var direction = targetCenter - eyePos;
+        var hit = Raycast.Cast(_gameServer.DefaultWorld, eyePos, direction, 6f);
+        if (hit == null) return;
 
         var blockPos = new Vector3s((short)x, (short)y, (short)z);
         var block = _gameServer.DefaultWorld.GetBlock(blockPos);
@@ -946,8 +1081,11 @@ public class GameHub : Hub<IGameClient>
         {
             await Clients.Caller.OnBlockSound(blockName, x, y, z);
         }
-        else if (blockName.Contains("door") || blockName == "trapdoor" || blockName == "iron_trapdoor")
+        else if (blockName.Contains("door") || blockName == "trapdoor" || blockName == "iron_trapdoor" || blockName == "tnt")
         {
+            if (!_areaProtection.CanInteract(player.Name, x, y, z)
+                && !_gameServer.Privileges.HasPrivilege(player.Name, "protection_bypass")) return;
+
             var currentBlock = _gameServer.DefaultWorld.GetBlock(blockPos);
             var isOpen = (currentBlock.Type == BlockType.DoorOpen ||
                           currentBlock.Type == BlockType.IronDoorOpen);
@@ -979,6 +1117,9 @@ public class GameHub : Hub<IGameClient>
         }
         else if (blockName == "lever")
         {
+            if (!_areaProtection.CanInteract(player.Name, x, y, z)
+                && !_gameServer.Privileges.HasPrivilege(player.Name, "protection_bypass")) return;
+
             var currentBlock = _gameServer.DefaultWorld.GetBlock(blockPos);
             var isPowered = currentBlock.Type == BlockType.LeverOn;
             var newType = isPowered ? BlockType.Lever : BlockType.LeverOn;
@@ -988,6 +1129,9 @@ public class GameHub : Hub<IGameClient>
         }
         else if (blockName == "button" || blockName == "stone_button")
         {
+            if (!_areaProtection.CanInteract(player.Name, x, y, z)
+                && !_gameServer.Privileges.HasPrivilege(player.Name, "protection_bypass")) return;
+
             _gameServer.DefaultWorld.SetBlock(blockPos, new Block(BlockType.ButtonPressed));
             await Clients.Caller.OnBlockUpdate(x, y, z, (ushort)BlockType.ButtonPressed);
             await Clients.Caller.OnPlaySound("button", "interactive", "click", x + 0.5f, y + 0.5f, z + 0.5f, 0.5f);
@@ -1219,7 +1363,13 @@ public class GameHub : Hub<IGameClient>
             var toolName = toolItem.ItemId.ToLowerInvariant();
             damage = ToolConfig.GetWeaponDamage(toolName);
         }
+        var wasDead = target.IsDead;
         var knockback = _gameServer.DamagePlayerWithKnockback(target, damage, attacker.Position, "player");
+        attacker.Statistics.AddDamageDealt((int)Math.Ceiling(damage));
+        if (!wasDead && target.IsDead)
+        {
+            attacker.Statistics.IncrementPlayersKilled();
+        }
         await Clients.Client(target.ConnectionId).OnKnockback(knockback.X, knockback.Y, knockback.Z);
 
         if (toolItem != null)
@@ -1285,6 +1435,10 @@ public class GameHub : Hub<IGameClient>
             else
             {
                 mob.TakeDamage(damage, damageGroup);
+                if (!mob.IsAlive)
+                {
+                    player.Statistics.IncrementMobsKilled();
+                }
             }
         }
     }
@@ -1295,6 +1449,7 @@ public class GameHub : Hub<IGameClient>
 
         var player = GetAuthenticatedPlayer();
         if (player == null || player.IsDead) return;
+        if (float.IsNaN(x) || float.IsInfinity(x) || float.IsNaN(y) || float.IsInfinity(y) || float.IsNaN(z) || float.IsInfinity(z)) return;
 
         var fishingSystem = _gameServer.FishingSystem;
         if (fishingSystem == null) return;
@@ -1392,6 +1547,17 @@ public class GameHub : Hub<IGameClient>
         await Clients.Caller.OnPrivilegeList(privs);
     }
 
+    public async Task<PlayerStatistics?> GetStatistics(string? targetName = null)
+    {
+        if (!CheckRateLimit(Context.ConnectionId, "stats", 1000)) return null;
+        var caller = GetAuthenticatedPlayer();
+        if (caller == null) return null;
+        var playerName = targetName ?? caller.Name;
+        var player = _gameServer.GetPlayer(playerName);
+        if (player == null) return null;
+        return player.Statistics;
+    }
+
     public async Task ToggleFlight()
     {
         if (!CheckRateLimit(Context.ConnectionId, "flight", 500)) return;
@@ -1454,6 +1620,7 @@ public class GameHub : Hub<IGameClient>
         player.Inventory.AddItem(new ItemStack(recipe.ResultItemId, recipe.ResultCount));
 
         _gameServer.AwardExperience(player, 1);
+        player.Statistics.IncrementItemsCrafted();
 
         await SendInventoryUpdate(player);
         await Clients.Caller.OnCraftResult(recipe.ResultItemId, recipe.ResultCount);
@@ -1529,6 +1696,7 @@ public class GameHub : Hub<IGameClient>
         player.Inventory.AddItem(new ItemStack(recipe.ResultItemId, recipe.ResultCount));
 
         _gameServer.AwardExperience(player, 1);
+        player.Statistics.IncrementItemsCrafted();
 
         await SendInventoryUpdate(player);
         await Clients.Caller.OnCraftResult(recipe.ResultItemId, recipe.ResultCount);
@@ -1701,7 +1869,13 @@ public class GameHub : Hub<IGameClient>
     private async Task SendInventoryUpdate(PlayerEnt player)
     {
         var items = player.Inventory.GetAll()
-            .Select(i => i == null ? null : (object)new { itemId = i.ItemId, count = i.Count, metadata = i.Metadata })
+            .Select(i => i == null ? null : (object)new
+            {
+                itemId = i.ItemId,
+                count = i.Count,
+                metadata = i.Metadata,
+                color = player.ItemColors.TryGetValue(i.ItemId, out var c) ? c : null
+            })
             .ToArray();
         await Clients.Caller.OnInventoryUpdate(items!);
     }
@@ -1935,6 +2109,36 @@ public class GameHub : Hub<IGameClient>
                z >= short.MinValue && z <= short.MaxValue;
     }
 
+    private void DropAttachedNeighbors(int x, int y, int z)
+    {
+        var offsets = new (int dx, int dy, int dz)[]
+        {
+            (0, 1, 0), (0, -1, 0), (1, 0, 0), (-1, 0, 0), (0, 0, 1), (0, 0, -1)
+        };
+
+        foreach (var (dx, dy, dz) in offsets)
+        {
+            var nx = x + dx;
+            var ny = y + dy;
+            var nz = z + dz;
+            var neighborBlock = _gameServer.DefaultWorld.GetBlock(new Vector3s((short)nx, (short)ny, (short)nz));
+            var neighborDef = _blockDefinitionManager.Get((ushort)neighborBlock.Type);
+
+            if (neighborDef != null && neighborDef.AttachedNode)
+            {
+                _gameServer.DefaultWorld.SetBlock(new Vector3s((short)nx, (short)ny, (short)nz), Block.Air);
+                _ = _hubContext.Clients.All.OnBlockUpdate(nx, ny, nz, 0);
+
+                var dropName = neighborDef.Drops ?? neighborDef.Name ?? "";
+                if (!string.IsNullOrEmpty(dropName))
+                {
+                    var dropEntity = new ItemEntity(dropName, 1, new Vector3(nx + 0.5f, ny + 0.5f, nz + 0.5f));
+                    _entityManager.Add(dropEntity);
+                }
+            }
+        }
+    }
+
     public async Task GridCraft(string?[,] grid, int gridSize)
     {
         if (!CheckRateLimit(Context.ConnectionId, "gridcraft", 500)) return;
@@ -1983,6 +2187,7 @@ public class GameHub : Hub<IGameClient>
 
         player.Inventory.AddItem(new ItemStack(recipe.ResultItemId, recipe.ResultCount));
         _gameServer.AwardExperience(player, 2);
+        player.Statistics.IncrementItemsCrafted();
 
         await SendInventoryUpdate(player);
         await Clients.Caller.OnCraftResult(recipe.ResultItemId, recipe.ResultCount);
@@ -2057,6 +2262,7 @@ public class GameHub : Hub<IGameClient>
 
         player.Inventory.AddItem(new ItemStack(recipe.ResultItemId, recipe.ResultCount));
         _gameServer.AwardExperience(player, 2);
+        player.Statistics.IncrementItemsCrafted();
 
         await SendInventoryUpdate(player);
         await Clients.Caller.OnCraftResult(recipe.ResultItemId, recipe.ResultCount);

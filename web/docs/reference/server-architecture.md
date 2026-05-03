@@ -465,8 +465,11 @@ WebGameServer (GameServer.cs)
 
 명령어는 `ChatCommandManager`에 등록되며 권한 기반 접근 제어를 사용합니다:
 - `ChatCommand` 레코드: Name, Description, Aliases, Handler, RequiredPrivilege
-- 결과 접두어 패턴: `LIGHTING:`, `HUD_SET:`, `HUD_TOGGLE:`, `INFPLACE:`, `GIVE_INITIAL_STUFF`
+- 결과 접두어 패턴: `LIGHTING:`, `HUD_SET:`, `HUD_TOGGLE:`, `INFPLACE:`, `GIVE_INITIAL_STUFF`, `SKY_SET:`
 - GameHub에서 접두어를 감지하여 특별 처리 (SignalR 이벤트 전송 등)
+- `/setsky` 명령어: 태양/달/별/안개 파라미터 제어 (서브커맨드: `sun`, `moon`, `stars`, `fog`, `reset`)
+  - `SKY_SET:` 접두어 패턴을 사용하여 GameHub에서 처리
+  - 클라이언트에 `OnSkyParams` SignalR 이벤트로 스카이 렌더링 파라미터 전송
 
 ### 8.4 보안 조치
 
@@ -476,3 +479,37 @@ WebGameServer (GameServer.cs)
 - CORS/CSP 헤더 구성 (frame-ancestors none 포함)
 - IP 기반 연결 제한 및 브루트포스 잠금
 - CreateDetachedInventory 서버 권한 필요
+- InteractBlock: interact 권한 검사, 영역 보호(AreaProtection) 확인, 레이캐스트 거리 검증 (6블록 최대)
+- UseBucket: 영역 보호(AreaProtection) 확인
+- TeleportPlayer: 좌표 범위 검증 (NaN/Infinity 무시, 월드 경계 검사, Y축 -64..320 클램프)
+- MoveItemToChest/TakeItemFromChest: 슬롯 인덱스 범위 검증
+- SetPlayerHotbarSize: 1-9 범위로 클램프
+- StartFishing: NaN/Infinity 좌표 검증
+
+### 8.5 Raycast 시스템
+
+`Core/World/Raycast.cs` — DDA (Digital Differential Analyzer) 복셀 트래버설 알고리즘:
+- 3D 그리드를 통해 레이를 단계별로 진행하며 각 복셀을 검사
+- 레이캐스트 최대 거리: 6블록 (InteractBlock에서 범위 검증에 사용)
+- 모든 축을 따라 정확한 복셀 경계 교차점 계산
+
+### 8.6 엔티티 시스템
+
+엔티티 부착 (Attachment) 시스템:
+- `AttachTo(entityId)`: 다른 엔티티에 부착
+- `Detach()`: 부착 해제
+- `AddChild(entityId)`: 자식 엔티티 추가
+- `RemoveChild(entityId)`: 자식 엔티티 제거
+
+엔티티 시각 속성:
+- `VisualScale`: 엔티티 렌더링 크기 조절
+- `Infotext`: 엔티티 정보 텍스트
+- `AutoRotateSpeed`: 자동 회전 속도 (0 = 회전 없음)
+
+### 8.7 액체 시스템
+
+- 액체 점성도(Viscosity): `viscosity * 3` = 흐름 틱 간격 (점성도가 높을수록 천천히 흐름)
+- 액체 범위(Liquid Range): 수평 확산 거리 제어
+- 흐름 거리 추적: 무한 확산 방지 (거리에 따른 우선순위 큐)
+- 강물(River Water) 패밀리: 일반 물과 함께 처리됨
+- 물-용암 상호작용: 강물에서도 동작 (돌/자갈/흑요석 생성)

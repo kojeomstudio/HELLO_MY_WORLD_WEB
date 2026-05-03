@@ -432,8 +432,31 @@ GameClient.ts (중앙 오케스트레이터)
 | OnLightingUpdate | 조명 파라미터 |
 | OnHudFlag | HUD 요소 토글 |
 | OnDetachedInventory | 분리 인벤토리 UI |
+| OnSkyParams | 서버 구동 스카이 파라미터 변경 (태양/달/별/안개) |
 
-### 16.3 Vite 빌드 최적화
+### 16.3 애니메이션 시스템
+
+플레이어 아이들 애니메이션:
+- 정지 시 호흡/미세 흔들림 애니메이션 자동 적용
+- 플레이어별 개별 애니메이션 타이밍 (공유 타이머 미사용)
+
+Plantlike 블록 웨이빙:
+- `waving=1` 속성을 가진 블록이 X/Z 방향으로 흔들림
+- 블록 이름 기반 감지 대신 `waving` 프로퍼티 기반 데이터 구동 방식
+
+### 16.4 오디오 시스템
+
+3D 포지셔널 오디오:
+- 거리 기반 볼륨 감쇠 (가까울수록 크게, 멀수록 작게)
+- 상대 X 위치 기반 스테레오 패닝 (왼쪽/오른쪽 소리 분리)
+- 최대 가청 거리: 16블록
+
+추가 사운드 타입:
+- `mob_hurt`: 몹 피해 사운드
+- `explosion`: 폭발 사운드
+- `splash`: 물 튀김 사운드
+
+### 16.5 Vite 빌드 최적화
 
 - **Manual Chunks**: Three.js, SignalR, Game, World, UI, Rendering 모듈 분리
 - **Tree Shaking**: TypeScript strict mode (`noUnusedLocals`, `noUnusedParameters`)

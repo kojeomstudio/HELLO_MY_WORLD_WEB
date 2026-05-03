@@ -12,6 +12,7 @@ export class ItemRegistry {
     private items: Map<string, ItemDefinition> = new Map();
     private blockRegistry: BlockRegistry | null;
     private loaded: boolean = false;
+    private itemColors: Map<string, string> = new Map();
 
     constructor(blockRegistry?: BlockRegistry) {
         this.blockRegistry = blockRegistry ?? null;
@@ -106,5 +107,17 @@ export class ItemRegistry {
 
     get(itemId: string): ItemDefinition | undefined {
         return this.items.get(itemId);
+    }
+
+    setItemColor(itemId: string, color: string): void {
+        if (color) {
+            this.itemColors.set(itemId, color);
+        } else {
+            this.itemColors.delete(itemId);
+        }
+    }
+
+    getItemColor(itemId: string): string | undefined {
+        return this.itemColors.get(itemId);
     }
 }

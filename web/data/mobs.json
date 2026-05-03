@@ -14,7 +14,10 @@
             "armorGroups": { "fleshy": 100 },
             "makesFootstepSound": true,
             "nametag": "Zombie",
-            "nametagColor": "#55AA55"
+            "nametagColor": "#55AA55",
+            "visual_scale": 1.0,
+            "infotext": "",
+            "auto_rotate_speed": 0
         },
         {
             "type": "Skeleton",
@@ -30,7 +33,10 @@
             "armorGroups": { "fleshy": 100 },
             "makesFootstepSound": true,
             "nametag": "Skeleton",
-            "nametagColor": "#AAAAAA"
+            "nametagColor": "#AAAAAA",
+            "visual_scale": 1.0,
+            "infotext": "",
+            "auto_rotate_speed": 0
         },
         {
             "type": "Spider",
@@ -46,7 +52,10 @@
             "armorGroups": { "fleshy": 75 },
             "makesFootstepSound": true,
             "nametag": "Spider",
-            "nametagColor": "#664422"
+            "nametagColor": "#664422",
+            "visual_scale": 1.0,
+            "infotext": "",
+            "auto_rotate_speed": 0
         },
         {
             "type": "Cow",
@@ -62,7 +71,10 @@
             "armorGroups": { "fleshy": 50 },
             "makesFootstepSound": true,
             "nametag": "Cow",
-            "nametagColor": "#8B6914"
+            "nametagColor": "#8B6914",
+            "visual_scale": 1.0,
+            "infotext": "",
+            "auto_rotate_speed": 0
         },
         {
             "type": "Pig",
@@ -78,7 +90,10 @@
             "armorGroups": { "fleshy": 50 },
             "makesFootstepSound": true,
             "nametag": "Pig",
-            "nametagColor": "#FFAAAA"
+            "nametagColor": "#FFAAAA",
+            "visual_scale": 1.0,
+            "infotext": "",
+            "auto_rotate_speed": 0
         },
         {
             "type": "Chicken",
@@ -94,7 +109,10 @@
             "armorGroups": { "fleshy": 25 },
             "makesFootstepSound": false,
             "nametag": "Chicken",
-            "nametagColor": "#FFFFFF"
+            "nametagColor": "#FFFFFF",
+            "visual_scale": 1.0,
+            "infotext": "",
+            "auto_rotate_speed": 0
         }
     ]
 }
