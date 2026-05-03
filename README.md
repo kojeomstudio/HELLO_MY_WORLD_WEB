@@ -18,7 +18,7 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Protection System**: Area-based protection zones with owner/allowed player lists
 - **Rollback System**: Block change recording with player/time/area-based rollback support
 - **Ban Database**: Persistent ban storage (JSON-backed) with IP and name banning
-- **Sound Spec System**: 15 sound groups with procedural audio descriptors
+- **Sound Spec System**: 15 sound groups with procedural audio descriptors, eat/breaks/place_failed/punch_use events
 - **Bucket System**: Place and pick up water/lava, drink milk for healing
 - **Tool Wear/Durability**: Tools degrade with use via centralized ToolWearSystem (minetest-matching 65536 wear scale), integrated into dig and combat actions, repair by combining two same-type tools
 - **Player Mechanics**: Health, hunger (passive drain matching Minetest), breath, fall damage, knockback, swimming, climbing, sprinting, flying, slippery blocks, move resistance

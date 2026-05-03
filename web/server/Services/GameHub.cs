@@ -555,6 +555,7 @@ public class GameHub : Hub<IGameClient>
                 if (wornTool == null)
                 {
                     player.Inventory.RemoveItem(player.SelectedHotbarSlot, 1);
+                    _ = PlayBlockSound((ushort)BlockType.Air, "breaks", player.Position.X, player.Position.Y, player.Position.Z);
                     await Clients.Caller.OnChatMessage("Server", $"Your {toolName} broke!", "system");
                 }
                 else
@@ -727,6 +728,7 @@ public class GameHub : Hub<IGameClient>
                     player.Inventory.AddItem(new ItemStack(foodInfo.ReplaceWith, 1));
                 }
                 _gameServer.FeedPlayer(player, foodInfo.Nutrition, foodInfo.Saturation);
+                _ = PlayBlockSound((ushort)BlockType.Air, "eat", player.Position.X, player.Position.Y, player.Position.Z);
                 await SendInventoryUpdate(player);
             }
         }

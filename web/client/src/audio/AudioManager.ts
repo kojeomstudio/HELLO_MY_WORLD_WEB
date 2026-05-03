@@ -19,10 +19,14 @@ export class AudioManager {
         switch (soundName) {
             case 'block_break': this.playBlockBreak(); break;
             case 'block_place': this.playBlockPlace(); break;
+            case 'block_place_failed': this.playPlaceFailed(); break;
             case 'footstep': this.playFootstep(); break;
             case 'hurt': this.playHurt(); break;
             case 'pickup': this.playPickup(); break;
             case 'death': this.playDeath(); break;
+            case 'eat': this.playEat(); break;
+            case 'tool_breaks': this.playToolBreaks(); break;
+            case 'punch_use': this.playPunchUse(); break;
         }
     }
 
@@ -159,6 +163,85 @@ export class AudioManager {
         gain.gain.setValueAtTime(this.volume * 0.35, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
 
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + duration);
+    }
+
+    private playEat(): void {
+        if (!this.audioContext) return;
+        const ctx = this.audioContext;
+        const duration = 0.2;
+        const bufferSize = Math.floor(ctx.sampleRate * duration);
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            const t = i / ctx.sampleRate;
+            data[i] = (Math.random() * 2 - 1) * Math.sin(t * 40) * (1 - i / bufferSize) * 0.5;
+        }
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(this.volume * 0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+        source.connect(gain);
+        gain.connect(ctx.destination);
+        source.start();
+    }
+
+    private playToolBreaks(): void {
+        if (!this.audioContext) return;
+        const ctx = this.audioContext;
+        const duration = 0.15;
+        const bufferSize = Math.floor(ctx.sampleRate * duration);
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+        }
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'highpass';
+        filter.frequency.setValueAtTime(3000, ctx.currentTime);
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(this.volume * 0.4, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+        source.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+        source.start();
+    }
+
+    private playPlaceFailed(): void {
+        if (!this.audioContext) return;
+        const ctx = this.audioContext;
+        const duration = 0.1;
+        const osc = ctx.createOscillator();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(200, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + duration);
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(this.volume * 0.15, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + duration);
+    }
+
+    private playPunchUse(): void {
+        if (!this.audioContext) return;
+        const ctx = this.audioContext;
+        const duration = 0.08;
+        const osc = ctx.createOscillator();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(300, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(150, ctx.currentTime + duration);
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(this.volume * 0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start();

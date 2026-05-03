@@ -87,6 +87,7 @@
             "dig": { "pitch": [0.8, 1.2], "type": "noise", "duration": 0.15, "volume": 0.7 },
             "dug": { "pitch": [0.8, 1.0], "type": "noise", "duration": 0.12, "volume": 0.6 },
             "place": { "pitch": [0.9, 1.1], "type": "thud", "duration": 0.1, "volume": 0.6 },
+            "place_failed": { "pitch": [0.7, 0.9], "type": "click", "duration": 0.06, "volume": 0.3 },
             "footstep": { "pitch": [0.7, 1.0], "type": "click", "duration": 0.08, "volume": 0.4 },
             "fall": { "pitch": [0.7, 1.0], "type": "thud", "duration": 0.1, "volume": 0.5 }
         },
@@ -99,7 +100,8 @@
         },
         "item": {
             "eat": { "pitch": [0.9, 1.1], "type": "noise", "duration": 0.2, "volume": 0.6 },
-            "breaks": { "pitch": [0.7, 0.9], "type": "click", "duration": 0.1, "volume": 0.5 }
+            "breaks": { "pitch": [0.7, 0.9], "type": "click", "duration": 0.1, "volume": 0.5 },
+            "punch_use": { "pitch": [0.8, 1.2], "type": "click", "duration": 0.08, "volume": 0.4 }
         }
     },
     "mobSounds": {
