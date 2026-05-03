@@ -66,6 +66,12 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Per-Player Physics Override**: `/setphysics` command for custom gravity, jump, walk, sprint, fly per player
 - **Bouncy Blocks**: Slime block bounce physics (80% velocity reversal), fall damage negated on bouncy blocks
 - **Node Timer System**: Server-side node timers with persistence, used for farmland decay and crop growth
+- **Block Damage/Healing**: All blocks with `Damage > 0` deal damage (fire, cactus, campfire, magma); blocks with `healPerSecond > 0` heal standing players
+- **Dagger Fast Attack**: Daggers have 250ms punch cooldown (vs 500ms for other weapons)
+- **Healing Weapons**: `heal_sword`, `heal_sword_super`, `dagger_heal` deal negative damage to heal players/mobs
+- **Detached Inventory**: Shared inventories via `/detached` command and hub methods, with access control
+- **Zoom FOV**: C key toggles zoom (50% FOV reduction) with smooth interpolation
+- **Per-Player Speed Validation**: Server validates speed against physics overrides and block move resistance
 
 ## Architecture
 

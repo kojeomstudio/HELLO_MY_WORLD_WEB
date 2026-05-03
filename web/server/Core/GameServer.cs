@@ -667,6 +667,20 @@ public class GameServer
                 ? (player.OverrideSprintSpeed ?? _physicsEngine.SprintSpeed)
                 : (player.OverrideWalkSpeed ?? _physicsEngine.WalkSpeed);
 
+        if (player.IsOnGround && !player.IsFlying)
+        {
+            var feetPos = new Vector3s(
+                (short)Math.Floor(player.Position.X),
+                (short)Math.Floor(player.Position.Y - 0.1),
+                (short)Math.Floor(player.Position.Z));
+            var feetBlock = DefaultWorld.GetBlock(feetPos);
+            var feetDef = _blockDefinitionManager.Get((ushort)feetBlock.Type);
+            if (feetDef != null && feetDef.MoveResistance > 0)
+            {
+                maxSpeed *= Math.Max(0.1f, 1.0f - feetDef.MoveResistance * 0.1f);
+            }
+        }
+
         var maxDistance = maxSpeed * dt * 1.5f;
         var distance = Vector3.Distance(player.Position, player.PreviousPosition);
 
