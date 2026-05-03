@@ -30,6 +30,7 @@ public class Player
     public int AirTimeTicks { get; set; }
 
     public int SelectedHotbarSlot { get; set; } = 0;
+    public int HotbarSize { get; set; } = 8;
     public Inventory Inventory { get; } = new();
 
     public ItemStack?[] ArmorSlots { get; } = new ItemStack?[4];
@@ -42,6 +43,21 @@ public class Player
     public int ExperienceLevel { get; set; }
     public Vector3 SpawnPoint { get; set; } = Vector3.Zero;
     public bool HasSpawnPoint { get; set; }
+
+    public float? OverrideGravity { get; set; }
+    public float? OverrideJumpForce { get; set; }
+    public float? OverrideWalkSpeed { get; set; }
+    public float? OverrideSprintSpeed { get; set; }
+    public float? OverrideFlySpeed { get; set; }
+
+    public void ClearPhysicsOverride()
+    {
+        OverrideGravity = null;
+        OverrideJumpForce = null;
+        OverrideWalkSpeed = null;
+        OverrideSprintSpeed = null;
+        OverrideFlySpeed = null;
+    }
 
     public Player(string name)
     {

@@ -50,6 +50,11 @@ public class ChatCommandManager
     private readonly Func<string, string, bool>? _setPassword;
     private readonly Func<string, bool>? _isValidItemId;
     private readonly Func<string, bool>? _isValidEntityType;
+    private readonly Action<string, float>? _setPlayerHp;
+    private readonly Action<string, int>? _setHotbarSize;
+    private readonly Action<string, float?, float?, float?, float?, float?>? _setPhysicsOverride;
+    private readonly Action<string>? _clearPhysicsOverride;
+    private readonly Action<string>? _sendPhysicsParams;
 
     public ChatCommandManager(
         Func<long> getGameTime,
@@ -76,7 +81,12 @@ public class ChatCommandManager
         AreaProtectionSystem? areaProtection = null,
         Func<string, string, bool>? setPassword = null,
         Func<string, bool>? isValidItemId = null,
-        Func<string, bool>? isValidEntityType = null)
+        Func<string, bool>? isValidEntityType = null,
+        Action<string, float>? setPlayerHp = null,
+        Action<string, int>? setHotbarSize = null,
+        Action<string, float?, float?, float?, float?, float?>? setPhysicsOverride = null,
+        Action<string>? clearPhysicsOverride = null,
+        Action<string>? sendPhysicsParams = null)
     {
         _getGameTime = getGameTime;
         _getTps = getTps;
@@ -103,6 +113,11 @@ public class ChatCommandManager
         _setPassword = setPassword;
         _isValidItemId = isValidItemId;
         _isValidEntityType = isValidEntityType;
+        _setPlayerHp = setPlayerHp;
+        _setHotbarSize = setHotbarSize;
+        _setPhysicsOverride = setPhysicsOverride;
+        _clearPhysicsOverride = clearPhysicsOverride;
+        _sendPhysicsParams = sendPhysicsParams;
         RegisterBuiltInCommands();
     }
 
@@ -283,11 +298,20 @@ public class ChatCommandManager
                 var granterPrivs = _getPlayerPrivileges?.Invoke(playerName);
                 var hasBasicPrivs = granterPrivs != null && Array.Exists(granterPrivs, p => p == "basic_privs");
                 var hasFullPrivs = granterPrivs != null && Array.Exists(granterPrivs, p => p == "privs");
-                if (!hasFullPrivs && hasBasicPrivs)
+                var hasServer = granterPrivs != null && Array.Exists(granterPrivs, p => p == "server");
+                if (!hasServer)
                 {
-                    var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "interact", "shout" };
-                    if (!allowed.Contains(args[1]))
-                        return Task.FromResult("basic_privs can only grant 'interact' and 'shout'.");
+                    var safePrivs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        "interact", "shout", "fly", "fast", "teleport", "give",
+                        "noclip", "creative", "rollback"
+                    };
+                    if (hasBasicPrivs)
+                    {
+                        safePrivs.IntersectWith(new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "interact", "shout" });
+                    }
+                    if (!safePrivs.Contains(args[1]))
+                        return Task.FromResult($"You cannot grant '{args[1]}'. Only server admins can grant dangerous privileges.");
                 }
                 _grantPrivilege(args[0], args[1]);
                 return Task.FromResult($"Granted '{args[1]}' to {args[0]}");
@@ -466,12 +490,68 @@ public class ChatCommandManager
             {
                 if (_setPassword == null) return Task.FromResult("Password command is not available.");
                 if (args.Length == 0) return Task.FromResult("Usage: /password <new_password>");
-                var newPassword = args[0];
+                var newPassword = string.Join(' ', args);
                 if (newPassword.Length < 8) return Task.FromResult("Password must be at least 8 characters.");
-                if (newPassword.Length > 64) return Task.FromResult("Password must be at most 64 characters.");
+                if (newPassword.Length > 128) return Task.FromResult("Password must be at most 128 characters.");
                 var success = _setPassword(playerName, newPassword);
-                return Task.FromResult(success ? "Password set successfully." : "Failed to set password.");
-            }));
+                return Task.FromResult(success ? "Password updated successfully." : "Failed to update password.");
+            }, ""));
+
+        Register(new ChatCommand("hp", "Set your health", new[] { "sethp" },
+            (playerName, args) =>
+            {
+                if (_setPlayerHp == null) return Task.FromResult("HP command is not available.");
+                if (args.Length == 0 || !float.TryParse(args[0], out var hp))
+                    return Task.FromResult("Usage: /hp <health>");
+                if (hp < 0 || hp > 100) return Task.FromResult("Health must be between 0 and 100.");
+                _setPlayerHp(playerName, hp);
+                return Task.FromResult($"Health set to {hp}");
+            }, "server"));
+
+        Register(new ChatCommand("hotbar", "Set hotbar size", new[] { "sethotbar" },
+            (playerName, args) =>
+            {
+                if (_setHotbarSize == null) return Task.FromResult("Hotbar command is not available.");
+                if (args.Length == 0 || !int.TryParse(args[0], out var size))
+                    return Task.FromResult("Usage: /hotbar <size>");
+                if (size < 1 || size > 9) return Task.FromResult("Hotbar size must be between 1 and 9.");
+                _setHotbarSize(playerName, size);
+                return Task.FromResult($"Hotbar size set to {size}");
+            }, "server"));
+
+        Register(new ChatCommand("setphysics", "Override player physics parameters", new[] { "physics" },
+            (playerName, args) =>
+            {
+                if (_setPhysicsOverride == null) return Task.FromResult("Physics command is not available.");
+                if (args.Length == 0) return Task.FromResult("Usage: /setphysics <player> [gravity] [jump] [walk] [sprint] [fly]");
+                if (args.Length < 2) return Task.FromResult("Usage: /setphysics <player> [gravity] [jump] [walk] [sprint] [fly]");
+                var target = args[0];
+                float? gravity = null, jumpForce = null, walkSpeed = null, sprintSpeed = null, flySpeed = null;
+                if (args.Length > 1 && float.TryParse(args[1], out var g)) gravity = Math.Clamp(g, 0.1f, 50f);
+                if (args.Length > 2 && float.TryParse(args[2], out var j)) jumpForce = Math.Clamp(j, 0f, 50f);
+                if (args.Length > 3 && float.TryParse(args[3], out var w)) walkSpeed = Math.Clamp(w, 0.1f, 50f);
+                if (args.Length > 4 && float.TryParse(args[4], out var s)) sprintSpeed = Math.Clamp(s, 0.1f, 50f);
+                if (args.Length > 5 && float.TryParse(args[5], out var f)) flySpeed = Math.Clamp(f, 0.1f, 50f);
+                _setPhysicsOverride(target, gravity, jumpForce, walkSpeed, sprintSpeed, flySpeed);
+                if (_sendPhysicsParams != null) _sendPhysicsParams(target);
+                var parts = new List<string>();
+                if (gravity.HasValue) parts.Add($"gravity={gravity}");
+                if (jumpForce.HasValue) parts.Add($"jump={jumpForce}");
+                if (walkSpeed.HasValue) parts.Add($"walk={walkSpeed}");
+                if (sprintSpeed.HasValue) parts.Add($"sprint={sprintSpeed}");
+                if (flySpeed.HasValue) parts.Add($"fly={flySpeed}");
+                return Task.FromResult($"Physics overridden for {target}: {string.Join(", ", parts)}");
+            }, "server"));
+
+        Register(new ChatCommand("resetphysics", "Reset player physics to defaults", new[] { "clearphysics" },
+            (playerName, args) =>
+            {
+                if (_clearPhysicsOverride == null) return Task.FromResult("Physics command is not available.");
+                var target = args.Length > 0 ? args[0] : playerName;
+                _clearPhysicsOverride(target);
+                if (_sendPhysicsParams != null) _sendPhysicsParams(target);
+                return Task.FromResult($"Physics reset to defaults for {target}");
+            }, "server"));
     }
 
     public void Register(ChatCommand command)

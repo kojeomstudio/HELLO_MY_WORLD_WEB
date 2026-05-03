@@ -228,5 +228,9 @@ public enum BlockType : ushort
     SeaGrass = 223,
     SeaPickle = 224,
     Conduit = 225,
-    TurtleEgg = 226
+    TurtleEgg = 226,
+    DoorOpen = 227,
+    IronDoorOpen = 228,
+    LeverOn = 229,
+    ButtonPressed = 230
 }

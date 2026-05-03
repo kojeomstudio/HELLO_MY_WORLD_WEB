@@ -112,6 +112,7 @@ public class GameServer
         _abmSystem = abmSystem;
         _knockbackSystem = knockbackSystem;
         _physicsEngine = physicsEngine;
+        _physicsEngine.BlockDefs = blockDefinitionManager;
         _entityManager = entityManager;
         _playerDatabase = playerDatabase;
         _blockMetadataDatabase = blockMetadataDatabase;
@@ -541,6 +542,60 @@ public class GameServer
             _ = _hubContext.Clients.Client(player.ConnectionId)
                 .OnFoodUpdate(player.FoodLevel, 20f);
         }
+    }
+
+    public void SetPlayerHealth(string playerName, float health)
+    {
+        var player = GetPlayer(playerName);
+        if (player == null) return;
+        player.Health = Math.Clamp(health, 0, player.MaxHealth);
+
+        if (_hubContext != null)
+        {
+            _ = _hubContext.Clients.Client(player.ConnectionId)
+                .OnHealthUpdate(player.Health, player.MaxHealth);
+        }
+    }
+
+    public void SetPlayerHotbarSize(string playerName, int size)
+    {
+        var player = GetPlayer(playerName);
+        if (player == null) return;
+        player.HotbarSize = size;
+    }
+
+    public void SetPlayerPhysicsOverride(string playerName, float? gravity, float? jumpForce, float? walkSpeed, float? sprintSpeed, float? flySpeed)
+    {
+        var player = GetPlayer(playerName);
+        if (player == null) return;
+        player.OverrideGravity = gravity;
+        player.OverrideJumpForce = jumpForce;
+        player.OverrideWalkSpeed = walkSpeed;
+        player.OverrideSprintSpeed = sprintSpeed;
+        player.OverrideFlySpeed = flySpeed;
+    }
+
+    public void ClearPlayerPhysicsOverride(string playerName)
+    {
+        var player = GetPlayer(playerName);
+        if (player == null) return;
+        player.ClearPhysicsOverride();
+    }
+
+    public void SendPhysicsParamsToPlayer(string playerName)
+    {
+        var player = GetPlayer(playerName);
+        if (player == null || _hubContext == null) return;
+        var physics = _config.Physics;
+        _ = _hubContext.Clients.Client(player.ConnectionId)
+            .OnPhysicsParams(
+                player.OverrideGravity ?? physics.Gravity,
+                player.OverrideJumpForce ?? physics.JumpForce,
+                player.OverrideWalkSpeed ?? physics.WalkSpeed,
+                player.OverrideSprintSpeed ?? physics.SprintSpeed,
+                player.OverrideFlySpeed ?? physics.FlySpeed,
+                physics.ClimbSpeed,
+                physics.LiquidDrag);
     }
 
     public bool SetGameMode(string playerName, GameMode mode)
@@ -974,7 +1029,8 @@ public class GameServer
             {
                 var nutrition = prop.Value.GetProperty("nutrition").GetInt32();
                 var saturation = prop.Value.GetProperty("saturation").GetSingle();
-                _foodValues[prop.Name] = new FoodValue(nutrition, saturation);
+                var replaceWith = prop.Value.TryGetProperty("replaceWith", out var rw) ? rw.GetString() : null;
+                _foodValues[prop.Name] = new FoodValue(nutrition, saturation, replaceWith);
             }
         }
 
@@ -1291,4 +1347,4 @@ public record FurnaceOperation(
     float Progress,
     string ConnectionId);
 
-public record FoodValue(int Nutrition, float Saturation);
+public record FoodValue(int Nutrition, float Saturation, string? ReplaceWith = null);

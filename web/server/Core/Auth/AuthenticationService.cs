@@ -56,6 +56,8 @@ public class AuthenticationService
 
     public AuthResult AuthenticateWithPassword(string name, string? password, string connectionId, int onlineCount, int maxPlayers, string? ipAddress, PlayerDatabase playerDb)
     {
+        if (password?.Length > 128) return AuthResult.PasswordIncorrect;
+
         var baseResult = AuthenticatePlayer(name, connectionId, onlineCount, maxPlayers, ipAddress);
         if (baseResult != AuthResult.Success) return baseResult;
 

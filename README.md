@@ -62,6 +62,10 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Weather**: Server-driven weather system (rain, snow, thunderstorm) with day/night-aware probability and lightning generation
 - **Grid Crafting UI**: 3x3 crafting grid interface with real-time recipe matching for crafting table interaction
 - **Detailed Mob Models**: Multi-part geometry for each mob type (Zombie, Skeleton, Spider, Cow, Pig, Chicken) with name tags
+- **Food Replacement**: Eating container foods (stew, soup) returns empty bowl to inventory
+- **Per-Player Physics Override**: `/setphysics` command for custom gravity, jump, walk, sprint, fly per player
+- **Bouncy Blocks**: Slime block bounce physics (80% velocity reversal), fall damage negated on bouncy blocks
+- **Node Timer System**: Server-side node timers with persistence, used for farmland decay and crop growth
 
 ## Architecture
 
@@ -293,6 +297,10 @@ The Vite dev server proxies `/game` to the server.
 | /unprotect id | Remove protection area |
 | /areas | List your protected areas |
 | /area_info x y z | Show protection at position |
+| /hp value | Set your health |
+| /hotbar size | Set hotbar size (1-9) |
+| /setphysics player gravity jump walk sprint fly | Override player physics |
+| /resetphysics [player] | Reset physics to defaults |
 
 ## Ported from minetest_sub_project
 

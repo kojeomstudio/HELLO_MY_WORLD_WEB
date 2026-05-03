@@ -145,6 +145,11 @@ public class GameHub : Hub<IGameClient>
 
     public async Task Join(string playerName, string? password = null)
     {
+        if (!CheckRateLimit(Context.ConnectionId, "join", 2000))
+        {
+            return;
+        }
+
         var ipAddress = Context.GetHttpContext()?.Connection?.RemoteIpAddress?.ToString() ?? Context.ConnectionId;
 
         var lockoutKey = $"{ipAddress}:{playerName.ToLowerInvariant()}";
@@ -669,6 +674,10 @@ public class GameHub : Hub<IGameClient>
             var removed = player.Inventory.RemoveItem(slotIndex, 1);
             if (removed != null)
             {
+                if (foodInfo.ReplaceWith != null)
+                {
+                    player.Inventory.AddItem(new ItemStack(foodInfo.ReplaceWith, 1));
+                }
                 _gameServer.FeedPlayer(player, foodInfo.Nutrition, foodInfo.Saturation);
                 await SendInventoryUpdate(player);
             }
@@ -758,6 +767,7 @@ public class GameHub : Hub<IGameClient>
     public async Task InteractBlock(int x, int y, int z)
     {
         if (!IsValidBlockCoord(x, y, z)) return;
+        if (!CheckRateLimit(Context.ConnectionId, "interact_block", 300)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
 
@@ -785,6 +795,66 @@ public class GameHub : Hub<IGameClient>
         else if (blockName == "note_block" || blockName == "jukebox")
         {
             await Clients.Caller.OnBlockSound(blockName, x, y, z);
+        }
+        else if (blockName.Contains("door") || blockName == "trapdoor" || blockName == "iron_trapdoor")
+        {
+            var currentBlock = _gameServer.DefaultWorld.GetBlock(blockPos);
+            var isOpen = (currentBlock.Type == BlockType.DoorOpen ||
+                          currentBlock.Type == BlockType.IronDoorOpen);
+            var openBlockType = blockName switch
+            {
+                "door_wood" => BlockType.DoorOpen,
+                "spruce_door" => BlockType.DoorOpen,
+                "birch_door" => BlockType.DoorOpen,
+                "jungle_door" => BlockType.DoorOpen,
+                "acacia_door" => BlockType.DoorOpen,
+                "dark_oak_door" => BlockType.DoorOpen,
+                "iron_door" => BlockType.IronDoorOpen,
+                _ => BlockType.DoorOpen
+            };
+            var closedBlockType = blockName switch
+            {
+                "door_wood" => BlockType.DoorWood,
+                "spruce_door" => BlockType.SpruceDoor,
+                "birch_door" => BlockType.BirchDoor,
+                "jungle_door" => BlockType.JungleDoor,
+                "acacia_door" => BlockType.AcaciaDoor,
+                "dark_oak_door" => BlockType.DarkOakDoor,
+                "iron_door" => BlockType.IronDoor,
+                _ => BlockType.DoorWood
+            };
+            _gameServer.DefaultWorld.SetBlock(blockPos, new Block(isOpen ? closedBlockType : openBlockType));
+            await Clients.Caller.OnBlockUpdate(x, y, z, (uint)(isOpen ? (ushort)closedBlockType : (ushort)openBlockType));
+            await Clients.Caller.OnPlaySound("door", "interactive", isOpen ? "close" : "open", x + 0.5f, y + 0.5f, z + 0.5f, 0.5f);
+        }
+        else if (blockName == "lever")
+        {
+            var currentBlock = _gameServer.DefaultWorld.GetBlock(blockPos);
+            var isPowered = currentBlock.Type == BlockType.LeverOn;
+            var newType = isPowered ? BlockType.Lever : BlockType.LeverOn;
+            _gameServer.DefaultWorld.SetBlock(blockPos, new Block(newType));
+            await Clients.Caller.OnBlockUpdate(x, y, z, (ushort)newType);
+            await Clients.Caller.OnPlaySound("lever", "interactive", isPowered ? "off" : "on", x + 0.5f, y + 0.5f, z + 0.5f, 0.5f);
+        }
+        else if (blockName == "button" || blockName == "stone_button")
+        {
+            _gameServer.DefaultWorld.SetBlock(blockPos, new Block(BlockType.ButtonPressed));
+            await Clients.Caller.OnBlockUpdate(x, y, z, (ushort)BlockType.ButtonPressed);
+            await Clients.Caller.OnPlaySound("button", "interactive", "click", x + 0.5f, y + 0.5f, z + 0.5f, 0.5f);
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(500);
+                var block = _gameServer.DefaultWorld.GetBlock(blockPos);
+                if (block.Type == BlockType.ButtonPressed)
+                {
+                    _gameServer.DefaultWorld.SetBlock(blockPos, new Block(BlockType.Button));
+                    try
+                    {
+                        await _hubContext.Clients.All.OnBlockUpdate(x, y, z, (ushort)BlockType.Button);
+                    }
+                    catch { }
+                }
+            });
         }
     }
 

@@ -1,5 +1,6 @@
 using WebGameServer.Core;
 using WebGameServer.Core.Entities;
+using WebGameServer.Core.Game;
 using WorldMap = WebGameServer.Core.World.World;
 using WebGameServer.Core.World;
 
@@ -19,6 +20,7 @@ public class PhysicsEngine
     public float LiquidDrag { get; set; } = 0.8f;
     public float TerminalVelocity { get; set; } = 50.0f;
     public float StepHeight { get; set; } = 0.6f;
+    public BlockDefinitionManager? BlockDefs { get; set; }
 
     public PhysicsState Simulate(PhysicsState state, PlayerInput input, WorldMap world, float dt)
     {
@@ -136,11 +138,16 @@ public class PhysicsEngine
 
         if (newState.IsOnGround && !wasOnGround && !state.IsFlying)
         {
-            var fallDistance = state.LastGroundY - newPos.Y;
-            if (fallDistance > 3.0f)
+            var groundBlockDef = BlockDefs?.Get((ushort)groundBlock.Type);
+            var isBouncy = groundBlockDef != null && groundBlockDef.Bouncy > 0;
+            if (!isBouncy)
             {
-                var fallDamage = fallDistance - 3.0f;
-                newState = newState with { Health = Math.Max(0, newState.Health - fallDamage) };
+                var fallDistance = state.LastGroundY - newPos.Y;
+                if (fallDistance > 3.0f)
+                {
+                    var fallDamage = fallDistance - 3.0f;
+                    newState = newState with { Health = Math.Max(0, newState.Health - fallDamage) };
+                }
             }
         }
 

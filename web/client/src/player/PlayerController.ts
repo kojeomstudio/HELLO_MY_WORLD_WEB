@@ -473,6 +473,16 @@ export class PlayerController {
         return blockDef?.moveResistance ?? 0;
     }
 
+    private getBounciness(): number {
+        if (!this._worldManager) return 0;
+        const px = Math.floor(this._position.x);
+        const py = Math.floor(this._position.y - 0.1);
+        const pz = Math.floor(this._position.z);
+        const blockId = this._worldManager.getBlock(px, py, pz);
+        const blockDef = this._worldManager.getBlockRegistry().get(blockId);
+        return blockDef?.bouncy ?? 0;
+    }
+
     private updateMovement(dt: number): void {
         const forward = new THREE.Vector3(-Math.sin(this._yaw), 0, -Math.cos(this._yaw));
         const right = new THREE.Vector3(Math.cos(this._yaw), 0, -Math.sin(this._yaw));
@@ -567,7 +577,12 @@ export class PlayerController {
                 this._onGround = false;
             } else {
                 if (this._velocity.y < 0) {
-                    if (this._onGround && Math.abs(this._velocity.y) < 8) {
+                    const bounciness = this.getBounciness();
+                    if (bounciness > 0 && Math.abs(this._velocity.y) > 2) {
+                        this._velocity.y = -this._velocity.y * (bounciness / 100);
+                        this._position.y = newY + 0.01;
+                        this._onGround = false;
+                    } else if (this._onGround && Math.abs(this._velocity.y) < 8) {
                         if (!this.checkCollision(this._position.x, newY + STEP_HEIGHT, this._position.z) &&
                             !this.checkCollision(this._position.x, newY + STEP_HEIGHT + PLAYER_FULL_HEIGHT - 0.01, this._position.z)) {
                             this._position.y = newY + STEP_HEIGHT;

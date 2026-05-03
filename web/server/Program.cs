@@ -19,6 +19,15 @@ using WebGameServer.Core.Protection;
 using WebGameServer.Core.Rollback;
 using WebGameServer.Core.Sound;
 
+static bool IsValidOrigin(string origin)
+{
+    if (string.IsNullOrWhiteSpace(origin)) return false;
+    return Uri.TryCreate(origin, UriKind.Absolute, out var uri)
+        && (uri.Scheme == "http" || uri.Scheme == "https")
+        && uri.Host.Length > 0
+        && uri.Host.All(c => char.IsLetterOrDigit(c) || c == '.' || c == '-' || c == '_');
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 var configPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "data", "server_config.json");
@@ -410,7 +419,12 @@ builder.Services.AddSingleton<ChatCommandManager>(sp =>
             var crafting = sp.GetRequiredService<CraftingSystem>();
             return crafting.GetAllRecipes().Any(r => r.ResultItemId.Equals(itemId, StringComparison.OrdinalIgnoreCase));
         },
-        (entityType) => MobConfig.Definitions.ContainsKey(entityType));
+        (entityType) => MobConfig.Definitions.ContainsKey(entityType),
+        (playerName, hp) => { gameServer.SetPlayerHealth(playerName, hp); },
+        (playerName, size) => { gameServer.SetPlayerHotbarSize(playerName, size); },
+        (playerName, gravity, jump, walk, sprint, fly) => { gameServer.SetPlayerPhysicsOverride(playerName, gravity, jump, walk, sprint, fly); },
+        (playerName) => { gameServer.ClearPlayerPhysicsOverride(playerName); },
+        (playerName) => { gameServer.SendPhysicsParamsToPlayer(playerName); });
 });
 builder.Services.AddSingleton<CraftingSystem>(sp =>
 {
@@ -486,7 +500,7 @@ app.Use(async (context, next) =>
         "script-src 'self'; " +
         "style-src 'self' 'unsafe-inline'; " +
         "img-src 'self' data: blob:; " +
-        $"connect-src 'self' ws: wss: {string.Join(' ', serverConfig.CorsOrigins)}; " +
+        $"connect-src 'self' ws: wss: {string.Join(' ', serverConfig.CorsOrigins.Where(IsValidOrigin))}; " +
         "media-src 'self' blob:; " +
         "font-src 'self'; " +
         "object-src 'none'; " +
