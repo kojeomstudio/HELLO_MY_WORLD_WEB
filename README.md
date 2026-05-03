@@ -34,7 +34,7 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Sky Rendering**: Gradient sky dome with sunrise/sunset color transitions, sun positioning, moon, and star field
 - **Weather**: Rain and snow particle systems with day/night color transitions, cyclable weather modes, server-driven weather broadcasting
 - **Multiplayer**: Real-time multiplayer via SignalR WebSocket with chat, player list
-- **Chat Commands**: 37+ commands with privilege enforcement
+- **Chat Commands**: 45+ commands with privilege enforcement
 - **Privilege System**: 19 privileges fully loaded from JSON with per-command privilege checks
 - **Password Authentication**: PBKDF2 (100k iterations, SHA-256) with per-user random salts, constant-time comparison, legacy SHA-256 migration support
 - **Inventory UI**: Hotbar, main inventory, crafting, furnace, chest, creative inventory, armor
@@ -318,6 +318,11 @@ The Vite dev server proxies `/game` to the server.
 | /detached name size | Create a detached inventory |
 | /trash | Open shared trash inventory |
 | /stuff | Give initial starter items to yourself |
+| /infplace [on|off] | Toggle infinite block placement |
+| /days | Show current day count |
+| /mods | List ported game features |
+| /whois <player> | Show player info (mode, HP) |
+| /ping | Check connection latency |
 | /set_lighting [shadow] [exposure_min] [exposure_max] [ambient] [bloom] | Set lighting params (/set_lighting reset) |
 | /hudflag <flag> [on|off] | Toggle HUD element (hotbar, healthbar, crosshair, breathbar, hungerbar, minimap, debug, chat) |
 

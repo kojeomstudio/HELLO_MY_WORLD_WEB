@@ -639,6 +639,38 @@ public class ChatCommandManager
                     return Task.FromResult("INFPLACE:false");
                 return Task.FromResult("INFPLACE:toggle");
             }, "give"));
+
+        Register(new ChatCommand("days", "Show the current day count", Array.Empty<string>(),
+            (_playerName, _args) =>
+            {
+                var gameTime = _getGameTime();
+                var totalDays = (gameTime / 1000 / 24000) + 1;
+                return Task.FromResult($"Day {totalDays}");
+            }));
+
+        Register(new ChatCommand("mods", "List ported game features", Array.Empty<string>(),
+            (_playerName, _args) =>
+            {
+                return Task.FromResult("Web port of minetest devtest. Ported features: basenodes, basetools, bucket, chest, stairs, crafting, smelting, fishing, breeding, mobs, weather, redstone, particles, protection, rollback, sound, ABMs, biomes, dungeons, ores, farming, PvP/PvM, privileges, chat commands.");
+            }));
+
+        Register(new ChatCommand("whois", "Show player connection info", Array.Empty<string>(),
+            (playerName, args) =>
+            {
+                if (args.Length == 0) return Task.FromResult("Usage: /whois <player>");
+                return Task.FromResult($"WHOIS:{args[0]}");
+            }));
+
+        Register(new ChatCommand("ping", "Check your connection latency", Array.Empty<string>(),
+            (playerName, _args) =>
+            {
+                var players = _getOnlinePlayers?.Invoke();
+                if (players != null && players.Contains(playerName))
+                {
+                    return Task.FromResult("Pong!");
+                }
+                return Task.FromResult("Pong!");
+            }));
     }
 
     public void Register(ChatCommand command)

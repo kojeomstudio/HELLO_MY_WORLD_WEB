@@ -413,3 +413,66 @@ struct CollisionInfo {
 - **압축**: zlib 압축으로 대역폭 절약
 - **Monoblock 최적화**: 동일 노드로 구성된 블록은 4바이트만 전송
 - **증분 전송**: 변경된 블록만 재전송
+
+## 8. Web Port Architecture (C# ASP.NET Core 10.0)
+
+### 8.1 웹 포트 클래스 계층
+
+```
+WebGameServer (GameServer.cs)
+  ├── Services/
+  │    ├── GameHub (SignalR Hub - 모든 클라이언트 통신)
+  │    └── GameLoopService (BackgroundService - 게임 틱)
+  ├── Core/
+  │    ├── World/ (World, Chunk, MapGen, Lighting, ABMs, Redstone)
+  │    ├── Player/ (Player, PlayerDatabase, PlayerState)
+  │    ├── Entities/ (EntityManager, MobEntity, ItemEntity)
+  │    ├── Physics/ (PhysicsEngine, Knockback)
+  │    ├── Crafting/ (CraftingSystem, GridCraftingSystem)
+  │    ├── Auth/ (Authentication, PrivilegeManager, BanDatabase)
+  │    ├── Chat/ (ChatCommandManager)
+  │    ├── Game/ (BlockDefinition, BlockDefinitionManager)
+  │    ├── Inventory/ (DetachedInventoryManager)
+  │    ├── Smelting/ (SmeltingSystem)
+  │    ├── Weather/ (WeatherSystem)
+  │    ├── Sound/ (SoundSpecManager)
+  │    ├── ToolWear/ (ToolWearSystem)
+  │    ├── Particles/ (ParticleSpawnerSpec)
+  │    ├── Pathfinding/ (A* Pathfinder)
+  │    ├── Protection/ (AreaProtection, Rollback)
+  │    └── Rollback/ (Block change rollback)
+  └── Program.cs (DI setup, middleware, CORS, CSP)
+```
+
+### 8.2 SignalR 허브 메서드 (IGameClient 인터페이스)
+
+| 메서드 | 목적 | Rate Limit |
+|--------|------|-----------|
+| OnChunkReceived | 청크 데이터 전송 | - |
+| OnPlayerPositionUpdate | 다른 플레이어 위치 | - |
+| OnChatMessage | 채팅 메시지 | 500ms |
+| OnBlockUpdate | 블록 변경 알림 | - |
+| OnHealthUpdate/FoodUpdate/BreathUpdate | 플레이어 스탯 | - |
+| OnInventoryUpdate | 인벤토리 변경 | - |
+| OnWeatherUpdate | 날씨 변경 | - |
+| OnWaypoint | 웨이포인트 생성 | - |
+| OnFov | 서버 FOV 제어 | - |
+| OnLightingUpdate | 조명 파라미터 제어 | - |
+| OnHudFlag | HUD 요소 표시/숨김 | - |
+| OnDetachedInventory | 분리 인벤토리 열기 | - |
+
+### 8.3 채팅 명령어 시스템
+
+명령어는 `ChatCommandManager`에 등록되며 권한 기반 접근 제어를 사용합니다:
+- `ChatCommand` 레코드: Name, Description, Aliases, Handler, RequiredPrivilege
+- 결과 접두어 패턴: `LIGHTING:`, `HUD_SET:`, `HUD_TOGGLE:`, `INFPLACE:`, `GIVE_INITIAL_STUFF`
+- GameHub에서 접두어를 감지하여 특별 처리 (SignalR 이벤트 전송 등)
+
+### 8.4 보안 조치
+
+- 모든 허브 메서드에 Rate Limiting (CheckRateLimit)
+- 채팅 메시지 HTML 엔티티 인코딩 (SanitizeChatMessage)
+- PBKDF2 비밀번호 해싱 (100k iterations, SHA-256)
+- CORS/CSP 헤더 구성 (frame-ancestors none 포함)
+- IP 기반 연결 제한 및 브루트포스 잠금
+- CreateDetachedInventory 서버 권한 필요

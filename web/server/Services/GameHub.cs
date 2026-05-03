@@ -376,6 +376,20 @@ public class GameHub : Hub<IGameClient>
                     player.InfinitePlace = enabled;
                     await Clients.Caller.OnChatMessage("Server", $"Infinite placement {(enabled ? "enabled" : "disabled")}", "system");
                 }
+                else if (result.StartsWith("WHOIS:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var targetName = result.Substring(6);
+                    var targetPlayer = _gameServer.GetPlayer(targetName);
+                    if (targetPlayer != null)
+                    {
+                        var info = $"Player: {targetPlayer.Name}, Mode: {targetPlayer.Mode}, HP: {targetPlayer.Health:F0}/{targetPlayer.MaxHealth:F0}";
+                        await Clients.Caller.OnChatMessage("Server", info, "system");
+                    }
+                    else
+                    {
+                        await Clients.Caller.OnChatMessage("Server", $"Player '{targetName}' not found.", "system");
+                    }
+                }
                 else
                 {
                     await Clients.Caller.OnChatMessage("Server", result, "system");
