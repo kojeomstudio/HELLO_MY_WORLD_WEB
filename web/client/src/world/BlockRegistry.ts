@@ -27,6 +27,14 @@ export interface BlockDefinition {
     liquidRenewable?: boolean;
     level?: number;
     maxLevel?: number;
+    waving?: number;
+    noJump?: boolean;
+    liquidNoSwim?: boolean;
+    buildableTo?: boolean;
+    attachedNode?: boolean;
+    fallDamageAddPercent?: number;
+    damageGroup?: string;
+    healPerSecond?: number;
 }
 
 export class BlockRegistry {
@@ -43,10 +51,10 @@ export class BlockRegistry {
             { id: 1, name: 'stone', solid: true, transparent: false, color: '#808080', hardness: 1.5, drops: 'cobblestone', textureName: 'default_stone' },
             { id: 2, name: 'dirt', solid: true, transparent: false, color: '#8B4513', hardness: 0.5, textureName: 'default_dirt' },
             { id: 3, name: 'grass', solid: true, transparent: false, color: '#228B22', hardness: 0.6, textureName: 'default_grass' },
-            { id: 4, name: 'water', solid: false, transparent: true, color: '#4169E1', liquid: true, textureName: 'default_water' },
+            { id: 4, name: 'water', solid: false, transparent: true, color: '#4169E1', liquid: true, textureName: 'default_water', waving: 3 },
             { id: 5, name: 'sand', solid: true, transparent: false, color: '#F4A460', hardness: 0.5, textureName: 'default_sand' },
             { id: 6, name: 'wood', solid: true, transparent: false, color: '#DEB887', hardness: 2.0, textureName: 'default_tree' },
-            { id: 7, name: 'leaves', solid: true, transparent: true, color: '#32CD32', hardness: 0.2, textureName: 'default_leaves' },
+            { id: 7, name: 'leaves', solid: true, transparent: true, color: '#32CD32', hardness: 0.2, textureName: 'default_leaves', waving: 2 },
             { id: 8, name: 'glass', solid: true, transparent: true, color: '#ADD8E6', hardness: 0.3, textureName: 'default_glass' },
             { id: 9, name: 'brick', solid: true, transparent: false, color: '#B22222', hardness: 2.0, textureName: 'default_brick' },
             { id: 10, name: 'ore_iron', solid: true, transparent: false, color: '#C4A882', hardness: 3.0, drops: 'iron_ingot', textureName: 'default_iron_ore' },
@@ -241,6 +249,19 @@ export class BlockRegistry {
             if (raw.soundGroup !== undefined) block.soundGroup = raw.soundGroup;
             if (raw.textureName !== undefined) block.textureName = raw.textureName;
         if (raw.drawType !== undefined) block.drawType = raw.drawType;
+            if (raw.waving !== undefined) block.waving = raw.waving;
+            if (raw.noJump !== undefined) block.noJump = raw.noJump;
+            if (raw.liquidNoSwim !== undefined) block.liquidNoSwim = raw.liquidNoSwim;
+            if (raw.buildableTo !== undefined) block.buildableTo = raw.buildableTo;
+            if (raw.attachedNode !== undefined) block.attachedNode = raw.attachedNode;
+            if (raw.fallDamageAddPercent !== undefined) block.fallDamageAddPercent = raw.fallDamageAddPercent;
+            if (raw.damageGroup !== undefined) block.damageGroup = raw.damageGroup;
+            if (raw.healPerSecond !== undefined) block.healPerSecond = raw.healPerSecond;
+            if (raw.liquidRange !== undefined) block.liquidRange = raw.liquidRange;
+            if (raw.liquidViscosity !== undefined) block.liquidViscosity = raw.liquidViscosity;
+            if (raw.liquidRenewable !== undefined) block.liquidRenewable = raw.liquidRenewable;
+            if (raw.level !== undefined) block.level = raw.level;
+            if (raw.maxLevel !== undefined) block.maxLevel = raw.maxLevel;
 
             this.blocks.set(id, block);
             this.byName.set(block.name, block);

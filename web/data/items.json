@@ -77,6 +77,11 @@
         "clay_ball": { "name": "Clay Ball", "type": "resource", "stackable": true, "maxStack": 64 },
         "brick_item": { "name": "Brick", "type": "resource", "stackable": true, "maxStack": 64 },
         "sand_item": { "name": "Sand", "type": "resource", "stackable": true, "maxStack": 64 },
+        "mud": { "name": "Mud", "type": "block", "stackable": true, "maxStack": 64, "blockId": 231 },
+        "packed_mud": { "name": "Packed Mud", "type": "block", "stackable": true, "maxStack": 64, "blockId": 232 },
+        "mud_bricks": { "name": "Mud Bricks", "type": "block", "stackable": true, "maxStack": 64, "blockId": 233 },
+        "mud_brick_stair": { "name": "Mud Brick Stairs", "type": "block", "stackable": true, "maxStack": 64, "blockId": 234 },
+        "mud_brick_slab": { "name": "Mud Brick Slab", "type": "block", "stackable": true, "maxStack": 64, "blockId": 235 },
         "charcoal": { "name": "Charcoal", "type": "resource", "stackable": true, "maxStack": 64 },
         "stick": { "name": "Stick", "type": "material", "stackable": true, "maxStack": 64 },
         "planks": { "name": "Planks", "type": "block", "stackable": true, "maxStack": 64, "blockId": 25 },
@@ -395,7 +400,12 @@
         { "result": "pine_wood_slab_item", "resultCount": 6, "ingredients": [["pine_wood", 3]] },
         { "result": "titanium_pickaxe", "resultCount": 1, "ingredients": [["titanium_pickaxe", 2]] },
         { "result": "mese_sword", "resultCount": 1, "ingredients": [["mese_sword", 2]] },
-        { "result": "titanium_sword", "resultCount": 1, "ingredients": [["titanium_sword", 2]] }
+        { "result": "titanium_sword", "resultCount": 1, "ingredients": [["titanium_sword", 2]] },
+        { "result": "mud", "resultCount": 1, "ingredients": [["dirt_block", 1], ["water", 1]] },
+        { "result": "packed_mud", "resultCount": 1, "ingredients": [["mud", 1], ["dirt_block", 1]] },
+        { "result": "mud_bricks", "resultCount": 4, "ingredients": [["packed_mud", 1], ["sand_item", 1]] },
+        { "result": "mud_brick_stair", "resultCount": 4, "ingredients": [["mud_bricks", 6]] },
+        { "result": "mud_brick_slab", "resultCount": 6, "ingredients": [["mud_bricks", 3]] }
     ],
     "foodValues": {
         "apple": { "nutrition": 4, "saturation": 2.4 },

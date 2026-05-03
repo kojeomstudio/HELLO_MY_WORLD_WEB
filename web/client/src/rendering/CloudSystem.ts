@@ -1,13 +1,15 @@
 import * as THREE from 'three';
 
 const CLOUD_SIZE = 600;
-const CLOUD_HEIGHT = 120;
-const CLOUD_SPEED = 3.0;
 const CLOUD_WRAP = 200;
 
 export class CloudSystem {
     private mesh: THREE.Mesh;
     private material: THREE.MeshBasicMaterial;
+    private cloudSpeed = 3.0;
+    private cloudHeight = 120;
+    private cloudDensity = 0.55;
+
     constructor(scene: THREE.Scene) {
         const texture = this.generateCloudTexture();
         texture.wrapS = THREE.RepeatWrapping;
@@ -18,15 +20,36 @@ export class CloudSystem {
             transparent: true,
             side: THREE.DoubleSide,
             depthWrite: false,
-            opacity: 0.6
+            opacity: this.cloudDensity
         });
 
         const geometry = new THREE.PlaneGeometry(CLOUD_SIZE, CLOUD_SIZE);
         geometry.rotateX(-Math.PI / 2);
         this.mesh = new THREE.Mesh(geometry, this.material);
-        this.mesh.position.set(0, CLOUD_HEIGHT, 0);
+        this.mesh.position.set(0, this.cloudHeight, 0);
         this.mesh.name = 'clouds';
         scene.add(this.mesh);
+    }
+
+    setParams(params: { density?: number; thickness?: number; height?: number; speed?: number; reset?: boolean }): void {
+        if (params.reset) {
+            this.cloudDensity = 0.55;
+            this.cloudHeight = 120;
+            this.cloudSpeed = 3.0;
+            this.mesh.position.y = this.cloudHeight;
+            return;
+        }
+        if (params.density !== undefined) this.cloudDensity = Math.max(0, Math.min(1, params.density));
+        if (params.height !== undefined) {
+            this.cloudHeight = Math.max(50, Math.min(200, params.height));
+            this.mesh.position.y = this.cloudHeight;
+        }
+        if (params.speed !== undefined) this.cloudSpeed = Math.max(0, Math.min(20, params.speed));
+        if (params.thickness !== undefined) this.cloudDensity = Math.max(0.1, Math.min(1, params.thickness / 32));
+    }
+
+    getParams(): { density: number; height: number; speed: number } {
+        return { density: this.cloudDensity, height: this.cloudHeight, speed: this.cloudSpeed };
     }
 
     private generateCloudTexture(): THREE.CanvasTexture {
@@ -77,7 +100,7 @@ export class CloudSystem {
     }
 
     update(brightness: number, dt: number): void {
-        this.mesh.position.x += CLOUD_SPEED * dt;
+        this.mesh.position.x += this.cloudSpeed * dt;
         if (this.mesh.position.x > CLOUD_WRAP) {
             this.mesh.position.x -= CLOUD_WRAP * 2;
         }
