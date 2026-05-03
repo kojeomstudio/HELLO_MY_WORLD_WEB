@@ -75,6 +75,7 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **HUD Waypoints**: Server-driven waypoints via `/waypoint` command with distance display and customizable colors, updated in real-time game loop
 - **Server FOV Control**: Server can set client FOV via SignalR with smooth transition time
 - **Detached Inventory UI**: Visual detached inventory panel for shared/trash inventories via `/detached` and `/trash` commands
+- **Creative Mode**: No tool wear, no item drops on dig, infinite block placement
 
 ## Architecture
 

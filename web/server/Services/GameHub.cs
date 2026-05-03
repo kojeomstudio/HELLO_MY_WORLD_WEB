@@ -498,6 +498,11 @@ public class GameHub : Hub<IGameClient>
         await Clients.All.OnBlockUpdate(x, y, z, 0);
         _ = PlayBlockSound((ushort)oldBlock.Type, "dig", x + 0.5f, y + 0.5f, z + 0.5f);
 
+        if (player.Mode == GameMode.Creative || player.Mode == GameMode.Spectator)
+        {
+            return;
+        }
+
         var dropName = blockDef?.Drops ?? blockDef?.Name ?? oldBlock.Type.ToString().ToLowerInvariant();
         var itemEntity = new ItemEntity(dropName, 1, new Vector3(x + 0.5f, y + 0.5f, z + 0.5f));
         _entityManager.Add(itemEntity);

@@ -43,6 +43,7 @@ export class PlayerController {
     private _yaw: number = 0;
     private _pitch: number = 0;
     private _isFlying: boolean = false;
+    private _gameMode: string = 'survival';
     private _selectedSlot: number = 0;
     private _selectedBlockType: number = 1;
     private _worldManager: WorldManager | null = null;
@@ -798,6 +799,7 @@ export class PlayerController {
     }
 
     setGameMode(mode: string): void {
+        this._gameMode = mode;
         if (mode === 'creative' || mode === 'spectator') {
             this._isFlying = true;
         } else {
@@ -855,4 +857,5 @@ export class PlayerController {
     getCameraMode(): number { return this._cameraMode; }
     isSneaking(): boolean { return this._isSneaking; }
     setSneaking(value: boolean): void { this._isSneaking = value; }
+    getGameMode(): string { return this._gameMode; }
 }
