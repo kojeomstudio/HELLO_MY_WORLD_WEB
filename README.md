@@ -317,6 +317,7 @@ The Vite dev server proxies `/game` to the server.
 | /waypoint name x y z [color] | Add a waypoint marker |
 | /detached name size | Create a detached inventory |
 | /trash | Open shared trash inventory |
+| /stuff | Give initial starter items to yourself |
 | /set_lighting [shadow] [exposure_min] [exposure_max] [ambient] [bloom] | Set lighting params (/set_lighting reset) |
 | /hudflag <flag> [on|off] | Toggle HUD element (hotbar, healthbar, crosshair, breathbar, hungerbar, minimap, debug, chat) |
 

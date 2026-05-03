@@ -364,6 +364,18 @@ public class GameHub : Hub<IGameClient>
                     await Clients.Caller.OnHudFlag(flag, false);
                     await Clients.Caller.OnChatMessage("Server", $"HUD flag '{flag}' toggled", "system");
                 }
+                else if (result == "GIVE_INITIAL_STUFF")
+                {
+                    GiveInitialStuff(player);
+                    await Clients.Caller.OnChatMessage("Server", "Given initial starter items!", "system");
+                }
+                else if (result.StartsWith("INFPLACE:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var val = result.Substring(9);
+                    var enabled = val == "true" || (val == "toggle" && !player.InfinitePlace);
+                    player.InfinitePlace = enabled;
+                    await Clients.Caller.OnChatMessage("Server", $"Infinite placement {(enabled ? "enabled" : "disabled")}", "system");
+                }
                 else
                 {
                     await Clients.Caller.OnChatMessage("Server", result, "system");
@@ -1692,6 +1704,16 @@ public class GameHub : Hub<IGameClient>
     private PlayerEnt? GetAuthenticatedPlayer()
     {
         return _gameServer.GetPlayerByConnection(Context.ConnectionId);
+    }
+
+    private void GiveInitialStuff(PlayerEnt player)
+    {
+        foreach (var itemName in _config.Player.StartItems)
+        {
+            var count = DefaultStartItemCounts.TryGetValue(itemName, out var c) ? c : 1;
+            player.Inventory.AddItem(new ItemStack(itemName, count));
+        }
+        _ = SendInventoryUpdate(player);
     }
 
     private static string SanitizeChatMessage(string message)

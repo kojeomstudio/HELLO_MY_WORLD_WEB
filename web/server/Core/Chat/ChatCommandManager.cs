@@ -626,6 +626,19 @@ public class ChatCommandManager
                 }
                 return Task.FromResult($"HUD_TOGGLE:{flag}");
             }, "interact"));
+
+        Register(new ChatCommand("stuff", "Give initial starter items to yourself", new[] { "givestuff" },
+            (_playerName, _args) => Task.FromResult("GIVE_INITIAL_STUFF"), "give"));
+
+        Register(new ChatCommand("infplace", "Toggle infinite block placement", new[] { "infinite_place" },
+            (playerName, args) =>
+            {
+                if (args.Length > 0 && args[0].Equals("on", StringComparison.OrdinalIgnoreCase))
+                    return Task.FromResult("INFPLACE:true");
+                if (args.Length > 0 && args[0].Equals("off", StringComparison.OrdinalIgnoreCase))
+                    return Task.FromResult("INFPLACE:false");
+                return Task.FromResult("INFPLACE:toggle");
+            }, "give"));
     }
 
     public void Register(ChatCommand command)
