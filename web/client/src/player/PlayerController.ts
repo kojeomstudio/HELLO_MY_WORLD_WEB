@@ -68,6 +68,9 @@ export class PlayerController {
     private _bobActive: boolean = false;
     private _currentBobOffset: THREE.Vector3 = new THREE.Vector3();
     private _physics: PhysicsParams = { ...DEFAULT_PHYSICS };
+    private _baseFov: number = 72;
+    private _currentFov: number = 72;
+    private _isZooming: boolean = false;
     health: number = 20;
     maxHealth: number = 20;
     inventory: any[] = [];
@@ -153,6 +156,9 @@ export class PlayerController {
                     if (!this._isFlying && !this.isInLiquid()) {
                         this._isSneaking = !this._isSneaking;
                     }
+                    break;
+                case 'KeyC':
+                    this._isZooming = !this._isZooming;
                     break;
             }
         });
@@ -643,6 +649,13 @@ export class PlayerController {
         if (this._position.y < -20) {
             this._position.set(0, 50, 0);
             this._velocity.set(0, 0, 0);
+        }
+
+        const targetFov = this._isZooming ? this._baseFov * 0.5 : this._baseFov;
+        this._currentFov += (targetFov - this._currentFov) * Math.min(1, dt * 8);
+        if (this._camera.fov !== this._currentFov) {
+            this._camera.fov = this._currentFov;
+            this._camera.updateProjectionMatrix();
         }
     }
 

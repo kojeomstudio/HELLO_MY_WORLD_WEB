@@ -258,6 +258,7 @@ The Vite dev server proxies `/game` to the server.
 | P | Armor panel |
 | F3 | Debug info |
 | B | Toggle weather |
+| C | Toggle zoom FOV |
 | F5 | Cycle camera mode |
 | F12 | Screenshot |
 | M | Minimap cycle |
