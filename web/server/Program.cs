@@ -505,6 +505,7 @@ app.Use(async (context, next) =>
         "media-src 'self' blob:; " +
         "font-src 'self'; " +
         "object-src 'none'; " +
+        "frame-ancestors 'none'; " +
         "base-uri 'self'";
     context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
     await next();

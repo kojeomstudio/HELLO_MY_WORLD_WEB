@@ -585,6 +585,7 @@ public class GameHub : Hub<IGameClient>
     public async Task<float> DigBlockStart(int x, int y, int z)
     {
         if (!IsValidBlockCoord(x, y, z)) return -1f;
+        if (!CheckRateLimit(Context.ConnectionId, "digstart", 250)) return -1f;
         var player = GetAuthenticatedPlayer();
         if (player == null) return -1f;
         var blockPos = new Vector3s((short)x, (short)y, (short)z);
@@ -776,6 +777,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task Respawn()
     {
+        if (!CheckRateLimit(Context.ConnectionId, "respawn", 1000)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
         if (!player.IsDead) return;
@@ -1212,6 +1214,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task ReelIn()
     {
+        if (!CheckRateLimit(Context.ConnectionId, "reel", 1000)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null || player.IsDead) return;
 
@@ -1363,6 +1366,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task GetCraftingRecipes()
     {
+        if (!CheckRateLimit(Context.ConnectionId, "craftlist", 2000)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
         var recipes = _craftingSystem.GetAllRecipes();
@@ -1389,6 +1393,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task CraftRecipe(int recipeIndex)
     {
+        if (!CheckRateLimit(Context.ConnectionId, "craft", 500)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
 
@@ -1436,6 +1441,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task GetSmeltingRecipes()
     {
+        if (!CheckRateLimit(Context.ConnectionId, "smeltlist", 2000)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
         var recipes = _smeltingSystem.GetAllRecipes();
@@ -1452,6 +1458,8 @@ public class GameHub : Hub<IGameClient>
     public async Task StartSmelting(string inputItemId, string resultItemId, int x, int y, int z)
     {
         if (!IsValidBlockCoord(x, y, z)) return;
+        if (!CheckRateLimit(Context.ConnectionId, "smelt", 500)) return;
+        if (string.IsNullOrEmpty(inputItemId) || inputItemId.Length > 100 || string.IsNullOrEmpty(resultItemId) || resultItemId.Length > 100) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
 
@@ -1476,6 +1484,7 @@ public class GameHub : Hub<IGameClient>
     public async Task GetChestInventory(int x, int y, int z)
     {
         if (!IsValidBlockCoord(x, y, z)) return;
+        if (!CheckRateLimit(Context.ConnectionId, "chest", 500)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
 
@@ -1493,6 +1502,7 @@ public class GameHub : Hub<IGameClient>
     public async Task MoveItemToChest(int slotIndex, int chestSlot, int x, int y, int z)
     {
         if (!IsValidBlockCoord(x, y, z)) return;
+        if (!CheckRateLimit(Context.ConnectionId, "chestmove", 250)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
 
@@ -1519,6 +1529,7 @@ public class GameHub : Hub<IGameClient>
     public async Task TakeItemFromChest(int chestSlot, int slotIndex, int x, int y, int z)
     {
         if (!IsValidBlockCoord(x, y, z)) return;
+        if (!CheckRateLimit(Context.ConnectionId, "chesttake", 250)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
 
@@ -1810,6 +1821,8 @@ public class GameHub : Hub<IGameClient>
 
     public async Task GridCraft(string?[,] grid, int gridSize)
     {
+        if (!CheckRateLimit(Context.ConnectionId, "gridcraft", 500)) return;
+        if (gridSize < 1 || gridSize > 9) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
 
@@ -1861,6 +1874,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task CheckGridRecipe(string?[] grid)
     {
+        if (!CheckRateLimit(Context.ConnectionId, "checkrecipe", 500)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
 
@@ -1881,6 +1895,8 @@ public class GameHub : Hub<IGameClient>
 
     public async Task GridCraft(string resultItemId, int resultCount)
     {
+        if (!CheckRateLimit(Context.ConnectionId, "gridcraft2", 500)) return;
+        if (string.IsNullOrEmpty(resultItemId) || resultItemId.Length > 100 || resultCount < 1 || resultCount > 999) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
 
@@ -1932,8 +1948,12 @@ public class GameHub : Hub<IGameClient>
 
     public async Task CreateDetachedInventory(string name, int size)
     {
+        if (!CheckRateLimit(Context.ConnectionId, "detachedcreate", 2000)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
+        if (!_gameServer.Privileges.HasPrivilege(player.Name, "server")) return;
+        if (string.IsNullOrEmpty(name) || name.Length > 64) return;
+        size = Math.Clamp(size, 1, 256);
         if (_detachedInventory.Exists(name))
         {
             await Clients.Caller.OnChatMessage("Server", $"Inventory '{name}' already exists.", "system");
@@ -1945,6 +1965,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task OpenDetachedInventory(string name)
     {
+        if (!CheckRateLimit(Context.ConnectionId, "detachedopen", 1000)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
         var inv = _detachedInventory.Get(name);
@@ -1966,6 +1987,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task DetachedInventoryMove(string invName, int fromSlot, int toSlot)
     {
+        if (!CheckRateLimit(Context.ConnectionId, "detachedmove", 250)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
         if (!_detachedInventory.MoveItem(invName, fromSlot, invName, toSlot, player.Name)) return;
@@ -1974,6 +1996,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task DetachedInventoryPut(string invName, int slot)
     {
+        if (!CheckRateLimit(Context.ConnectionId, "detachedput", 250)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
         var inv = _detachedInventory.Get(invName);
@@ -1993,6 +2016,7 @@ public class GameHub : Hub<IGameClient>
 
     public async Task DetachedInventoryTake(string invName, int slot)
     {
+        if (!CheckRateLimit(Context.ConnectionId, "detachedtake", 250)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
         var item = _detachedInventory.RemoveItem(invName, slot, 1, player.Name);
