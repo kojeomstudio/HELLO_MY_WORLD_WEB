@@ -1368,6 +1368,13 @@ public class GameServer
         }
         return count;
     }
+
+    public void BroadcastWaypoint(string playerName, float x, float y, float z, string name, string color)
+    {
+        var connectionId = GetPlayerConnectionId(playerName);
+        if (connectionId == null || _hubContext == null) return;
+        _ = _hubContext.Clients.Client(connectionId).OnWaypoint(x, y, z, name, color);
+    }
 }
 
 public record FurnaceOperation(

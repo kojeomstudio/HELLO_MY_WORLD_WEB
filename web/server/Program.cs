@@ -424,7 +424,8 @@ builder.Services.AddSingleton<ChatCommandManager>(sp =>
         (playerName, size) => { gameServer.SetPlayerHotbarSize(playerName, size); },
         (playerName, gravity, jump, walk, sprint, fly) => { gameServer.SetPlayerPhysicsOverride(playerName, gravity, jump, walk, sprint, fly); },
         (playerName) => { gameServer.ClearPlayerPhysicsOverride(playerName); },
-        (playerName) => { gameServer.SendPhysicsParamsToPlayer(playerName); });
+        (playerName) => { gameServer.SendPhysicsParamsToPlayer(playerName); },
+        (playerName, x, y, z, color, name) => { gameServer.BroadcastWaypoint(playerName, x, y, z, name, color); });
 });
 builder.Services.AddSingleton<CraftingSystem>(sp =>
 {

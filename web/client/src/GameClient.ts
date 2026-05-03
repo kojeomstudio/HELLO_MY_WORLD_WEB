@@ -279,6 +279,10 @@ export class GameClient {
                 this.uiManager.showWeatherNotification(weatherType);
             }
         });
+
+        this.connection.on('OnWaypoint', (x: number, y: number, z: number, name: string, color: string) => {
+            this.uiManager.addWaypoint(x, y, z, name, color);
+        });
     }
 
     sendChat(message: string): void {

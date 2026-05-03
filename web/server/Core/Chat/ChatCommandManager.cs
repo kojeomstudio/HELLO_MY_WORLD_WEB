@@ -55,6 +55,7 @@ public class ChatCommandManager
     private readonly Action<string, float?, float?, float?, float?, float?>? _setPhysicsOverride;
     private readonly Action<string>? _clearPhysicsOverride;
     private readonly Action<string>? _sendPhysicsParams;
+    private readonly Action<string, float, float, float, string, string>? _addWaypoint;
 
     public ChatCommandManager(
         Func<long> getGameTime,
@@ -86,7 +87,8 @@ public class ChatCommandManager
         Action<string, int>? setHotbarSize = null,
         Action<string, float?, float?, float?, float?, float?>? setPhysicsOverride = null,
         Action<string>? clearPhysicsOverride = null,
-        Action<string>? sendPhysicsParams = null)
+        Action<string>? sendPhysicsParams = null,
+        Action<string, float, float, float, string, string>? addWaypoint = null)
     {
         _getGameTime = getGameTime;
         _getTps = getTps;
@@ -118,6 +120,7 @@ public class ChatCommandManager
         _setPhysicsOverride = setPhysicsOverride;
         _clearPhysicsOverride = clearPhysicsOverride;
         _sendPhysicsParams = sendPhysicsParams;
+        _addWaypoint = addWaypoint;
         RegisterBuiltInCommands();
     }
 
@@ -564,6 +567,18 @@ public class ChatCommandManager
 
         Register(new ChatCommand("trash", "Open a shared trash inventory", Array.Empty<string>(),
             (_, _) => Task.FromResult("DETACHED_OPEN:trash")));
+
+        Register(new ChatCommand("waypoint", "Add a waypoint marker", Array.Empty<string>(),
+            (playerName, args) =>
+            {
+                if (_addWaypoint == null) return Task.FromResult("Waypoint command not available.");
+                if (args.Length < 3) return Task.FromResult("Usage: /waypoint <name> <x> <y> <z> [color]");
+                if (!float.TryParse(args[1], out var x) || !float.TryParse(args[2], out var y) || !float.TryParse(args[3], out var z))
+                    return Task.FromResult("Invalid coordinates. Usage: /waypoint <name> <x> <y> <z> [color]");
+                var color = args.Length > 4 ? args[4] : "#00ff00";
+                _addWaypoint(playerName, x, y, z, args[0], color);
+                return Task.FromResult($"Waypoint '{args[0]}' set at ({Math.Round(x)}, {Math.Round(y)}, {Math.Round(z)})");
+            }, "interact"));
     }
 
     public void Register(ChatCommand command)

@@ -60,6 +60,7 @@ public interface IGameClient
     Task OnWeatherUpdate(string weatherType, float intensity);
     Task OnDetachedInventory(string name, object[] items);
     Task OnFov(float fov, float transitionTime);
+    Task OnWaypoint(float x, float y, float z, string name, string color);
 }
 
 public class GameHub : Hub<IGameClient>
