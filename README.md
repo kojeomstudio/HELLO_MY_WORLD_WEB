@@ -76,6 +76,7 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Server FOV Control**: Server can set client FOV via SignalR with smooth transition time
 - **Detached Inventory UI**: Visual detached inventory panel for shared/trash inventories via `/detached` and `/trash` commands
 - **Creative Mode**: No tool wear, no item drops on dig, infinite block placement
+- **Lighting Settings**: `/set_lighting` command for runtime shadow intensity, exposure, ambient boost, bloom
 
 ## Architecture
 
@@ -315,6 +316,7 @@ The Vite dev server proxies `/game` to the server.
 | /waypoint name x y z [color] | Add a waypoint marker |
 | /detached name size | Create a detached inventory |
 | /trash | Open shared trash inventory |
+| /set_lighting [shadow] [exposure_min] [exposure_max] [ambient] [bloom] | Set lighting params (/set_lighting reset) |
 
 ## Ported from minetest_sub_project
 

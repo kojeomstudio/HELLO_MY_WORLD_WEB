@@ -45,6 +45,11 @@ export class Renderer {
     private targetStarOpacity: number = 0;
     private currentMoonIntensity: number = 0;
     private currentStarOpacity: number = 0;
+    private shadowIntensity: number = 1.0;
+    private exposureMin: number = 0.2;
+    private exposureMax: number = 1.0;
+    private ambientBoost: number = 0;
+    private bloomStrength: number = 0;
 
     constructor(container: HTMLElement) {
         this.canvas = document.createElement('canvas');
@@ -208,6 +213,24 @@ export class Renderer {
         this.camera.updateProjectionMatrix();
     }
 
+    setLighting(params: { shadowIntensity?: number; exposureMin?: number; exposureMax?: number; ambientBoost?: number; bloomStrength?: number }): void {
+        if (params.shadowIntensity !== undefined) this.shadowIntensity = params.shadowIntensity;
+        if (params.exposureMin !== undefined) this.exposureMin = params.exposureMin;
+        if (params.exposureMax !== undefined) this.exposureMax = params.exposureMax;
+        if (params.ambientBoost !== undefined) this.ambientBoost = params.ambientBoost;
+        if (params.bloomStrength !== undefined) this.bloomStrength = params.bloomStrength;
+    }
+
+    getLighting(): { shadowIntensity: number; exposureMin: number; exposureMax: number; ambientBoost: number; bloomStrength: number } {
+        return {
+            shadowIntensity: this.shadowIntensity,
+            exposureMin: this.exposureMin,
+            exposureMax: this.exposureMax,
+            ambientBoost: this.ambientBoost,
+            bloomStrength: this.bloomStrength
+        };
+    }
+
     setCloudsEnabled(enabled: boolean): void {
         this.cloudSystem.setVisible(enabled);
     }
@@ -304,8 +327,12 @@ export class Renderer {
         this.fog.far = this.isRaining ? this.rainFogFar : this.normalFogFar;
 
         this.skyLight.intensity = this.isRaining ? sunIntensity * 0.6 : sunIntensity;
+        this.skyLight.intensity *= this.shadowIntensity;
         this.skyLight.color.copy(sunColor);
         this.ambientLight.intensity = this.isRaining ? 0.3 + 0.3 * brightness : 0.2 + 0.6 * brightness;
+        this.ambientLight.intensity += this.ambientBoost;
+        var effectiveExposure = this.exposureMin + (this.exposureMax - this.exposureMin) * brightness;
+        this.skyLight.intensity *= effectiveExposure;
 
         if (this.skyMesh) {
             const mat = this.skyMesh.material as THREE.ShaderMaterial;

@@ -61,6 +61,7 @@ public interface IGameClient
     Task OnDetachedInventory(string name, object[] items);
     Task OnFov(float fov, float transitionTime);
     Task OnWaypoint(float x, float y, float z, string name, string color);
+    Task OnLightingUpdate(float shadowIntensity, float exposureMin, float exposureMax, float ambientBoost, float bloomStrength);
 }
 
 public class GameHub : Hub<IGameClient>
@@ -333,7 +334,24 @@ public class GameHub : Hub<IGameClient>
             var result = await _chatCommands.TryExecute(player.Name, message);
             if (result != null)
             {
-                await Clients.Caller.OnChatMessage("Server", result, "system");
+                if (result.StartsWith("LIGHTING:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var parts = result.Substring(8).Split(':');
+                    if (parts.Length == 5 &&
+                        float.TryParse(parts[0], out var shadow) &&
+                        float.TryParse(parts[1], out var expMin) &&
+                        float.TryParse(parts[2], out var expMax) &&
+                        float.TryParse(parts[3], out var ambient) &&
+                        float.TryParse(parts[4], out var bloom))
+                    {
+                        await Clients.Caller.OnLightingUpdate(shadow, expMin, expMax, ambient, bloom);
+                        await Clients.Caller.OnChatMessage("Server", $"Lighting updated: shadow={shadow:F2} exposure_min={expMin:F2} exposure_max={expMax:F2} ambient={ambient:F2} bloom={bloom:F2}", "system");
+                    }
+                }
+                else
+                {
+                    await Clients.Caller.OnChatMessage("Server", result, "system");
+                }
             }
             return;
         }

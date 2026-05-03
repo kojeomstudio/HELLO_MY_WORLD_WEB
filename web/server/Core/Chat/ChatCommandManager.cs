@@ -579,6 +579,35 @@ public class ChatCommandManager
                 _addWaypoint(playerName, x, y, z, args[0], color);
                 return Task.FromResult($"Waypoint '{args[0]}' set at ({Math.Round(x)}, {Math.Round(y)}, {Math.Round(z)})");
             }, "interact"));
+
+        Register(new ChatCommand("set_lighting", "Set lighting parameters", new[] { "lighting" },
+            (playerName, args) =>
+            {
+                if (args.Length == 0)
+                    return Task.FromResult("Usage: /set_lighting [shadow <0-1>] [exposure_min <0-1>] [exposure_max <0-2>] [ambient <0-2>] [bloom <0-1>]");
+                if (args.Length == 1 && args[0].Equals("reset", StringComparison.OrdinalIgnoreCase))
+                    return Task.FromResult("LIGHTING:1:0.2:1:0:0");
+                var shadow = 1.0f; var expMin = 0.2f; var expMax = 1.0f; var ambient = 0f; var bloom = 0f;
+                for (var i = 0; i < args.Length - 1; i += 2)
+                {
+                    if (i + 1 >= args.Length) break;
+                    if (!float.TryParse(args[i + 1], out var val)) continue;
+                    switch (args[i].ToLowerInvariant())
+                    {
+                        case "shadow": shadow = val; break;
+                        case "exposure_min": expMin = val; break;
+                        case "exposure_max": expMax = val; break;
+                        case "ambient": ambient = val; break;
+                        case "bloom": bloom = val; break;
+                    }
+                }
+                shadow = Math.Clamp(shadow, 0, 1);
+                expMin = Math.Clamp(expMin, 0, 1);
+                expMax = Math.Clamp(expMax, 0, 2);
+                ambient = Math.Clamp(ambient, 0, 2);
+                bloom = Math.Clamp(bloom, 0, 1);
+                return Task.FromResult($"LIGHTING:{shadow}:{expMin}:{expMax}:{ambient}:{bloom}");
+            }, "server"));
     }
 
     public void Register(ChatCommand command)

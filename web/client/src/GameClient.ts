@@ -291,6 +291,10 @@ export class GameClient {
         this.connection.on('OnDetachedInventory', (name: string, items: any[]) => {
             this.uiManager.showDetachedInventory(name, items);
         });
+
+        this.connection.on('OnLightingUpdate', (shadowIntensity: number, exposureMin: number, exposureMax: number, ambientBoost: number, bloomStrength: number) => {
+            this.renderer.setLighting({ shadowIntensity, exposureMin, exposureMax, ambientBoost, bloomStrength });
+        });
     }
 
     sendChat(message: string): void {
