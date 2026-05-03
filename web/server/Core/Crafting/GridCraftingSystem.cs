@@ -198,6 +198,12 @@ public class GridCraftingSystem
     }
 
     public IReadOnlyList<GridRecipe> GetAllRecipes() => _recipes.AsReadOnly();
+
+    public GridRecipe? FindRecipeByResult(string resultItemId)
+    {
+        return _recipes.FirstOrDefault(r =>
+            r.ResultItemId.Equals(resultItemId, StringComparison.OrdinalIgnoreCase));
+    }
 }
 
 public record GridRecipe(

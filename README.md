@@ -32,7 +32,7 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Interactive Blocks**: Sign text input, bed spawn point, note block/jukebox procedural audio, crafting table, chest, furnace, TNT explosion
 - **Day/Night Cycle**: Full 24000-tick day/night cycle with sky brightness transitions
 - **Sky Rendering**: Gradient sky dome with sunrise/sunset color transitions, sun positioning, moon, and star field
-- **Weather**: Rain and snow particle systems with day/night color transitions, cyclable weather modes
+- **Weather**: Rain and snow particle systems with day/night color transitions, cyclable weather modes, server-driven weather broadcasting
 - **Multiplayer**: Real-time multiplayer via SignalR WebSocket with chat, player list
 - **Chat Commands**: 32+ commands with privilege enforcement
 - **Privilege System**: 19 privileges fully loaded from JSON with per-command privilege checks
@@ -59,6 +59,8 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Underwater Effects**: Blue overlay and fog when submerged in water
 - **Head Bobbing**: Subtle walking/sprinting head bob animation
 - **Server-Driven Physics**: Physics parameters (gravity, speed, jump, etc.) sent from server on join
+- **Weather**: Server-driven weather system (rain, snow, thunderstorm) with day/night-aware probability and lightning generation
+- **Grid Crafting UI**: 3x3 crafting grid interface with real-time recipe matching for crafting table interaction
 - **Detailed Mob Models**: Multi-part geometry for each mob type (Zombie, Skeleton, Spider, Cow, Pig, Chicken) with name tags
 
 ## Architecture
@@ -79,13 +81,15 @@ web/
 │   │   │   ├── ChunkMesh.ts     # Greedy mesh with AO
 │   │   │   ├── BlockRegistry.ts # Block definitions
 │   │   │   ├── ParticleSystem.ts
-│   │   │   └── WeatherSystem.ts # Rain
+│   │   │   ├── ItemRegistry.ts
+│   │   │   └── WeatherSystem.ts # Rain, snow, thunderstorm
 │   │   ├── player/
 │   │   │   └── PlayerController.ts  # FPS controller
 │   │   ├── input/
 │   │   │   └── InputManager.ts
 │   │   ├── ui/
 │   │   │   ├── UIManager.ts     # All UI panels
+│   │   │   ├── CraftingGridUI.ts # 3x3 crafting grid
 │   │   │   ├── Minimap.ts
 │   │   │   └── SettingsPanel.ts
 │   │   └── audio/
@@ -117,6 +121,7 @@ web/
 │   │   ├── Sound/                # Sound spec manager
 │   │   ├── ToolWear/             # Tool wear/durability system
 │   │   ├── Smelting/             # Smelting system
+│   │   ├── Weather/              # Server weather system (rain, snow, thunderstorm)
 │   │   └── World/                # World, chunks, generators, lighting, ABMs, redstone
 │   └── Services/
 │       ├── GameHub.cs            # SignalR hub

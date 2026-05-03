@@ -3,6 +3,7 @@ using WebGameServer.Core;
 using WebGameServer.Core.Entities;
 using WebGameServer.Core.Game;
 using WebGameServer.Core.Player;
+using WebGameServer.Core.Weather;
 using WebGameServer.Core.World;
 using PlayerEnt = WebGameServer.Core.Player.Player;
 
@@ -66,6 +67,11 @@ public class GameLoopService : BackgroundService
                         _gameServer.GameTime,
                         _gameServer.TimeSpeed,
                         _gameServer.DayNight.SkyBrightness);
+
+                    var weather = _gameServer.Weather;
+                    await _hub.Clients.All.OnWeatherUpdate(
+                        weather.CurrentWeather.ToString().ToLowerInvariant(),
+                        weather.Intensity);
                 }
                 catch (Exception ex)
                 {

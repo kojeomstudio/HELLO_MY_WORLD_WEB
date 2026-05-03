@@ -271,6 +271,14 @@ export class GameClient {
         this.connection.on('OnPhysicsParams', (gravity: number, jumpForce: number, walkSpeed: number, sprintSpeed: number, flySpeed: number, climbSpeed: number, liquidDrag: number) => {
             this.playerController.setPhysicsParams({ gravity, jumpForce, walkSpeed, sprintSpeed, flySpeed, climbSpeed, liquidDrag });
         });
+
+        this.connection.on('OnWeatherUpdate', (weatherType: string, _intensity: number) => {
+            if (weatherType !== this.weatherSystem.getWeatherType()) {
+                this.weatherSystem.setWeather(weatherType as 'none' | 'rain' | 'snow' | 'thunderstorm');
+                this.renderer.setRaining(weatherType === 'rain' || weatherType === 'thunderstorm');
+                this.uiManager.showWeatherNotification(weatherType);
+            }
+        });
     }
 
     sendChat(message: string): void {

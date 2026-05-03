@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-export type WeatherType = 'none' | 'rain' | 'snow';
+export type WeatherType = 'none' | 'rain' | 'snow' | 'thunderstorm';
 
 const RAIN_COUNT = 800;
 const RAIN_RADIUS = 50;
@@ -117,11 +117,16 @@ export class WeatherSystem {
 
     private applyWeather(): void {
         if (this.rainPoints) {
-            this.rainPoints.visible = this.weatherType === 'rain';
+            this.rainPoints.visible = this.weatherType === 'rain' || this.weatherType === 'thunderstorm';
         }
         if (this.snowPoints) {
             this.snowPoints.visible = this.weatherType === 'snow';
         }
+    }
+
+    setWeather(type: WeatherType): void {
+        this.weatherType = type;
+        this.applyWeather();
     }
 
     setRaining(raining: boolean): void {
@@ -140,7 +145,7 @@ export class WeatherSystem {
     update(dt: number, playerX: number, playerY: number, playerZ: number): void {
         this.groundLevel = playerY - 10;
 
-        if (this.weatherType === 'rain') {
+        if (this.weatherType === 'rain' || this.weatherType === 'thunderstorm') {
             this.updateRain(dt, playerX, playerZ);
         } else if (this.weatherType === 'snow') {
             this.updateSnow(dt, playerX, playerZ);

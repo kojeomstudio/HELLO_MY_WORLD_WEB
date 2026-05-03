@@ -1,5 +1,6 @@
 import * as HubConnection from '@microsoft/signalr';
 import { SettingsPanel } from './SettingsPanel';
+import { CraftingGridUI } from './CraftingGridUI';
 
 interface CreativeInventoryEntry {
     id: number;
@@ -32,6 +33,7 @@ export class UIManager {
     private creativeEntries: CreativeInventoryEntry[] = [];
     private onCreativeSelect: ((blockId: number) => void) | null = null;
     private settingsPanel: SettingsPanel;
+    private craftingGridUI: CraftingGridUI | null = null;
 
     constructor() {
         this.chatMessages = document.getElementById('chat-messages')!;
@@ -39,6 +41,7 @@ export class UIManager {
         this.hotbar = document.getElementById('hotbar')!;
         this.debugInfo = document.getElementById('debug-info')!;
         this.settingsPanel = new SettingsPanel();
+        this.initCraftingGrid();
         this.setupHotbar();
     }
 
@@ -64,18 +67,35 @@ export class UIManager {
                 this.showFurnaceUI(x, y, z);
                 this._connection.invoke('GetSmeltingRecipes');
             } else if (blockName === 'crafting_table') {
-                this.showCraftingUI();
-                this._connection.invoke('GetCraftingRecipes');
+                this.craftingGridUI?.show();
             } else if (blockName === 'note_block' || blockName === 'jukebox') {
                 this._connection.invoke('InteractBlock', x, y, z);
             }
         }) as EventListener);
 
         document.addEventListener('openCrafting', () => {
-            if (!this._connection) return;
-            this.showCraftingUI();
-            this._connection.invoke('GetCraftingRecipes');
+            this.craftingGridUI?.show();
         });
+    }
+
+    private initCraftingGrid(): void {
+        const gridContainer = document.createElement('div');
+        gridContainer.id = 'crafting-grid-container';
+        document.body.appendChild(gridContainer);
+
+        this.craftingGridUI = new CraftingGridUI(
+            gridContainer,
+            (recipe) => {
+                if (this._connection) {
+                    this._connection.invoke('GridCraft', recipe.itemId, recipe.count);
+                }
+            },
+            (items) => {
+                if (this._connection) {
+                    this._connection.invoke('CheckGridRecipe', items);
+                }
+            }
+        );
     }
 
     private setupHotbar(): void {
@@ -1112,7 +1132,8 @@ export class UIManager {
     showWeatherNotification(weatherType: string): void {
         const label = weatherType === 'none' ? 'Clear' :
                       weatherType === 'rain' ? 'Rain' :
-                      weatherType === 'snow' ? 'Snow' : weatherType;
+                      weatherType === 'snow' ? 'Snow' :
+                      weatherType === 'thunderstorm' ? 'Thunderstorm' : weatherType;
 
         const notification = document.createElement('div');
         notification.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:white;font-size:24px;text-shadow:2px 2px 4px black;pointer-events:none;z-index:200;opacity:1;transition:opacity 1s;';

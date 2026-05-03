@@ -56,6 +56,7 @@ public interface IGameClient
     Task OnSignEditorOpened(int x, int y, int z, string text);
     Task OnBlockSound(string blockType, int x, int y, int z);
     Task OnPhysicsParams(float gravity, float jumpForce, float walkSpeed, float sprintSpeed, float flySpeed, float climbSpeed, float liquidDrag);
+    Task OnWeatherUpdate(string weatherType, float intensity);
 }
 
 public class GameHub : Hub<IGameClient>
@@ -1660,6 +1661,77 @@ public class GameHub : Hub<IGameClient>
         if (player == null) return;
 
         var recipe = _gridCraftingSystem.FindRecipe(grid, gridSize);
+        if (recipe == null)
+        {
+            await Clients.Caller.OnChatMessage("Server", "No matching recipe found.", "system");
+            return;
+        }
+
+        var availableItems = player.Inventory.GetAll()
+            .Where(i => i != null)
+            .Select(i => (i!.ItemId, i.Count))
+            .ToList();
+
+        foreach (var (requiredId, requiredCount) in recipe.Ingredients)
+        {
+            var available = availableItems
+                .Where(i => _gridCraftingSystem.ItemMatchesGroup(requiredId, i.ItemId))
+                .Sum(i => i.Count);
+            if (available < requiredCount)
+            {
+                await Clients.Caller.OnChatMessage("Server", $"Missing ingredients for {recipe.ResultItemId}.", "system");
+                return;
+            }
+        }
+
+        foreach (var (requiredId, requiredCount) in recipe.Ingredients)
+        {
+            int remaining = requiredCount;
+            for (int i = 0; i < player.Inventory.Size && remaining > 0; i++)
+            {
+                var slot = player.Inventory[i];
+                if (slot != null && _gridCraftingSystem.ItemMatchesGroup(requiredId, slot.ItemId))
+                {
+                    var take = Math.Min(remaining, slot.Count);
+                    player.Inventory.RemoveItem(i, take);
+                    remaining -= take;
+                }
+            }
+        }
+
+        player.Inventory.AddItem(new ItemStack(recipe.ResultItemId, recipe.ResultCount));
+        _gameServer.AwardExperience(player, 2);
+
+        await SendInventoryUpdate(player);
+        await Clients.Caller.OnCraftResult(recipe.ResultItemId, recipe.ResultCount);
+    }
+
+    public async Task CheckGridRecipe(string?[] grid)
+    {
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
+
+        if (grid == null || grid.Length != 9) return;
+
+        var gridArray = new string?[3, 3];
+        for (int i = 0; i < 9; i++)
+        {
+            gridArray[i / 3, i % 3] = grid[i];
+        }
+
+        var recipe = _gridCraftingSystem.FindRecipe(gridArray, 3);
+        if (recipe != null)
+        {
+            await Clients.Caller.OnCraftResult(recipe.ResultItemId, recipe.ResultCount);
+        }
+    }
+
+    public async Task GridCraft(string resultItemId, int resultCount)
+    {
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
+
+        var recipe = _gridCraftingSystem.FindRecipeByResult(resultItemId);
         if (recipe == null)
         {
             await Clients.Caller.OnChatMessage("Server", "No matching recipe found.", "system");

@@ -11,6 +11,7 @@ using WebGameServer.Core.Protection;
 using WebGameServer.Core.Rollback;
 using WebGameServer.Core.Smelting;
 using WebGameServer.Core.Sound;
+using WebGameServer.Core.Weather;
 using WebGameServer.Core.World;
 using WebGameServer.Core.World.Generators;
 using WebGameServer.Services;
@@ -52,6 +53,7 @@ public class GameServer
     private readonly BreedingSystem _breedingSystem;
     private readonly MobSpawner _mobSpawner;
     private readonly WorldPathfinder _pathfinder;
+    private readonly WeatherSystem _weatherSystem;
     private NodeTimerSystem _nodeTimerSystem;
     public AgricultureSystem? Agriculture { get; set; }
     public FishingSystem FishingSystem => _fishingSystem;
@@ -77,6 +79,7 @@ public class GameServer
     public ProtectionSystem Protection => _protectionSystem;
     public RedstoneSystem Redstone => _redstoneSystem;
     public SoundSpecManager SoundSpecs => _soundSpecManager;
+    public WeatherSystem Weather => _weatherSystem;
     public int WorldBorderSize { get; private set; }
 
     public int OnlinePlayerCount => _players.Count;
@@ -150,6 +153,8 @@ public class GameServer
         DefaultWorld.LavaFlowInterval = config.Liquid.LavaFlowInterval;
 
         Agriculture = new AgricultureSystem(DefaultWorld, _blockDefinitionManager);
+
+        _weatherSystem = new WeatherSystem(config, DefaultWorld);
 
         _entityManager.OnEntityDespawned += entity =>
         {
@@ -336,6 +341,7 @@ public class GameServer
 
         GameTime = (GameTime + (long)(TimeSpeed * 100)) % 24000;
         DayNight.Update(GameTime);
+        _weatherSystem.Update(GameTime);
 
         foreach (var player in _players.Values)
         {
