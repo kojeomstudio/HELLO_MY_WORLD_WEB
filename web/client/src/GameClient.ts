@@ -13,6 +13,7 @@ import { WieldItem } from './rendering/WieldItem';
 import { SelectionBox } from './rendering/SelectionBox';
 import { WeatherSystem } from './world/WeatherSystem';
 import { ItemRegistry } from './world/ItemRegistry';
+import { FormspecRenderer } from './ui/FormspecRenderer';
 
 export class GameClient {
     private connection: HubConnection.HubConnection | null = null;
@@ -28,6 +29,7 @@ export class GameClient {
     private selectionBox: SelectionBox;
     private weatherSystem: WeatherSystem;
     private itemRegistry: ItemRegistry;
+    private formspecRenderer: FormspecRenderer;
     private isRunning: boolean = false;
     private lastTime: number = 0;
     private frameCount: number = 0;
@@ -49,9 +51,13 @@ export class GameClient {
         this.wieldItem = new WieldItem(this.renderer.getScene(), this.renderer.getCamera());
         this.selectionBox = new SelectionBox(this.renderer.getScene());
         this.weatherSystem = new WeatherSystem(this.renderer.getScene());
+        this.formspecRenderer = new FormspecRenderer();
         this.playerController = new PlayerController(this.renderer.getCamera(), this.inputManager);
         this.playerController.setWorldManager(this.worldManager);
         this.playerController.setSelectionBox(this.selectionBox);
+
+        this.renderer.setOcclusionCulling(true, (blockId: number) => this.worldManager.getBlockRegistry().isOcclusionBlocking(blockId));
+        this.renderer.setOcclusionGetBlock((x: number, y: number, z: number) => this.worldManager.getBlock(x, y, z));
         this.playerController.setParticleEmitter((x, y, z, type) => {
             this.onParticleEvent(x, y, z, type);
         });
@@ -322,6 +328,13 @@ export class GameClient {
 
         this.connection.on('OnItemColorUpdate', (itemId: string, color: string) => {
             this.itemRegistry.setItemColor(itemId, color);
+        });
+
+        this.connection.on('OnShowFormspec', (formName: string, elementsJson: string) => {
+            this.formspecRenderer.setResponseCallback((name, fields) => {
+                this.connection?.invoke('FormspecResponse', name, fields);
+            });
+            this.formspecRenderer.show(formName, elementsJson);
         });
     }
 

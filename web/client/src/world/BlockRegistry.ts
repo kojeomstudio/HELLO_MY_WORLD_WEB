@@ -35,6 +35,7 @@ export interface BlockDefinition {
     fallDamageAddPercent?: number;
     damageGroup?: string;
     healPerSecond?: number;
+    connectsTo?: string[];
 }
 
 export class BlockRegistry {
@@ -287,6 +288,12 @@ export class BlockRegistry {
         return block.transparent === true || block.liquid === true;
     }
     getGroups(id: number): Record<string, number> { return this.blocks.get(id)?.groups ?? {}; }
+    isOcclusionBlocking(id: number): boolean {
+        const block = this.blocks.get(id);
+        if (!block) return false;
+        return block.solid === true && block.transparent === false;
+    }
+
     getAll(): Map<number, BlockDefinition> { return this.blocks; }
 
     getDrawType(id: number): string {

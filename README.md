@@ -6,7 +6,7 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 
 - **Voxel World**: Procedurally generated 3D world with noise-based terrain, caves, ores, schematic-based trees (oak, pine, jungle, birch, cactus), rivers, multi-room dungeons, and 10 biomes (grassland, forest, desert, snow, taiga, jungle, savanna, mountains, swamp, ocean) selected via heat/humidity noise
 - **162 Block Types**: Including stone variants, 9 ore types (diamond, gold, iron, coal, redstone, emerald, lapis, copper), wood types (oak, jungle, pine), stairs/slabs, fences, walls, glass panes, doors, decorative blocks, flowers, mushrooms, utility blocks, light sources, fire, cobweb, vine, Nether/End blocks, redstone components, mud/mud brick blocks, and all wood variants (spruce/birch/jungle/acacia/dark oak doors, fences, planks)
-- **226 Block Definitions**: Full block enum (IDs 0-238) with complete defaults in code and JSON data override
+- **226 Block Definitions**: Full block enum (IDs 0-231) with complete defaults in code and JSON data override
 - **220+ Items**: Tools (wood/stone/iron/diamond/gold/steel/mese/titanium), special weapons (fire sword, ice sword, blood sword, heal sword, elemental sword, daggers), steel shears, alchemy ingredients, crafting materials, armor (leather/iron/gold/diamond), food, resources, utility items, and fishing/breeding drops
 - **Crafting System**: 166+ recipes including shaped crafting, tool creation, special weapon recipes, ore block storage, copper processing, decoration recipes, gold tool recipes, titanium recipes, armor, building blocks, food, and tool repair. Grid-based crafting system with pattern offset matching and item group support.
 - **Fuel Registry**: Configurable fuel items with burn times loaded from `items.json` (coal, charcoal, wood, lava bucket, etc.)
@@ -113,6 +113,12 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Redstone Repeater/Comparator**: New redstone components with delay and signal comparison
 - **Creative Search**: Real-time search by name or block ID with result highlighting
 - **Frustum Culling**: Camera frustum-based chunk visibility culling for performance
+- **Occlusion Culling**: 9-point raycast occlusion culling with progressive step increase (1.05x factor), configurable solid-block threshold, and early exit optimization
+- **Cascade Shadow Maps**: Multi-cascade (1-4) shadow system with dynamic frustum fitting, block-boundary snapping, configurable split distances, bias, and map resolution
+- **Auto-Exposure / Tone Mapping**: ACES filmic tone mapping shader with luminance-based auto-exposure, configurable min/max exposure range
+- **Formspec System**: Server-driven UI system with formspec string parser (12 element types: size, label, button, field, textarea, list, image, box, dropdown, checkbox, bgcolor, container), predefined templates (chest, furnace, crafting, death screen), SignalR bidirectional communication
+- **Mod Storage**: Persistent key-value storage per mod with JSON persistence, CRUD operations via SignalR hub methods
+- **Connected NodeBox**: Fence, wall, and glass_pane blocks with bidirectional `connectsTo` connectivity (fences connect to all wood variants, walls connect to stone variants, glass panes connect to glass/iron bars)
 - **Modding API**: Client-side mod loading system with lifecycle hooks and game API
 - **LiquidSimulator**: Full liquid flow simulation with viscosity-based speed, range-limited spread, source renewal, and water-lava interaction (obsidian/cobblestone/stone generation)
 - **Post-Processing Pipeline**: Three.js EffectComposer with UnrealBloomPass (server-toggleable glow effects), FXAA anti-aliasing, and tone mapping output
@@ -141,7 +147,10 @@ web/
 │   │   │   ├── Renderer.ts      # Scene, camera, lights, sky
 │   │   │   ├── CloudSystem.ts   # Procedural clouds
 │   │   │   ├── WieldItem.ts     # First-person held item
-│   │   │   └── SelectionBox.ts  # Block selection overlay
+│   │   │   ├── SelectionBox.ts  # Block selection overlay
+│   │   │   ├── OcclusionCuller.ts # 9-point raycast occlusion
+│   │   │   ├── CascadeShadowMap.ts # Multi-cascade shadows
+│   │   │   └── AutoExposurePass.ts # ACES tone mapping
 │   │   ├── world/               # World management
 │   │   │   ├── WorldManager.ts  # Chunk load/unload
 │   │   │   ├── ChunkMesh.ts     # Greedy mesh with AO
@@ -156,6 +165,7 @@ web/
 │   │   ├── ui/
 │   │   │   ├── UIManager.ts     # All UI panels
 │   │   │   ├── CraftingGridUI.ts # 3x3 crafting grid
+│   │   │   ├── FormspecRenderer.ts # Server-driven UI
 │   │   │   ├── Minimap.ts
 │   │   │   └── SettingsPanel.ts
 │   │   └── audio/
@@ -187,13 +197,15 @@ web/
 │   │   ├── Sound/                # Sound spec manager
 │   │   ├── ToolWear/             # Tool wear/durability system
 │   │   ├── Smelting/             # Smelting system
+│   │   ├── ModStorage/           # Persistent mod key-value storage
+│   │   ├── UI/                   # Formspec parser and system
 │   │   ├── Weather/              # Server weather system (rain, snow, thunderstorm)
 │   │   └── World/                # World, chunks, generators, lighting, ABMs, redstone
 │   └── Services/
 │       ├── GameHub.cs            # SignalR hub
 │       └── GameLoopService.cs    # Background game loop
 ├── data/                # JSON configuration
-│   ├── blocks.json       # 237 block definitions (IDs 0-236, full defaults in code)
+│   ├── blocks.json       # 232 block definitions (IDs 0-231, full defaults in code)
 │   ├── items.json        # 220+ items, 166+ recipes, food values, tool capabilities
 │   ├── mobs.json         # 6 mob definitions
 │   ├── tools.json        # 8 tool material definitions
@@ -206,7 +218,7 @@ web/
 │   ├── smelting.json     # 20 smelting recipes
 │   ├── decorations.json
 │   ├── ores.json
-│   └── sky_params.json, day_night_ratio.json, sounds.json (15 groups), protection.json, game_constants.json
+│   └── sky_params.json, day_night_ratio.json, sounds.json (15 groups), protection.json, game_constants.json, formspecs.json
 └── docs/                # Architecture documentation
 ```
 

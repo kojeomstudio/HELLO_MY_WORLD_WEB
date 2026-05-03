@@ -18,6 +18,8 @@ using WebGameServer.Core.Particles;
 using WebGameServer.Core.Protection;
 using WebGameServer.Core.Rollback;
 using WebGameServer.Core.Sound;
+using WebGameServer.Core.UI;
+using WebGameServer.Core.ModStorage;
 
 static bool IsValidOrigin(string origin)
 {
@@ -579,6 +581,21 @@ builder.Services.AddSingleton<SoundSpecManager>(sp =>
     return manager;
 });
 builder.Services.AddSingleton<DetachedInventoryManager>();
+builder.Services.AddSingleton<FormspecSystem>(sp =>
+{
+    var system = new FormspecSystem();
+    var formspecPath = Path.Combine(dataPath, "formspecs.json");
+    if (File.Exists(formspecPath))
+        system.LoadFromFile(formspecPath);
+    return system;
+});
+
+builder.Services.AddSingleton<ModStorageDatabase>(sp =>
+{
+    var worldPath = Path.Combine(dataDir, "world");
+    Directory.CreateDirectory(worldPath);
+    return new ModStorageDatabase(worldPath);
+});
 
 var playerDbPath = Path.Combine(dataDir, "players.db");
 var blockMetaDbPath = Path.Combine(dataDir, "blockmeta.db");

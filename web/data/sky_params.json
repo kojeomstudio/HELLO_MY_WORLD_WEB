@@ -65,6 +65,14 @@
       "luminanceBias": 0.0,
       "strengthFactor": 0.0,
       "radius": 1.0
+    },
+    "cascadeShadows": {
+      "enabled": false,
+      "cascadeCount": 3,
+      "cascadeSplits": [0.05, 0.15, 0.4],
+      "shadowMapSize": 2048,
+      "shadowBias": 0.002,
+      "shadowNormalBias": 0.02
     }
   }
 }

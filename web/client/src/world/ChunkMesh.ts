@@ -4,6 +4,12 @@ const CHUNK_SIZE = 16;
 const BYTES_PER_BLOCK = 4;
 const LIGHT_OFFSETS: [number, number][] = [[-1, -1], [-1, 0], [0, -1], [0, 0]];
 
+let _blockRegistryCache: ((id: number) => any) | null = null;
+
+function blockIdToDef(blockId: number): any {
+    return _blockRegistryCache?.(blockId);
+}
+
 export interface TextureAtlas {
     texture: THREE.CanvasTexture;
     getUV(blockId: number): [number, number, number, number];
@@ -144,13 +150,24 @@ function buildSlab(ctx: BuildCtx, wx: number, wy: number, wz: number, param2: nu
     pushBox(ctx, wx, wy, wz, 0, y0, 0, 1, y1, 1, color, lm);
 }
 
+function isConnectedBlock(blockId: number, neighborId: number): boolean {
+    if (neighborId === blockId) return true;
+    if (blockId === 0 || neighborId === 0) return false;
+    const def = blockIdToDef(blockId);
+    const ndef = blockIdToDef(neighborId);
+    if (!def || !ndef) return false;
+    if (def.connectsTo && def.connectsTo.includes(ndef.name)) return true;
+    if (ndef.connectsTo && ndef.connectsTo.includes(def.name)) return true;
+    return false;
+}
+
 function buildFence(ctx: BuildCtx, wx: number, wy: number, wz: number, blockId: number, color: THREE.Color): void {
     const lm = getBlockLight(ctx, wx, wy, wz);
     const nb = ctx.getNeighborBlock;
-    const north = nb(wx, wy, wz - 1) === blockId;
-    const south = nb(wx, wy, wz + 1) === blockId;
-    const east = nb(wx + 1, wy, wz) === blockId;
-    const west = nb(wx - 1, wy, wz) === blockId;
+    const north = isConnectedBlock(blockId, nb(wx, wy, wz - 1));
+    const south = isConnectedBlock(blockId, nb(wx, wy, wz + 1));
+    const east = isConnectedBlock(blockId, nb(wx + 1, wy, wz));
+    const west = isConnectedBlock(blockId, nb(wx - 1, wy, wz));
 
     pushBox(ctx, wx, wy, wz, 0.4, 0, 0.4, 0.6, 1, 0.6, color, lm);
 
@@ -165,10 +182,10 @@ function buildFence(ctx: BuildCtx, wx: number, wy: number, wz: number, blockId: 
 function buildWall(ctx: BuildCtx, wx: number, wy: number, wz: number, blockId: number, color: THREE.Color): void {
     const lm = getBlockLight(ctx, wx, wy, wz);
     const nb = ctx.getNeighborBlock;
-    const north = nb(wx, wy, wz - 1) === blockId;
-    const south = nb(wx, wy, wz + 1) === blockId;
-    const east = nb(wx + 1, wy, wz) === blockId;
-    const west = nb(wx - 1, wy, wz) === blockId;
+    const north = isConnectedBlock(blockId, nb(wx, wy, wz - 1));
+    const south = isConnectedBlock(blockId, nb(wx, wy, wz + 1));
+    const east = isConnectedBlock(blockId, nb(wx + 1, wy, wz));
+    const west = isConnectedBlock(blockId, nb(wx - 1, wy, wz));
 
     pushBox(ctx, wx, wy, wz, 0.375, 0, 0.375, 0.625, 1, 0.625, color, lm);
 
@@ -181,10 +198,10 @@ function buildWall(ctx: BuildCtx, wx: number, wy: number, wz: number, blockId: n
 function buildGlassPane(ctx: BuildCtx, wx: number, wy: number, wz: number, blockId: number, color: THREE.Color): void {
     const lm = getBlockLight(ctx, wx, wy, wz);
     const nb = ctx.getNeighborBlock;
-    const north = nb(wx, wy, wz - 1) === blockId;
-    const south = nb(wx, wy, wz + 1) === blockId;
-    const east = nb(wx + 1, wy, wz) === blockId;
-    const west = nb(wx - 1, wy, wz) === blockId;
+    const north = isConnectedBlock(blockId, nb(wx, wy, wz - 1));
+    const south = isConnectedBlock(blockId, nb(wx, wy, wz + 1));
+    const east = isConnectedBlock(blockId, nb(wx + 1, wy, wz));
+    const west = isConnectedBlock(blockId, nb(wx - 1, wy, wz));
 
     pushBox(ctx, wx, wy, wz, 0.45, 0, 0.45, 0.55, 1, 0.55, color, lm);
 
@@ -544,6 +561,9 @@ export class ChunkMesh {
         this.isVegetation = false;
         this.isWater = false;
         this.isLava = false;
+
+        const getDef = (id: number) => blockRegistry?.get?.(id);
+        _blockRegistryCache = getDef;
 
         const solidPositions: number[] = [];
         const solidNormals: number[] = [];

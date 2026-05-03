@@ -6,6 +6,8 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { CloudSystem } from './CloudSystem';
+import { OcclusionCuller } from './OcclusionCuller';
+import { CascadeShadowMap } from './CascadeShadowMap';
 
 const SKY_COLORS = {
     day: new THREE.Color(0.412, 0.647, 0.863),
@@ -141,6 +143,9 @@ export class Renderer {
     private bloomPass: UnrealBloomPass | null = null;
     private fxaaPass: ShaderPass | null = null;
     private postProcessingEnabled: boolean = true;
+    private occlusionCuller: OcclusionCuller | null = null;
+    private occlusionGetBlock: ((x: number, y: number, z: number) => number) | null = null;
+    private cascadeShadowMap: CascadeShadowMap;
 
     constructor(container: HTMLElement) {
         this.canvas = document.createElement('canvas');
@@ -164,12 +169,12 @@ export class Renderer {
         this.skyLight = new THREE.DirectionalLight(0xffffff, 1.0);
         this.skyLight.position.set(100, 200, 100);
         this.skyLight.castShadow = true;
-        this.skyLight.shadow.mapSize.width = 1024;
-        this.skyLight.shadow.mapSize.height = 1024;
-        this.skyLight.shadow.camera.left = -50;
-        this.skyLight.shadow.camera.right = 50;
-        this.skyLight.shadow.camera.top = 50;
-        this.skyLight.shadow.camera.bottom = -50;
+        this.skyLight.shadow.mapSize.width = 2048;
+        this.skyLight.shadow.mapSize.height = 2048;
+        this.skyLight.shadow.camera.left = -60;
+        this.skyLight.shadow.camera.right = 60;
+        this.skyLight.shadow.camera.top = 60;
+        this.skyLight.shadow.camera.bottom = -60;
         this.skyLight.shadow.camera.near = 0.5;
         this.skyLight.shadow.camera.far = 500;
         this.scene.add(this.skyLight);
@@ -191,6 +196,7 @@ export class Renderer {
         this.waterOverlayEl = document.getElementById('water-overlay')!;
 
         this.initPostProcessing();
+        this.cascadeShadowMap = new CascadeShadowMap();
     }
 
     private initPostProcessing(): void {
@@ -400,6 +406,7 @@ export class Renderer {
         const dayTime = time % 24000;
         const dayFraction = dayTime / 24000;
         const sunAngle = dayFraction * Math.PI * 2;
+        const sunZ = Math.sin(sunAngle) * 200;
 
         let topColor: THREE.Color;
         let horizonColor: THREE.Color;
@@ -495,6 +502,10 @@ export class Renderer {
                 (this.sunMesh.material as THREE.MeshBasicMaterial).color.set(this.sunColorOverride);
             }
         }
+
+        this.skyLight.position.set(sunX * 0.5, Math.max(sunY * 0.5, 20), sunZ * 0.5);
+        this.skyLight.target.position.set(0, 0, 0);
+        this.skyLight.intensity = sunIntensity;
 
         if (this.moonMesh) {
             const mat = this.moonMesh.material as THREE.MeshBasicMaterial;
@@ -607,6 +618,51 @@ export class Renderer {
         return this.frustumCulling;
     }
 
+    setOcclusionCulling(enabled: boolean, isOcclusionBlocking: ((blockId: number) => boolean) | null = null): void {
+        if (enabled && !this.occlusionCuller && isOcclusionBlocking) {
+            this.occlusionCuller = new OcclusionCuller(isOcclusionBlocking);
+        }
+        if (this.occlusionCuller) {
+            this.occlusionCuller.setEnabled(enabled);
+        }
+    }
+
+    getOcclusionCulling(): boolean {
+        return this.occlusionCuller?.isEnabled() ?? false;
+    }
+
+    setOcclusionGetBlock(getBlock: (x: number, y: number, z: number) => number): void {
+        this.occlusionGetBlock = getBlock;
+    }
+
+    setCascadeShadows(enabled: boolean): void {
+        this.cascadeShadowMap.setEnabled(enabled);
+        if (enabled) {
+            this.cascadeShadowMap.applyToLight(this.skyLight);
+        }
+    }
+
+    getCascadeShadows(): boolean {
+        return this.cascadeShadowMap.isEnabled();
+    }
+
+    setCascadeShadowParams(params: {
+        cascadeCount?: number;
+        cascadeSplits?: number[];
+        shadowMapSize?: number;
+        shadowBias?: number;
+        shadowNormalBias?: number;
+    }): void {
+        this.cascadeShadowMap.setShadowParams(params);
+        if (this.cascadeShadowMap.isEnabled()) {
+            this.cascadeShadowMap.applyToLight(this.skyLight);
+        }
+    }
+
+    getCascadeShadowParams() {
+        return this.cascadeShadowMap.getShadowParams();
+    }
+
     render(): void {
         if (this.frustumCulling) {
             this.camera.updateMatrixWorld();
@@ -630,6 +686,25 @@ export class Renderer {
                 const visible = this.frustum.intersectsBox(_boxCenter, _boxHalfExtents);
                 child.visible = visible;
             }
+
+            if (this.occlusionCuller && this.occlusionCuller.isEnabled() && this.occlusionGetBlock) {
+                const cameraPos = this.camera.position;
+                for (let i = 0; i < children.length; i++) {
+                    const child = children[i];
+                    if (!(child instanceof THREE.Mesh) || !child.userData.isChunk || !child.visible) continue;
+
+                    const geometry = child.geometry;
+                    if (!geometry.boundingBox) {
+                        geometry.computeBoundingBox();
+                    }
+                    const box = geometry.boundingBox;
+                    box.getCenter(_boxCenter);
+
+                    if (this.occlusionCuller.isChunkOccluded(_boxCenter.x, _boxCenter.y, _boxCenter.z, cameraPos, this.occlusionGetBlock)) {
+                        child.visible = false;
+                    }
+                }
+            }
         } else {
             const children = this.scene.children;
             for (let i = 0; i < children.length; i++) {
@@ -638,6 +713,11 @@ export class Renderer {
                     child.visible = true;
                 }
             }
+        }
+
+        if (this.cascadeShadowMap.isEnabled()) {
+            this.cascadeShadowMap.updateCascades(this.camera, this.skyLight.position);
+            this.cascadeShadowMap.applyToLight(this.skyLight);
         }
 
         if (this.composer && this.postProcessingEnabled) {

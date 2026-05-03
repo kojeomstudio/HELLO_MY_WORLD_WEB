@@ -841,6 +841,10 @@ export class WorldManager {
         }
     }
 
+    getBlockAtWorld(worldX: number, worldY: number, worldZ: number): number {
+        return this.getBlock(worldX, worldY, worldZ);
+    }
+
     getBlock(worldX: number, worldY: number, worldZ: number): number {
         const chunkX = Math.floor(worldX / 16);
         const chunkY = Math.floor(worldY / 16);

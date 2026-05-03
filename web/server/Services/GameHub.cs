@@ -15,6 +15,8 @@ using WebGameServer.Core.Sound;
 using WebGameServer.Core.ToolWear;
 using WebGameServer.Core.World;
 using WebGameServer.Core.Inventory;
+using WebGameServer.Core.UI;
+using WebGameServer.Core.ModStorage;
 using PlayerEnt = WebGameServer.Core.Player.Player;
 using PlayerState = WebGameServer.Core.Player.PlayerState;
 
@@ -67,6 +69,7 @@ public interface IGameClient
     Task OnCloudParams(float density, float thickness, float height, float speed);
     Task OnPlayerFlags(string playerName, bool isInvisible, bool makesFootstepSound, bool canZoom);
     Task OnItemColorUpdate(string itemId, string color);
+    Task OnShowFormspec(string formName, string elementsJson);
 }
 
 public class GameHub : Hub<IGameClient>
@@ -91,6 +94,8 @@ public class GameHub : Hub<IGameClient>
     private readonly PlayerDatabase _playerDb;
     private readonly SoundSpecManager _soundSpecManager;
     private readonly DetachedInventoryManager _detachedInventory;
+    private readonly FormspecSystem _formspecSystem;
+    private readonly ModStorageDatabase _modStorage;
 
     private static readonly Dictionary<string, int> DefaultStartItemCounts = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -118,7 +123,9 @@ public class GameHub : Hub<IGameClient>
         AreaProtectionSystem areaProtection,
         PlayerDatabase playerDb,
         SoundSpecManager soundSpecManager,
-        DetachedInventoryManager detachedInventory)
+        DetachedInventoryManager detachedInventory,
+        FormspecSystem formspecSystem,
+        ModStorageDatabase modStorage)
     {
         _gameServer = gameServer;
         _logger = logger;
@@ -135,6 +142,8 @@ public class GameHub : Hub<IGameClient>
         _playerDb = playerDb;
         _soundSpecManager = soundSpecManager;
         _detachedInventory = detachedInventory;
+        _formspecSystem = formspecSystem;
+        _modStorage = modStorage;
     }
 
     public override async Task OnConnectedAsync()
@@ -2370,5 +2379,104 @@ public class GameHub : Hub<IGameClient>
         player.Inventory.AddItem(item);
         await SendInventoryUpdate(player);
         await OpenDetachedInventory(invName);
+    }
+
+    public async Task ShowFormspec(string formName, string formspec)
+    {
+        if (!CheckRateLimit(Context.ConnectionId, "formspec", 500)) return;
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
+        if (string.IsNullOrEmpty(formName) || formName.Length > 64) return;
+        if (string.IsNullOrEmpty(formspec) || formspec.Length > 4096) return;
+
+        var parsed = _formspecSystem.ParseAndSerialize(formspec);
+        await Clients.Caller.OnShowFormspec(formName, parsed);
+    }
+
+    public async Task FormspecResponse(string formName, Dictionary<string, string> fields)
+    {
+        if (!CheckRateLimit(Context.ConnectionId, "formspecresp", 300)) return;
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
+        if (string.IsNullOrEmpty(formName) || formName.Length > 64) return;
+        if (fields == null || fields.Count == 0) return;
+        if (fields.Count > 50) return;
+
+        foreach (var kvp in fields)
+        {
+            if (kvp.Key.Length > 64 || kvp.Value.Length > 256) return;
+        }
+
+        if (formName == "death" && fields.TryGetValue("respawn", out var _))
+        {
+            player.Respawn();
+            Vector3 spawnPos;
+            if (player.HasSpawnPoint)
+            {
+                spawnPos = player.SpawnPoint;
+            }
+            else
+            {
+                var spawnY = _gameServer.DefaultWorld.GetGroundHeight(0, 0) + 2;
+                spawnPos = new Vector3(0, spawnY, 0);
+            }
+            player.Position = spawnPos;
+            player.LastGroundY = spawnPos.Y;
+            player.FallDistance = 0;
+            await Clients.Caller.OnHealthUpdate(player.Health, player.MaxHealth);
+            await SendInitialChunks(player);
+        }
+        else if (formName == "chest" && fields.TryGetValue("close", out var _))
+        {
+        }
+        else if (formName == "furnace" && fields.TryGetValue("close", out var _))
+        {
+        }
+        else if (formName == "crafting" && fields.TryGetValue("close", out var _))
+        {
+        }
+    }
+
+    public async Task<string?> ModStorageGet(string modName, string key)
+    {
+        if (!CheckRateLimit(Context.ConnectionId, "modstorage", 200)) return null;
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return null;
+        if (string.IsNullOrEmpty(modName) || modName.Length > 64) return null;
+        if (string.IsNullOrEmpty(key) || key.Length > 256) return null;
+        return _modStorage.Get(modName, key);
+    }
+
+    public async Task ModStorageSet(string modName, string key, string value)
+    {
+        if (!CheckRateLimit(Context.ConnectionId, "modstorage", 100)) return;
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
+        if (string.IsNullOrEmpty(modName) || modName.Length > 64) return;
+        if (string.IsNullOrEmpty(key) || key.Length > 256) return;
+        if (value == null || value.Length > 4096) return;
+        _modStorage.Set(modName, key, value);
+        _modStorage.Save();
+    }
+
+    public async Task<bool> ModStorageRemove(string modName, string key)
+    {
+        if (!CheckRateLimit(Context.ConnectionId, "modstorage", 100)) return false;
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return false;
+        if (string.IsNullOrEmpty(modName) || modName.Length > 64) return false;
+        if (string.IsNullOrEmpty(key) || key.Length > 256) return false;
+        var result = _modStorage.Remove(modName, key);
+        if (result) _modStorage.Save();
+        return result;
+    }
+
+    public async Task<Dictionary<string, string>?> ModStorageGetMod(string modName)
+    {
+        if (!CheckRateLimit(Context.ConnectionId, "modstorage", 100)) return null;
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return null;
+        if (string.IsNullOrEmpty(modName) || modName.Length > 64) return null;
+        return _modStorage.GetModEntries(modName);
     }
 }
