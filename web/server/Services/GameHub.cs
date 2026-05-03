@@ -14,6 +14,7 @@ using WebGameServer.Core.Smelting;
 using WebGameServer.Core.Sound;
 using WebGameServer.Core.ToolWear;
 using WebGameServer.Core.World;
+using WebGameServer.Core.Inventory;
 using PlayerEnt = WebGameServer.Core.Player.Player;
 using PlayerState = WebGameServer.Core.Player.PlayerState;
 
@@ -57,6 +58,7 @@ public interface IGameClient
     Task OnBlockSound(string blockType, int x, int y, int z);
     Task OnPhysicsParams(float gravity, float jumpForce, float walkSpeed, float sprintSpeed, float flySpeed, float climbSpeed, float liquidDrag);
     Task OnWeatherUpdate(string weatherType, float intensity);
+    Task OnDetachedInventory(string name, object[] items);
 }
 
 public class GameHub : Hub<IGameClient>
@@ -79,6 +81,7 @@ public class GameHub : Hub<IGameClient>
     private readonly AreaProtectionSystem _areaProtection;
     private readonly PlayerDatabase _playerDb;
     private readonly SoundSpecManager _soundSpecManager;
+    private readonly DetachedInventoryManager _detachedInventory;
 
     private static readonly Dictionary<string, int> DefaultStartItemCounts = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -105,7 +108,8 @@ public class GameHub : Hub<IGameClient>
         ServerConfig config,
         AreaProtectionSystem areaProtection,
         PlayerDatabase playerDb,
-        SoundSpecManager soundSpecManager)
+        SoundSpecManager soundSpecManager,
+        DetachedInventoryManager detachedInventory)
     {
         _gameServer = gameServer;
         _logger = logger;
@@ -121,6 +125,7 @@ public class GameHub : Hub<IGameClient>
         _areaProtection = areaProtection;
         _playerDb = playerDb;
         _soundSpecManager = soundSpecManager;
+        _detachedInventory = detachedInventory;
     }
 
     public override async Task OnConnectedAsync()
@@ -1856,5 +1861,77 @@ public class GameHub : Hub<IGameClient>
 
         await SendInventoryUpdate(player);
         await Clients.Caller.OnCraftResult(recipe.ResultItemId, recipe.ResultCount);
+    }
+
+    public async Task CreateDetachedInventory(string name, int size)
+    {
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
+        if (_detachedInventory.Exists(name))
+        {
+            await Clients.Caller.OnChatMessage("Server", $"Inventory '{name}' already exists.", "system");
+            return;
+        }
+        _detachedInventory.Create(name, size, player.Name);
+        await Clients.Caller.OnChatMessage("Server", $"Created inventory '{name}' ({size} slots).", "system");
+    }
+
+    public async Task OpenDetachedInventory(string name)
+    {
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
+        var inv = _detachedInventory.Get(name);
+        if (inv == null)
+        {
+            await Clients.Caller.OnChatMessage("Server", $"Inventory '{name}' not found.", "system");
+            return;
+        }
+        if (!inv.AllowPlayerAccess(player.Name))
+        {
+            await Clients.Caller.OnChatMessage("Server", "You don't have access to this inventory.", "system");
+            return;
+        }
+        var items = inv.GetAll();
+        await Clients.Caller.OnDetachedInventory(name, items.Select(i => (object?)i != null
+            ? new object[] { i!.ItemId, i.Count }
+            : new object[] { "", 0 }).ToArray());
+    }
+
+    public async Task DetachedInventoryMove(string invName, int fromSlot, int toSlot)
+    {
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
+        if (!_detachedInventory.MoveItem(invName, fromSlot, invName, toSlot, player.Name)) return;
+        await OpenDetachedInventory(invName);
+    }
+
+    public async Task DetachedInventoryPut(string invName, int slot)
+    {
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
+        var inv = _detachedInventory.Get(invName);
+        if (inv == null || !inv.AllowPlayerAccess(player.Name) || !inv.AllowPut) return;
+        var hotbarItem = player.GetSelectedHotbarItem();
+        if (hotbarItem == null) return;
+        var removed = player.Inventory.RemoveItem(player.SelectedHotbarSlot, 1);
+        if (removed == null) return;
+        if (!inv.AddItem(removed))
+        {
+            player.Inventory.AddItem(removed);
+            return;
+        }
+        await SendInventoryUpdate(player);
+        await OpenDetachedInventory(invName);
+    }
+
+    public async Task DetachedInventoryTake(string invName, int slot)
+    {
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
+        var item = _detachedInventory.RemoveItem(invName, slot, 1, player.Name);
+        if (item == null) return;
+        player.Inventory.AddItem(item);
+        await SendInventoryUpdate(player);
+        await OpenDetachedInventory(invName);
     }
 }

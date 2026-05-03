@@ -549,9 +549,21 @@ public class ChatCommandManager
                 if (_clearPhysicsOverride == null) return Task.FromResult("Physics command is not available.");
                 var target = args.Length > 0 ? args[0] : playerName;
                 _clearPhysicsOverride(target);
-                if (_sendPhysicsParams != null) _sendPhysicsParams(target);
+                if (_sendPhysicsParams != null)                 _sendPhysicsParams(target);
                 return Task.FromResult($"Physics reset to defaults for {target}");
             }, "server"));
+
+        Register(new ChatCommand("detached", "Create a detached inventory", Array.Empty<string>(),
+            (playerName, args) =>
+            {
+                if (args.Length < 2) return Task.FromResult("Usage: /detached <name> <size>");
+                if (!int.TryParse(args[1], out var size) || size < 1 || size > 64)
+                    return Task.FromResult("Size must be between 1 and 64.");
+                return Task.FromResult($"DETACHED_CREATE:{args[0]}:{size}");
+            }, "server"));
+
+        Register(new ChatCommand("trash", "Open a shared trash inventory", Array.Empty<string>(),
+            (_, _) => Task.FromResult("DETACHED_OPEN:trash")));
     }
 
     public void Register(ChatCommand command)
