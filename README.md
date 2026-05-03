@@ -34,7 +34,7 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Sky Rendering**: Gradient sky dome with sunrise/sunset color transitions, sun positioning, moon, and star field
 - **Weather**: Rain and snow particle systems with day/night color transitions, cyclable weather modes, server-driven weather broadcasting
 - **Multiplayer**: Real-time multiplayer via SignalR WebSocket with chat, player list
-- **Chat Commands**: 32+ commands with privilege enforcement
+- **Chat Commands**: 37+ commands with privilege enforcement
 - **Privilege System**: 19 privileges fully loaded from JSON with per-command privilege checks
 - **Password Authentication**: PBKDF2 (100k iterations, SHA-256) with per-user random salts, constant-time comparison, legacy SHA-256 migration support
 - **Inventory UI**: Hotbar, main inventory, crafting, furnace, chest, creative inventory, armor
@@ -72,6 +72,8 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Detached Inventory**: Shared inventories via `/detached` command and hub methods, with access control
 - **Zoom FOV**: C key toggles zoom (50% FOV reduction) with smooth interpolation
 - **Per-Player Speed Validation**: Server validates speed against physics overrides and block move resistance
+- **HUD Waypoints**: Server-driven waypoints via `/waypoint` command with distance display and customizable colors
+- **Server FOV Control**: Server can set client FOV via SignalR for zoom effects
 
 ## Architecture
 
@@ -236,7 +238,7 @@ node cli-test.mjs list          # List available suites
 node cli-test.mjs multiplayer   # 2-player test
 ```
 
-Available test suites: `api-status`, `connection`, `position`, `chat`, `chunk`, `block-ops`, `crafting`, `smelting`, `inventory`, `privileges`, `armor`, `fishing`, `entity`, `gamemode`, `teleport`, `give`, `worldborder`, `daynight`, `interact`, `bucket`, `multiplayer`, `full-protocol`, `privs`, `respawn`, `sign`
+Available test suites: `api-status`, `connection`, `position`, `chat`, `chunk`, `block-ops`, `crafting`, `smelting`, `inventory`, `privileges`, `armor`, `fishing`, `entity`, `gamemode`, `teleport`, `give`, `worldborder`, `daynight`, `interact`, `bucket`, `multiplayer`, `full-protocol`, `privs`, `respawn`, `sign`, `detached`, `waypoint`
 
 ## Communication
 
@@ -308,6 +310,9 @@ The Vite dev server proxies `/game` to the server.
 | /hotbar size | Set hotbar size (1-9) |
 | /setphysics player gravity jump walk sprint fly | Override player physics |
 | /resetphysics [player] | Reset physics to defaults |
+| /waypoint name x y z [color] | Add a waypoint marker |
+| /detached name size | Create a detached inventory |
+| /trash | Open shared trash inventory |
 
 ## Ported from minetest_sub_project
 
