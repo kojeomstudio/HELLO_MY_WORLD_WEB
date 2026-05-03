@@ -34,6 +34,9 @@ export class UIManager {
     private onCreativeSelect: ((blockId: number) => void) | null = null;
     private settingsPanel: SettingsPanel;
     private craftingGridUI: CraftingGridUI | null = null;
+    private waypointOverlay: HTMLElement | null = null;
+    private waypoints: Array<{ x: number; y: number; z: number; name: string; color: string }> = [];
+    private waypointUpdateInterval: number = 0;
 
     constructor() {
         this.chatMessages = document.getElementById('chat-messages')!;
@@ -1148,5 +1151,59 @@ export class UIManager {
                 notification.parentNode.removeChild(notification);
             }
         }, 2500);
+    }
+
+    addWaypoint(x: number, y: number, z: number, name: string, color: string = '#00ff00'): void {
+        this.waypoints.push({ x, y, z, name, color });
+    }
+
+    removeWaypoint(name: string): void {
+        this.waypoints = this.waypoints.filter(w => w.name !== name);
+    }
+
+    clearWaypoints(): void {
+        this.waypoints = [];
+        this.destroyWaypointOverlay();
+    }
+
+    private destroyWaypointOverlay(): void {
+        if (this.waypointOverlay && this.waypointOverlay.parentNode) {
+            this.waypointOverlay.parentNode.removeChild(this.waypointOverlay);
+            this.waypointOverlay = null;
+        }
+    }
+
+    updateWaypoints(dt: number, camera: { position: { x: number; y: number; z: number } } | null): void {
+        if (this.waypoints.length === 0) {
+            this.destroyWaypointOverlay();
+            return;
+        }
+
+        this.waypointUpdateInterval += dt;
+        if (this.waypointUpdateInterval < 0.5) return;
+        this.waypointUpdateInterval = 0;
+
+        if (!this.waypointOverlay) {
+            this.waypointOverlay = document.createElement('div');
+            this.waypointOverlay.id = 'waypoint-overlay';
+            this.waypointOverlay.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:10;';
+            document.body.appendChild(this.waypointOverlay);
+        }
+
+        this.waypointOverlay.innerHTML = '';
+        for (const wp of this.waypoints) {
+            const div = document.createElement('div');
+            div.style.cssText = `color:${wp.color};font-size:12px;text-shadow:1px 1px 2px black;text-align:center;margin:2px 0;white-space:nowrap;`;
+            if (camera) {
+                const dx = wp.x - camera.position.x;
+                const dy = wp.y - (camera.position.y + 1.6);
+                const dz = wp.z - camera.position.z;
+                const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                div.textContent = `${wp.name} [${Math.round(distance)}m]`;
+            } else {
+                div.textContent = wp.name;
+            }
+            this.waypointOverlay.appendChild(div);
+        }
     }
 }
