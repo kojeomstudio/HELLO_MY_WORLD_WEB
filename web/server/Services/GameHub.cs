@@ -1046,10 +1046,13 @@ public class GameHub : Hub<IGameClient>
 
     public async Task PunchPlayer(string targetName)
     {
-        if (!CheckRateLimit(Context.ConnectionId, "punch", 500)) return;
-
         var attacker = GetAuthenticatedPlayer();
         if (attacker == null) return;
+
+        var toolItem = attacker.GetSelectedHotbarItem();
+        var isDagger = toolItem != null && toolItem.ItemId.ToLowerInvariant().Contains("dagger");
+        var rateLimitMs = isDagger ? 250 : 500;
+        if (!CheckRateLimit(Context.ConnectionId, "punch", rateLimitMs)) return;
         var target = _gameServer.GetPlayer(targetName);
         if (target == null || target.IsDead) return;
 
@@ -1060,7 +1063,6 @@ public class GameHub : Hub<IGameClient>
             return;
         }
 
-        var toolItem = attacker.GetSelectedHotbarItem();
         var damage = 1.0f;
         if (toolItem != null)
         {
@@ -1094,10 +1096,13 @@ public class GameHub : Hub<IGameClient>
 
     public async Task PunchEntity(Guid entityId)
     {
-        if (!CheckRateLimit(Context.ConnectionId, "punch", 500)) return;
-
         var player = GetAuthenticatedPlayer();
         if (player == null || player.IsDead) return;
+
+        var toolItem = player.GetSelectedHotbarItem();
+        var isDagger = toolItem != null && toolItem.ItemId.ToLowerInvariant().Contains("dagger");
+        var rateLimitMs = isDagger ? 250 : 500;
+        if (!CheckRateLimit(Context.ConnectionId, "punch", rateLimitMs)) return;
 
         var entity = _entityManager.Get(entityId);
         if (entity == null || !entity.IsAlive) return;
@@ -1105,7 +1110,6 @@ public class GameHub : Hub<IGameClient>
         var distance = Vector3.Distance(player.Position, entity.Position);
         if (distance > _gameServer.Config.Physics.PunchRange) return;
 
-        var toolItem = player.GetSelectedHotbarItem();
         var damage = 1.0f;
         if (toolItem != null)
         {
@@ -1115,7 +1119,14 @@ public class GameHub : Hub<IGameClient>
 
         if (entity is MobEntity mob)
         {
-            mob.TakeDamage(damage);
+            if (damage < 0)
+            {
+                mob.Heal(-damage);
+            }
+            else
+            {
+                mob.TakeDamage(damage);
+            }
         }
     }
 

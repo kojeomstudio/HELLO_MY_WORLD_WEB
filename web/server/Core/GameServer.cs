@@ -415,6 +415,22 @@ public class GameServer
         var standingBlock = DefaultWorld.GetBlock(playerBlockPos);
         var standingDef = _blockDefinitionManager.Get((ushort)standingBlock.Type);
 
+        if (standingDef != null && standingDef.Damage > 0 && standingBlock.Type != BlockType.Lava && standingBlock.Type != BlockType.LavaFlowing)
+        {
+            var damageKey = $"{player.Name}:blockdmg";
+            var now = DateTime.UtcNow;
+            if (!_lastDamageTime.TryGetValue(damageKey, out var lastDmg) || (now - lastDmg).TotalMilliseconds >= 500)
+            {
+                _lastDamageTime[damageKey] = now;
+                DamagePlayer(player, standingDef.Damage, standingDef.Name);
+            }
+        }
+
+        if (standingDef != null && standingDef.HealPerSecond > 0 && player.Health < player.MaxHealth)
+        {
+            HealPlayer(player, standingDef.HealPerSecond / _config.Server.TickRate);
+        }
+
         if (standingBlock.Type is BlockType.Lava or BlockType.LavaFlowing)
         {
             var damageKey = $"{player.Name}:lava";

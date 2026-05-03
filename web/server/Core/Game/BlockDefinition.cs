@@ -33,6 +33,7 @@ public class BlockDefinitionManager
                 Liquid = el.TryGetProperty("liquid", out var l) && l.GetBoolean(),
                 Light = el.TryGetProperty("light", out var li) ? li.GetInt32() : 0,
                 Damage = el.TryGetProperty("damage", out var d) ? d.GetSingle() : 0f,
+                HealPerSecond = el.TryGetProperty("healPerSecond", out var hps) ? hps.GetSingle() : 0f,
                 Breakable = !el.TryGetProperty("breakable", out var b) || b.GetBoolean(),
                 Interactive = el.TryGetProperty("interactive", out var i) && i.GetBoolean(),
                 DrawType = el.TryGetProperty("drawType", out var dt) ? dt.GetString() ?? "normal" : "normal",
@@ -318,6 +319,7 @@ public class BlockDefinition
     public bool Liquid { get; set; }
     public int Light { get; set; }
     public float Damage { get; set; }
+    public float HealPerSecond { get; set; }
     public bool Breakable { get; set; } = true;
     public bool Interactive { get; set; }
     public string DrawType { get; set; } = "normal";

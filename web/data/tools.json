@@ -21,6 +21,8 @@
         "ice_sword": 6,
         "blood_sword": 9,
         "heal_sword": -5,
+        "heal_sword_super": -10,
+        "dagger_heal": -1,
         "elemental_sword": 10,
         "wood_dagger": 2,
         "steel_dagger": 4,

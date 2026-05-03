@@ -191,6 +191,11 @@ public class MobEntity : Entity
         }
     }
 
+    public void Heal(float amount)
+    {
+        Health = Math.Min(MaxHealth, Health + amount);
+    }
+
     public void TakeDamage(float amount)
     {
         Health -= amount;
