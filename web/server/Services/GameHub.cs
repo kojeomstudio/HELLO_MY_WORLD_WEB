@@ -75,6 +75,11 @@ public interface IGameClient
     Task OnHudRemove(int hudId);
     Task OnHudChange(int hudId, string statField, string value);
     Task OnHudClear();
+    Task OnModChannelMessage(string channel, string sender, string message);
+    Task OnAddParticleSpawner(int spawnerId, float posX, float posY, float posZ, float velXMin, float velYMin, float velZMin, float velXMax, float velYMax, float velZMax, float accX, float accY, float accZ, float expirationTime, float sizeMin, float sizeMax, string texture, bool collisionDetection, bool collisionRemoval, bool vertical, int amount, float time);
+    Task OnDeleteParticleSpawner(int spawnerId);
+    Task OnItemDefinitions(string definitionsJson);
+    Task OnMinimapModes(string[] modes);
 }
 
 public class GameHub : Hub<IGameClient>
@@ -292,6 +297,8 @@ public class GameHub : Hub<IGameClient>
         await SendTimeUpdate();
         await Clients.Caller.OnFoodUpdate(player.FoodLevel, 20f);
         await SendBlockDefinitions();
+        await SendItemDefinitionsOnJoin();
+        await Clients.Caller.OnMinimapModes(new[] { "surface", "radar", "normal" });
         await Clients.Caller.OnPhysicsParams(
             _config.Physics.Gravity, _config.Physics.JumpForce,
             player.OverrideWalkSpeed ?? _config.Physics.WalkSpeed,
@@ -1998,6 +2005,17 @@ public class GameHub : Hub<IGameClient>
         await Clients.Caller.OnBlockDefinitions(json);
     }
 
+    private async Task SendItemDefinitionsOnJoin()
+    {
+        var itemsPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "data", "items.json");
+        if (!File.Exists(itemsPath))
+            itemsPath = Path.Combine(Directory.GetCurrentDirectory(), "data", "items.json");
+
+        if (!File.Exists(itemsPath)) return;
+        var json = File.ReadAllText(itemsPath);
+        await Clients.Caller.OnItemDefinitions(json);
+    }
+
     private async Task SendArmorUpdate(PlayerEnt player)
     {
         var items = player.ArmorSlots
@@ -2288,6 +2306,53 @@ public class GameHub : Hub<IGameClient>
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
 
+        if (_gridCraftingSystem.IsToolRepair(grid, gridSize))
+        {
+            var toolItems = new List<ItemStack>();
+            var toolSlots = new List<int>();
+            for (int r = 0; r < gridSize; r++)
+            {
+                for (int c = 0; c < gridSize; c++)
+                {
+                    if (!string.IsNullOrEmpty(grid[r, c]))
+                    {
+                        for (int s = 0; s < player.Inventory.Size; s++)
+                        {
+                            var slot = player.Inventory[s];
+                            if (slot != null && slot.ItemId == grid[r, c] && !toolSlots.Contains(s))
+                            {
+                                toolItems.Add(slot);
+                                toolSlots.Add(s);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (toolItems.Count == 2 && toolItems[0].ItemId == toolItems[1].ItemId)
+            {
+                if (_gridCraftingSystem.IsToolRepairDisabled(toolItems[0].ItemId))
+                {
+                    await Clients.Caller.OnChatMessage("Server", "This tool cannot be repaired.", "system");
+                    return;
+                }
+
+                var repaired = ToolWearSystem.RepairTools(toolItems[0], toolItems[1]);
+                if (repaired != null)
+                {
+                    foreach (var slotIdx in toolSlots.OrderByDescending(s => s))
+                        player.Inventory[slotIdx] = null;
+                    player.Inventory.AddItem(repaired);
+                    _gameServer.AwardExperience(player, 1);
+                    player.Statistics.IncrementItemsCrafted();
+                    await SendInventoryUpdate(player);
+                    await Clients.Caller.OnCraftResult(repaired.ItemId, 1);
+                    return;
+                }
+            }
+        }
+
         var recipe = _gridCraftingSystem.FindRecipe(grid, gridSize);
         if (recipe == null)
         {
@@ -2347,6 +2412,16 @@ public class GameHub : Hub<IGameClient>
         for (int i = 0; i < 9; i++)
         {
             gridArray[i / 3, i % 3] = grid[i];
+        }
+
+        if (_gridCraftingSystem.IsToolRepair(gridArray, 3))
+        {
+            var toolName = grid.FirstOrDefault(g => !string.IsNullOrEmpty(g));
+            if (toolName != null && !_gridCraftingSystem.IsToolRepairDisabled(toolName))
+            {
+                await Clients.Caller.OnCraftResult(toolName, 1);
+                return;
+            }
         }
 
         var recipe = _gridCraftingSystem.FindRecipe(gridArray, 3);
@@ -2606,5 +2681,98 @@ public class GameHub : Hub<IGameClient>
                 return false;
         }
         return true;
+    }
+
+    public async Task JoinModChannel(string channelName)
+    {
+        if (!CheckRateLimit(Context.ConnectionId, "modchannel", 200)) return;
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
+        if (string.IsNullOrEmpty(channelName) || channelName.Length > 64) return;
+
+        ModChannelManager.JoinChannel(channelName, player.Name);
+    }
+
+    public async Task LeaveModChannel(string channelName)
+    {
+        if (!CheckRateLimit(Context.ConnectionId, "modchannel", 200)) return;
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
+        if (string.IsNullOrEmpty(channelName)) return;
+
+        ModChannelManager.LeaveChannel(channelName, player.Name);
+    }
+
+    public async Task SendModChannelMessage(string channelName, string message)
+    {
+        if (!CheckRateLimit(Context.ConnectionId, "modchannelmsg", 100)) return;
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
+        if (string.IsNullOrEmpty(channelName) || channelName.Length > 64) return;
+        if (string.IsNullOrEmpty(message) || message.Length > 500) return;
+
+        var recipients = ModChannelManager.SendMessage(channelName, player.Name, message);
+        foreach (var recipient in recipients)
+        {
+            var connId = _gameServer.GetPlayerConnectionId(recipient);
+            if (connId != null && connId != Context.ConnectionId)
+            {
+                await Clients.Client(connId).OnModChannelMessage(channelName, player.Name, message);
+            }
+        }
+    }
+
+    public async Task AddParticleSpawner(
+        int spawnerId, float posX, float posY, float posZ,
+        float velXMin, float velYMin, float velZMin,
+        float velXMax, float velYMax, float velZMax,
+        float accX, float accY, float accZ,
+        float expirationTime, float sizeMin, float sizeMax,
+        string texture, bool collisionDetection, bool collisionRemoval,
+        bool vertical, int amount, float time)
+    {
+        if (!CheckRateLimit(Context.ConnectionId, "particlespawner", 500)) return;
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
+
+        await Clients.Caller.OnAddParticleSpawner(
+            spawnerId, posX, posY, posZ,
+            velXMin, velYMin, velZMin, velXMax, velYMax, velZMax,
+            accX, accY, accZ, expirationTime, sizeMin, sizeMax,
+            texture, collisionDetection, collisionRemoval, vertical, amount, time);
+    }
+
+    public async Task DeleteParticleSpawner(int spawnerId)
+    {
+        if (!CheckRateLimit(Context.ConnectionId, "particlespawner", 500)) return;
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
+
+        await Clients.Caller.OnDeleteParticleSpawner(spawnerId);
+    }
+
+    public async Task SendItemDefinitions()
+    {
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
+
+        var itemsPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "data", "items.json");
+        if (!File.Exists(itemsPath))
+            itemsPath = Path.Combine(Directory.GetCurrentDirectory(), "data", "items.json");
+
+        if (File.Exists(itemsPath))
+        {
+            var json = File.ReadAllText(itemsPath);
+            await Clients.Caller.OnItemDefinitions(json);
+        }
+    }
+
+    public async Task SendMinimapModes(string[] modes)
+    {
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
+        if (!_gameServer.Privileges.HasPrivilege(player.Name, "server")) return;
+
+        await Clients.Caller.OnMinimapModes(modes);
     }
 }

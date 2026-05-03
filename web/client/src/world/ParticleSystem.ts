@@ -10,12 +10,40 @@ interface Particle {
     alpha: number;
 }
 
+interface ParticleSpawner {
+    id: number;
+    posX: number;
+    posY: number;
+    posZ: number;
+    velXMin: number;
+    velYMin: number;
+    velZMin: number;
+    velXMax: number;
+    velYMax: number;
+    velZMax: number;
+    accX: number;
+    accY: number;
+    accZ: number;
+    expirationTime: number;
+    sizeMin: number;
+    sizeMax: number;
+    texture: string;
+    collisionDetection: boolean;
+    collisionRemoval: boolean;
+    vertical: boolean;
+    amount: number;
+    time: number;
+    elapsed: number;
+    accumulator: number;
+}
+
 export class ParticleSystem {
     private particles: Particle[] = [];
     private geometry: THREE.BufferGeometry;
     private material: THREE.PointsMaterial;
     private points: THREE.Points;
     private maxParticles: number = 500;
+    private spawners: Map<number, ParticleSpawner> = new Map();
 
     constructor(scene: THREE.Scene) {
         this.geometry = new THREE.BufferGeometry();
@@ -138,7 +166,78 @@ export class ParticleSystem {
         }
     }
 
+    addSpawner(
+        id: number, posX: number, posY: number, posZ: number,
+        velXMin: number, velYMin: number, velZMin: number,
+        velXMax: number, velYMax: number, velZMax: number,
+        accX: number, accY: number, accZ: number,
+        expirationTime: number, sizeMin: number, sizeMax: number,
+        texture: string, collisionDetection: boolean, collisionRemoval: boolean,
+        vertical: boolean, amount: number, time: number
+    ): void {
+        this.spawners.set(id, {
+            id, posX, posY, posZ,
+            velXMin, velYMin, velZMin, velXMax, velYMax, velZMax,
+            accX, accY, accZ,
+            expirationTime, sizeMin, sizeMax, texture,
+            collisionDetection, collisionRemoval, vertical,
+            amount, time, elapsed: 0, accumulator: 0
+        });
+    }
+
+    removeSpawner(id: number): void {
+        this.spawners.delete(id);
+    }
+
+    private updateSpawners(dt: number): void {
+        const expired: number[] = [];
+        for (const [id, spawner] of this.spawners) {
+            spawner.elapsed += dt;
+            if (spawner.expirationTime > 0 && spawner.elapsed >= spawner.expirationTime) {
+                expired.push(id);
+                continue;
+            }
+
+            if (spawner.time <= 0) continue;
+
+            spawner.accumulator += dt;
+            const interval = spawner.time / spawner.amount;
+            while (spawner.accumulator >= interval) {
+                spawner.accumulator -= interval;
+                this.emitFromSpawner(spawner);
+            }
+        }
+        for (const id of expired) {
+            this.spawners.delete(id);
+        }
+    }
+
+    private emitFromSpawner(s: ParticleSpawner): void {
+        if (this.particles.length >= this.maxParticles) {
+            this.particles.shift();
+        }
+
+        const vx = s.velXMin + Math.random() * (s.velXMax - s.velXMin);
+        const vy = s.vertical ? s.velYMin + Math.random() * (s.velYMax - s.velYMin) : s.velYMin + Math.random() * (s.velYMax - s.velYMin);
+        const vz = s.velZMin + Math.random() * (s.velZMax - s.velZMin);
+
+        this.particles.push({
+            position: new THREE.Vector3(
+                s.posX + (Math.random() - 0.5) * 0.5,
+                s.posY + (Math.random() - 0.5) * 0.5,
+                s.posZ + (Math.random() - 0.5) * 0.5
+            ),
+            velocity: new THREE.Vector3(vx, vy, vz),
+            life: 0.5 + Math.random() * 1.0,
+            maxLife: 1.5,
+            size: s.sizeMin + Math.random() * (s.sizeMax - s.sizeMin),
+            color: new THREE.Color(0xFFFFFF),
+            alpha: 1.0
+        });
+    }
+
     update(dt: number): void {
+        this.updateSpawners(dt);
         for (let i = this.particles.length - 1; i >= 0; i--) {
             const p = this.particles[i];
             p.life -= dt;

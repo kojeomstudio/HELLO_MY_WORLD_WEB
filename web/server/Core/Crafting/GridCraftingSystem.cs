@@ -1,5 +1,7 @@
 using System.Linq;
 using System.Text.Json;
+using WebGameServer.Core.Player;
+using WebGameServer.Core.ToolWear;
 
 namespace WebGameServer.Core.Crafting;
 
@@ -7,6 +9,7 @@ public class GridCraftingSystem
 {
     private readonly List<GridRecipe> _recipes = new();
     private readonly Dictionary<string, HashSet<string>> _groups = new();
+    private readonly HashSet<string> _disableRepairGroups = new();
 
     public void RegisterGroup(string groupName, HashSet<string> itemIds)
     {
@@ -203,6 +206,42 @@ public class GridCraftingSystem
     {
         return _recipes.FirstOrDefault(r =>
             r.ResultItemId.Equals(resultItemId, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public void RegisterDisableRepairGroup(string groupName)
+    {
+        _disableRepairGroups.Add(groupName);
+    }
+
+    public bool IsToolRepair(string?[,] grid, int gridSize)
+    {
+        var items = new List<string>();
+        for (int r = 0; r < gridSize; r++)
+        {
+            for (int c = 0; c < gridSize; c++)
+            {
+                if (!string.IsNullOrEmpty(grid[r, c]))
+                    items.Add(grid[r, c]!);
+            }
+        }
+
+        if (items.Count != 2) return false;
+        if (items[0] != items[1]) return false;
+
+        return ToolConfig.Materials.ContainsKey(items[0]);
+    }
+
+    public bool IsToolRepairDisabled(string toolItemId)
+    {
+        if (ToolConfig.Materials.TryGetValue(toolItemId, out var material) && material.GroupCapabilities != null)
+        {
+            foreach (var group in _disableRepairGroups)
+            {
+                if (material.GroupCapabilities.ContainsKey(group))
+                    return true;
+            }
+        }
+        return false;
     }
 }
 

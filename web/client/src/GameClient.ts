@@ -16,6 +16,15 @@ import { ItemRegistry } from './world/ItemRegistry';
 import { FormspecRenderer } from './ui/FormspecRenderer';
 import { setLeavesStyle as applyLeavesStyle, setTranslucentLiquids as applyTranslucentLiquids } from './world/ChunkMesh';
 
+enum ClientState {
+    Created = 'created',
+    Connecting = 'connecting',
+    Connected = 'connected',
+    Init = 'init',
+    Game = 'game',
+    Disconnected = 'disconnected'
+}
+
 export class GameClient {
     private connection: HubConnection.HubConnection | null = null;
     private renderer: Renderer;
@@ -31,7 +40,7 @@ export class GameClient {
     private weatherSystem: WeatherSystem;
     private itemRegistry: ItemRegistry;
     private formspecRenderer: FormspecRenderer;
-    private isRunning: boolean = false;
+    private clientState: ClientState = ClientState.Created;
     private lastTime: number = 0;
     private frameCount: number = 0;
     private fps: number = 0;
@@ -106,6 +115,7 @@ export class GameClient {
     }
 
     async connect(playerName: string, password?: string): Promise<void> {
+        this.clientState = ClientState.Connecting;
         this.connection = new HubConnection.HubConnectionBuilder()
             .withUrl('/game')
             .withAutomaticReconnect()
@@ -119,19 +129,30 @@ export class GameClient {
         this.uiManager.setItemRegistry(this.itemRegistry);
 
         try {
+            this.clientState = ClientState.Connected;
             await this.connection.start();
             await this.connection.invoke('Join', playerName, password || '');
-            this.isRunning = true;
+            this.clientState = ClientState.Init;
             this.lastTime = performance.now();
+            this.clientState = ClientState.Game;
             this.gameLoop();
         } catch (err) {
             if (this.connection) {
                 this.connection.stop();
                 this.connection = null;
             }
+            this.clientState = ClientState.Disconnected;
             this.uiManager.addChatMessage('Server', `Connection failed: ${err}`);
             this.showLoginScreen();
         }
+    }
+
+    getClientState(): ClientState {
+        return this.clientState;
+    }
+
+    isConnected(): boolean {
+        return this.clientState === ClientState.Game;
     }
 
     private setupServerHandlers(): void {
@@ -371,6 +392,33 @@ export class GameClient {
         this.connection.on('OnHudClear', () => {
             this.uiManager.clearHudElements();
         });
+
+        this.connection.on('OnModChannelMessage', (_channel: string, _sender: string, _message: string) => {
+        });
+
+        this.connection.on('OnAddParticleSpawner', (spawnerId: number, posX: number, posY: number, posZ: number,
+            velXMin: number, velYMin: number, velZMin: number,
+            velXMax: number, velYMax: number, velZMax: number,
+            accX: number, accY: number, accZ: number,
+            expirationTime: number, sizeMin: number, sizeMax: number,
+            texture: string, collisionDetection: boolean, collisionRemoval: boolean,
+            vertical: boolean, amount: number, time: number) => {
+            this.particleSystem.addSpawner(
+                spawnerId, posX, posY, posZ,
+                velXMin, velYMin, velZMin, velXMax, velYMax, velZMax,
+                accX, accY, accZ, expirationTime, sizeMin, sizeMax,
+                texture, collisionDetection, collisionRemoval, vertical, amount, time);
+        });
+
+        this.connection.on('OnDeleteParticleSpawner', (spawnerId: number) => {
+            this.particleSystem.removeSpawner(spawnerId);
+        });
+
+        this.connection.on('OnItemDefinitions', (_definitionsJson: string) => {
+        });
+
+        this.connection.on('OnMinimapModes', (_modes: string[]) => {
+        });
     }
 
     sendChat(message: string): void {
@@ -447,7 +495,7 @@ export class GameClient {
     }
 
     private gameLoop(): void {
-        if (!this.isRunning) return;
+        if (this.clientState !== ClientState.Game) return;
         requestAnimationFrame(() => this.gameLoop());
 
         const now = performance.now();

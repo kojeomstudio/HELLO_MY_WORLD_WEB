@@ -148,6 +148,13 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **MapgenValleys**: River valley terrain generator with altitude-chill biome adjustment, noise-based river carving, configurable valley depth/width
 - **MapgenCarpathian**: Terraced mountain terrain generator with step-height quantization, ridge noise for mountain ridges, stone surface at high altitudes, optional rivers
 - **Async Job System**: Background job queue with concurrency limiting (4 parallel), progress tracking, cancellation, job status (Pending/Running/Completed/Failed/Cancelled), automatic cleanup of completed jobs
+- **Tool Repair Crafting**: Combine two worn tools of the same type in the crafting grid to repair them; uses Minetest formula `new_wear = 65536 - (uses1 + uses2)`, respects disable_repair group
+- **ModChannel Communication**: Join/leave/send messages on named mod channels via SignalR hub methods, inter-mod communication framework
+- **Client Connection State Machine**: 5-state client lifecycle (Created/Connecting/Connected/Init/Game/Disconnected) replacing simple boolean, proper state transitions
+- **Recipe Priority System**: 6-level priority enum (NoRecipe < ToolRepair < ShapelessAndGroups < Shapeless < ShapedAndGroups < Shaped) matching Minetest's crafting resolution order
+- **Persistent Particle Spawners**: Server-driven spawner creation/deletion with configurable velocity/acceleration/size/expiration/collision parameters, time-based emission
+- **Item Definition Sync**: Server sends items.json to client on join for server-authoritative item definitions
+- **Minimap Modes**: Server-driven minimap mode list sent on join (surface/radar/normal)
 
 ## Architecture
 
