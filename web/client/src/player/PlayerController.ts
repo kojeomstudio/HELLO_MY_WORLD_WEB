@@ -70,6 +70,8 @@ export class PlayerController {
     private _physics: PhysicsParams = { ...DEFAULT_PHYSICS };
     private _baseFov: number = 72;
     private _currentFov: number = 72;
+    private _targetFov: number = 72;
+    private _fovTransitionSpeed: number = 0;
     private _isZooming: boolean = false;
     health: number = 20;
     maxHealth: number = 20;
@@ -651,8 +653,18 @@ export class PlayerController {
             this._velocity.set(0, 0, 0);
         }
 
-        const targetFov = this._isZooming ? this._baseFov * 0.5 : this._baseFov;
-        this._currentFov += (targetFov - this._currentFov) * Math.min(1, dt * 8);
+        let targetFov = this._isZooming ? this._baseFov * 0.5 : this._baseFov;
+        if (this._fovTransitionSpeed > 0) {
+            targetFov = this._targetFov;
+            this._currentFov += (targetFov - this._currentFov) * Math.min(1, dt * this._fovTransitionSpeed);
+            if (Math.abs(this._currentFov - targetFov) < 0.1) {
+                this._fovTransitionSpeed = 0;
+                this._currentFov = targetFov;
+                this._baseFov = targetFov;
+            }
+        } else {
+            this._currentFov += (targetFov - this._currentFov) * Math.min(1, dt * 8);
+        }
         if (this._camera.fov !== this._currentFov) {
             this._camera.fov = this._currentFov;
             this._camera.updateProjectionMatrix();
@@ -836,6 +848,10 @@ export class PlayerController {
     setSelectedBlockType(blockType: number): void { this._selectedBlockType = blockType; }
     setMouseSensitivity(value: number): void { this.mouseSensitivity = value; }
     setPhysicsParams(params: PhysicsParams): void { this._physics = { ...params }; }
+    setServerFov(fov: number, transitionTime: number): void {
+        this._targetFov = fov;
+        this._fovTransitionSpeed = transitionTime > 0 ? 1.0 / transitionTime : 10;
+    }
     getCameraMode(): number { return this._cameraMode; }
     isSneaking(): boolean { return this._isSneaking; }
     setSneaking(value: boolean): void { this._isSneaking = value; }

@@ -283,6 +283,14 @@ export class GameClient {
         this.connection.on('OnWaypoint', (x: number, y: number, z: number, name: string, color: string) => {
             this.uiManager.addWaypoint(x, y, z, name, color);
         });
+
+        this.connection.on('OnFov', (fov: number, transitionTime: number) => {
+            this.playerController.setServerFov(fov, transitionTime);
+        });
+
+        this.connection.on('OnDetachedInventory', (name: string, items: any[]) => {
+            this.uiManager.showDetachedInventory(name, items);
+        });
     }
 
     sendChat(message: string): void {
@@ -437,6 +445,7 @@ export class GameClient {
 
         this.renderer.updateLavaEffect(this.checkNearLava(playerPos));
         this.updateWaterEffect(playerPos);
+        this.uiManager.updateWaypoints(dt, { position: { x: playerPos.x, y: playerPos.y, z: playerPos.z } });
 
         this.renderer.render();
         this.uiManager.updateDebugInfo(

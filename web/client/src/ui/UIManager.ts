@@ -35,6 +35,8 @@ export class UIManager {
     private settingsPanel: SettingsPanel;
     private craftingGridUI: CraftingGridUI | null = null;
     private waypointOverlay: HTMLElement | null = null;
+    private detachedUI: HTMLElement | null = null;
+    private detachedOverlay: HTMLElement | null = null;
     private waypoints: Array<{ x: number; y: number; z: number; name: string; color: string }> = [];
     private waypointUpdateInterval: number = 0;
 
@@ -1151,6 +1153,105 @@ export class UIManager {
                 notification.parentNode.removeChild(notification);
             }
         }, 2500);
+    }
+
+    showDetachedInventory(name: string, items: any[]): void {
+        this.hideChestUI();
+        this.hideFurnaceUI();
+        this.hideDetachedInventory();
+        this.hideCraftingUI();
+        document.exitPointerLock();
+
+        this.detachedUI = document.createElement('div');
+        this.detachedUI.id = 'detached-inventory-ui';
+        this.detachedUI.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(60,60,80,0.95);color:white;padding:20px;border-radius:8px;z-index:500;width:400px;max-height:80vh;display:flex;flex-direction:column;';
+
+        const header = document.createElement('div');
+        header.style.cssText = 'font-size:18px;font-weight:bold;margin-bottom:12px;text-align:center;';
+        header.textContent = `Inventory: ${name}`;
+
+        const closeBtn = document.createElement('button');
+        closeBtn.style.cssText = 'position:absolute;top:8px;right:12px;cursor:pointer;background:none;border:none;color:white;font-size:20px;';
+        closeBtn.textContent = 'X';
+        closeBtn.addEventListener('click', () => {
+            this.hideDetachedInventory();
+        });
+
+        const gridLabel = document.createElement('div');
+        gridLabel.style.cssText = 'font-size:12px;color:#ccc;margin-bottom:6px;';
+        gridLabel.textContent = `${name} (click slot to take)`;
+
+        const grid = document.createElement('div');
+        grid.id = 'detached-grid';
+        grid.style.cssText = 'display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:16px;';
+        for (let i = 0; i < Math.max(items.length, 9); i++) {
+            const slot = document.createElement('div');
+            slot.className = 'detached-slot';
+            slot.dataset.slot = String(i);
+            slot.style.cssText = 'width:36px;height:36px;background:rgba(0,0,0,0.4);border:1px solid #555;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#aaa;text-align:center;cursor:pointer;position:relative;';
+            if (items[i] && items[i].itemId) {
+                const item = items[i];
+                slot.textContent = this.formatItemName(item.itemId);
+                slot.style.color = '#ffdd44';
+                slot.style.fontSize = '8px';
+                if (item.count > 1) {
+                    const badge = document.createElement('span');
+                    badge.style.cssText = 'position:absolute;bottom:1px;right:2px;font-size:9px;color:white;text-shadow:1px 1px 1px black;';
+                    badge.textContent = String(item.count);
+                    slot.appendChild(badge);
+                }
+            }
+            const slotIndex = i;
+            slot.addEventListener('click', () => {
+                this._connection?.invoke('DetachedInventoryTake', name, slotIndex);
+            });
+            grid.appendChild(slot);
+        }
+
+        const invLabel = document.createElement('div');
+        invLabel.style.cssText = 'font-size:12px;color:#ccc;margin-bottom:6px;';
+        invLabel.textContent = 'Your Inventory (click to put)';
+
+        const invGrid = document.createElement('div');
+        invGrid.id = 'detached-inv-grid';
+        invGrid.style.cssText = 'display:grid;grid-template-columns:repeat(8,1fr);gap:3px;';
+        for (let i = 0; i < 8; i++) {
+            const slot = document.createElement('div');
+            slot.className = 'detached-inv-slot';
+            slot.dataset.slot = String(i);
+            slot.style.cssText = 'width:36px;height:36px;background:rgba(0,0,0,0.4);border:1px solid #555;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#aaa;text-align:center;cursor:pointer;position:relative;';
+            const slotIndex = i;
+            slot.addEventListener('click', () => {
+                this._connection?.invoke('DetachedInventoryPut', name, slotIndex);
+            });
+            invGrid.appendChild(slot);
+        }
+
+        this.detachedOverlay = document.createElement('div');
+        this.detachedOverlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:499;';
+        this.detachedOverlay.addEventListener('click', () => {
+            this.hideDetachedInventory();
+        });
+
+        this.detachedUI.appendChild(closeBtn);
+        this.detachedUI.appendChild(header);
+        this.detachedUI.appendChild(gridLabel);
+        this.detachedUI.appendChild(grid);
+        this.detachedUI.appendChild(invLabel);
+        this.detachedUI.appendChild(invGrid);
+        document.body.appendChild(this.detachedOverlay);
+        document.body.appendChild(this.detachedUI);
+    }
+
+    hideDetachedInventory(): void {
+        if (this.detachedUI && this.detachedUI.parentNode) {
+            this.detachedUI.parentNode.removeChild(this.detachedUI);
+            this.detachedUI = null;
+        }
+        if (this.detachedOverlay && this.detachedOverlay.parentNode) {
+            this.detachedOverlay.parentNode.removeChild(this.detachedOverlay);
+            this.detachedOverlay = null;
+        }
     }
 
     addWaypoint(x: number, y: number, z: number, name: string, color: string = '#00ff00'): void {

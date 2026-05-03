@@ -72,8 +72,9 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Detached Inventory**: Shared inventories via `/detached` command and hub methods, with access control
 - **Zoom FOV**: C key toggles zoom (50% FOV reduction) with smooth interpolation
 - **Per-Player Speed Validation**: Server validates speed against physics overrides and block move resistance
-- **HUD Waypoints**: Server-driven waypoints via `/waypoint` command with distance display and customizable colors
-- **Server FOV Control**: Server can set client FOV via SignalR for zoom effects
+- **HUD Waypoints**: Server-driven waypoints via `/waypoint` command with distance display and customizable colors, updated in real-time game loop
+- **Server FOV Control**: Server can set client FOV via SignalR with smooth transition time
+- **Detached Inventory UI**: Visual detached inventory panel for shared/trash inventories via `/detached` and `/trash` commands
 
 ## Architecture
 
