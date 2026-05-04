@@ -277,6 +277,7 @@ public class MobEntity : Entity
     public Dictionary<string, int> ArmorGroups { get; set; } = new();
     public string? Nametag { get; set; }
     public string? NametagColor { get; set; }
+    public int Glow { get; set; }
     private const float MobGravity = 20.0f;
     private DateTime _lastAttackTime;
     private int AttackCooldownMs = 1000;

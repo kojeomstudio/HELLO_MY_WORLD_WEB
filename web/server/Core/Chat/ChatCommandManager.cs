@@ -76,6 +76,14 @@ public class ChatCommandManager
     private readonly Func<int, int, int, int, int, int, int>? _emergeBlocks;
     private readonly Func<int, int, int, int, int, int, int>? _deleteBlocks;
     private readonly Func<int, int, int, int, int, int, int>? _fixLight;
+    private readonly Func<string, Vector3>? _getPlayerPosition;
+    private readonly Func<string, string, bool>? _teleportPlayerToPlayer;
+    private readonly Action<string, string, int, int>? _useToolOnPlayer;
+    private readonly Func<string, int, int>? _detachNearby;
+    private readonly Action<string>? _setWeatherClear;
+    private readonly Action<string>? _setWeatherRain;
+    private readonly Action<string>? _setWeatherSnow;
+    private readonly Action<string>? _setWeatherThunder;
 
     public ChatCommandManager(
         Func<long> getGameTime,
@@ -127,7 +135,15 @@ public class ChatCommandManager
         Func<int, int, int, int, string?>? rollbackCheck = null,
         Func<int, int, int, int, int, int, int>? emergeBlocks = null,
         Func<int, int, int, int, int, int, int>? deleteBlocks = null,
-        Func<int, int, int, int, int, int, int>? fixLight = null)
+        Func<int, int, int, int, int, int, int>? fixLight = null,
+        Func<string, Vector3>? getPlayerPosition = null,
+        Func<string, string, bool>? teleportPlayerToPlayer = null,
+        Action<string, string, int, int>? useToolOnPlayer = null,
+        Func<string, int, int>? detachNearby = null,
+        Action<string>? setWeatherClear = null,
+        Action<string>? setWeatherRain = null,
+        Action<string>? setWeatherSnow = null,
+        Action<string>? setWeatherThunder = null)
     {
         _getGameTime = getGameTime;
         _getTps = getTps;
@@ -179,6 +195,14 @@ public class ChatCommandManager
         _emergeBlocks = emergeBlocks;
         _deleteBlocks = deleteBlocks;
         _fixLight = fixLight;
+        _getPlayerPosition = getPlayerPosition;
+        _teleportPlayerToPlayer = teleportPlayerToPlayer;
+        _useToolOnPlayer = useToolOnPlayer;
+        _detachNearby = detachNearby;
+        _setWeatherClear = setWeatherClear;
+        _setWeatherRain = setWeatherRain;
+        _setWeatherSnow = setWeatherSnow;
+        _setWeatherThunder = setWeatherThunder;
         RegisterBuiltInCommands();
     }
 
@@ -1068,6 +1092,73 @@ public class ChatCommandManager
                     return Task.FromResult("Invalid coordinates. Usage: /fixlight <x1> <y1> <z1> <x2> <y2> <z2>");
                 var count = _fixLight(x1, y1, z1, x2, y2, z2);
                 return Task.FromResult($"Fixed lighting for {count} nodes in ({x1},{y1},{z1})-({x2},{y2},{z2}).");
+            }, "server"));
+
+        Register(new ChatCommand("weather", "Set weather (clear/rain/snow/thunder)", Array.Empty<string>(),
+            (playerName, args) =>
+            {
+                if (args.Length < 1) return Task.FromResult("Usage: /weather <clear|rain|snow|thunder>");
+                var weather = args[0].ToLowerInvariant();
+                switch (weather)
+                {
+                    case "clear":
+                        _setWeatherClear?.Invoke(playerName);
+                        return Task.FromResult("Weather set to clear.");
+                    case "rain":
+                        _setWeatherRain?.Invoke(playerName);
+                        return Task.FromResult("Weather set to rain.");
+                    case "snow":
+                        _setWeatherSnow?.Invoke(playerName);
+                        return Task.FromResult("Weather set to snow.");
+                    case "thunder":
+                        _setWeatherThunder?.Invoke(playerName);
+                        return Task.FromResult("Weather set to thunderstorm.");
+                    default:
+                        return Task.FromResult("Unknown weather type. Use: clear, rain, snow, thunder");
+                }
+            }, "server"));
+
+        Register(new ChatCommand("tpplayer", "Teleport a player to another player", new[] { "teleport_player" },
+            (playerName, args) =>
+            {
+                if (_teleportPlayerToPlayer == null) return Task.FromResult("Teleport player command is not available.");
+                if (args.Length < 2) return Task.FromResult("Usage: /tpplayer <source> <target>");
+                var source = args[0];
+                var target = args[1];
+                var success = _teleportPlayerToPlayer(source, target);
+                return Task.FromResult(success ? $"Teleported {source} to {target}." : $"Failed to teleport. Check player names.");
+            }, "teleport"));
+
+        Register(new ChatCommand("use_tool", "Apply tool wear for testing", new[] { "usetool" },
+            (playerName, args) =>
+            {
+                if (_useToolOnPlayer == null) return Task.FromResult("Use tool command is not available.");
+                if (args.Length < 2) return Task.FromResult("Usage: /use_tool <dig|hit> <group> [level] [uses]");
+                var action = args[0].ToLowerInvariant();
+                if (action != "dig" && action != "hit") return Task.FromResult("Action must be 'dig' or 'hit'.");
+                var group = args[1];
+                var level = args.Length >= 3 && int.TryParse(args[2], out var lvl) ? lvl : 1;
+                var uses = args.Length >= 4 && int.TryParse(args[3], out var u) ? u : 1;
+                _useToolOnPlayer(playerName, group, level, uses);
+                return Task.FromResult($"Applied {uses} {action}({group},{level}) to your tool.");
+            }, "server"));
+
+        Register(new ChatCommand("detach", "Detach all objects near you", Array.Empty<string>(),
+            (playerName, args) =>
+            {
+                if (_detachNearby == null) return Task.FromResult("Detach command is not available.");
+                var radius = args.Length >= 1 && int.TryParse(args[0], out var r) ? r : 5;
+                var count = _detachNearby(playerName, radius);
+                return Task.FromResult($"Detached {count} objects within {radius} blocks.");
+            }, "interact"));
+
+        Register(new ChatCommand("clearobjects", "Clear all objects (quick/full)", new[] { "clear_obj" },
+            (playerName, args) =>
+            {
+                if (_clearAllEntities == null) return Task.FromResult("Clear objects command is not available.");
+                var mode = args.Length >= 1 ? args[0].ToLowerInvariant() : "quick";
+                _clearAllEntities();
+                return Task.FromResult($"Cleared all objects (mode: {mode}).");
             }, "server"));
 
         Register(new ChatCommand("pulverize", "Clear all entities", Array.Empty<string>(),

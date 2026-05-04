@@ -47,6 +47,9 @@ public class WorldSettings
     public float CaveDensity { get; set; } = 0.5f;
     public float OreDensity { get; set; } = 0.3f;
     public int WorldBorderSize { get; set; } = 1000;
+    public float? StaticSpawnX { get; set; }
+    public float? StaticSpawnY { get; set; }
+    public float? StaticSpawnZ { get; set; }
 }
 
 public class PlayerSettings

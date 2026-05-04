@@ -264,9 +264,17 @@ public class GameServer
         }
         else
         {
-            var spawnY = DefaultWorld.GetGroundHeight(0, 0) + 2;
-            player.Position = new Vector3(0, spawnY, 0);
-            player.LastGroundY = spawnY;
+            if (_config.World.StaticSpawnX.HasValue && _config.World.StaticSpawnY.HasValue && _config.World.StaticSpawnZ.HasValue)
+            {
+                player.Position = new Vector3(_config.World.StaticSpawnX.Value, _config.World.StaticSpawnY.Value, _config.World.StaticSpawnZ.Value);
+                player.LastGroundY = _config.World.StaticSpawnY.Value;
+            }
+            else
+            {
+                var spawnY = DefaultWorld.GetGroundHeight(0, 0) + 2;
+                player.Position = new Vector3(0, spawnY, 0);
+                player.LastGroundY = spawnY;
+            }
         }
 
         _players.TryAdd(playerName, player);
@@ -517,7 +525,7 @@ public class GameServer
 
     public void DamagePlayer(PlayerEnt player, float amount, string source)
     {
-        if (player.IsDead || player.Mode == GameMode.Creative) return;
+        if (player.IsDead || player.Mode == GameMode.Creative || player.Invulnerable) return;
 
         player.TakeDamage(amount);
         player.Statistics.AddDamageTaken((int)Math.Ceiling(amount));
@@ -658,11 +666,46 @@ public class GameServer
             Math.Clamp(position.X, -borderSize, borderSize),
             Math.Clamp(position.Y, -64, 320),
             Math.Clamp(position.Z, -borderSize, borderSize));
+        position = FindFreePositionNear(position);
         player.Position = position;
         player.Velocity = Vector3.Zero;
         player.FallDistance = 0;
         player.LastGroundY = position.Y;
         return true;
+    }
+
+    private Vector3 FindFreePositionNear(Vector3 pos)
+    {
+        var bx = (short)Math.Floor(pos.X);
+        var by = (short)Math.Floor(pos.Y);
+        var bz = (short)Math.Floor(pos.Z);
+
+        for (int dy = 0; dy >= -2; dy--)
+        {
+            var checkY = (short)(by + dy);
+            var feet = DefaultWorld.GetBlock(new Vector3s(bx, checkY, bz));
+            var head = DefaultWorld.GetBlock(new Vector3s(bx, (short)(checkY + 1), bz));
+            var below = DefaultWorld.GetBlock(new Vector3s(bx, (short)(checkY - 1), bz));
+            var feetDef = _blockDefinitionManager.Get((ushort)feet.Type);
+            if (feet.Type == BlockType.Air && head.Type == BlockType.Air &&
+                below.Type != BlockType.Air && (feetDef == null || !feetDef.Solid || feetDef.Transparent))
+            {
+                return new Vector3(bx + 0.5f, checkY + 1, bz + 0.5f);
+            }
+        }
+
+        for (int dy = 1; dy <= 3; dy++)
+        {
+            var checkY = (short)(by + dy);
+            var feet = DefaultWorld.GetBlock(new Vector3s(bx, checkY, bz));
+            var head = DefaultWorld.GetBlock(new Vector3s(bx, (short)(checkY + 1), bz));
+            if (feet.Type == BlockType.Air && head.Type == BlockType.Air)
+            {
+                return new Vector3(bx + 0.5f, checkY + 1, bz + 0.5f);
+            }
+        }
+
+        return pos;
     }
 
     private void ValidatePlayerPhysics(PlayerEnt player, float dt)

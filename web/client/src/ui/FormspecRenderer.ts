@@ -16,6 +16,12 @@ export class FormspecRenderer {
     private unitSize: number = 40;
     private containerOffsetX: number = 0;
     private containerOffsetY: number = 0;
+    private anchorX: number = 0;
+    private anchorY: number = 0;
+    private containerStack: Array<{x: number, y: number}> = [];
+    private formspecVersion: number = 1;
+    private realCoordinates: boolean = false;
+    private allowClose: boolean = true;
 
     show(formName: string, elementsJson: string): void {
         this.hide();
@@ -25,6 +31,14 @@ export class FormspecRenderer {
         this.fields = {};
         this.containerOffsetX = 0;
         this.containerOffsetY = 0;
+        this.anchorX = 0;
+        this.anchorY = 0;
+        this.containerStack = [];
+        this.formspecVersion = 1;
+        this.realCoordinates = false;
+        this.allowClose = true;
+        void this.formspecVersion;
+        void this.realCoordinates;
 
         let elements: FormspecElement[];
         try {
@@ -60,6 +74,16 @@ export class FormspecRenderer {
         this.fields = {};
         this.containerOffsetX = 0;
         this.containerOffsetY = 0;
+        this.anchorX = 0;
+        this.anchorY = 0;
+        this.containerStack = [];
+        this.formspecVersion = 1;
+        this.realCoordinates = false;
+        this.allowClose = true;
+    }
+
+    canClose(): boolean {
+        return this.allowClose;
     }
 
     getCurrentFormName(): string {
@@ -71,7 +95,7 @@ export class FormspecRenderer {
         this.overlay.id = 'formspec-overlay';
         this.overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:600;display:flex;align-items:center;justify-content:center;';
         this.overlay.addEventListener('click', (e) => {
-            if (e.target === this.overlay) {
+            if (e.target === this.overlay && this.allowClose) {
                 this.submitFields();
             }
         });
@@ -162,6 +186,50 @@ export class FormspecRenderer {
                 break;
             case 'vertlabel':
                 this.renderVertlabel(element);
+                break;
+            case 'image_button':
+                this.renderImageButton(element);
+                break;
+            case 'item_image_button':
+                this.renderItemImageButton(element);
+                break;
+            case 'button_exit':
+                this.renderButton(element);
+                break;
+            case 'button_url':
+                this.renderButton(element);
+                break;
+            case 'no_prepend':
+                break;
+            case 'anchor':
+                this.handleAnchor(element);
+                break;
+            case 'position':
+                this.handlePosition(element);
+                break;
+            case 'style_type':
+                this.applyStyle(element);
+                break;
+            case 'formspec_version':
+                this.formspecVersion = Number(element.version || 1);
+                break;
+            case 'scroll_container':
+                this.renderScrollContainer(element);
+                break;
+            case 'real_coordinates':
+                this.realCoordinates = element.enabled === true;
+                break;
+            case 'container_end':
+                this.handleContainerEnd();
+                break;
+            case 'textlist':
+                this.renderTextlist(element);
+                break;
+            case 'background9':
+                this.renderBackground9(element);
+                break;
+            case 'allow_close':
+                this.allowClose = element.enabled !== false;
                 break;
         }
     }
@@ -322,10 +390,18 @@ export class FormspecRenderer {
         select.selectedIndex = Math.min(selectedIdx, options.length - 1);
 
         select.addEventListener('change', () => {
-            this.fields[name] = options[select.selectedIndex].trim();
+            if (element.indexEvent === true) {
+                this.fields[name] = String(select.selectedIndex);
+            } else {
+                this.fields[name] = options[select.selectedIndex].trim();
+            }
         });
 
-        this.fields[name] = options[Math.min(selectedIdx, options.length - 1)].trim();
+        if (element.indexEvent === true) {
+            this.fields[name] = String(Math.min(selectedIdx, options.length - 1));
+        } else {
+            this.fields[name] = options[Math.min(selectedIdx, options.length - 1)].trim();
+        }
         wrapper.appendChild(select);
         this.container!.appendChild(wrapper);
     }
@@ -779,6 +855,164 @@ export class FormspecRenderer {
         this.container!.appendChild(span);
     }
 
+    private renderImageButton(element: FormspecElement): void {
+        const btn = document.createElement('button');
+        const x = Number(element.x || 0) * this.unitSize;
+        const y = Number(element.y || 0) * this.unitSize;
+        const w = Number(element.width || 1) * this.unitSize;
+        const h = Number(element.height || 1) * this.unitSize;
+        const name = String(element.name || '');
+        const label = String(element.label || name);
+        const texture = String(element.texture || '');
+
+        let background = 'rgba(80,80,80,0.9)';
+        if (texture && this.isValidCssColor(texture)) {
+            background = texture;
+        }
+
+        btn.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px;background:${background};color:white;border:1px solid #888;border-radius:3px;cursor:pointer;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;`;
+        btn.textContent = label;
+        btn.dataset.name = name;
+        btn.addEventListener('mouseenter', () => {
+            btn.style.borderColor = '#aaa';
+        });
+        btn.addEventListener('mouseleave', () => {
+            btn.style.borderColor = '#888';
+        });
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.fields[name] = label;
+            this.submitFields();
+        });
+        this.container!.appendChild(btn);
+    }
+
+    private renderItemImageButton(element: FormspecElement): void {
+        const btn = document.createElement('button');
+        const x = Number(element.x || 0) * this.unitSize;
+        const y = Number(element.y || 0) * this.unitSize;
+        const w = Number(element.width || 1) * this.unitSize;
+        const h = Number(element.height || 1) * this.unitSize;
+        const itemName = String(element.itemName || '');
+        const name = String(element.name || '');
+        const label = String(element.label || '');
+
+        btn.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px;background:rgba(60,60,60,0.5);border:1px solid rgba(255,255,255,0.1);border-radius:3px;cursor:pointer;font-size:13px;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;`;
+        btn.dataset.name = name;
+
+        const itemLabel = document.createElement('span');
+        itemLabel.style.cssText = 'font-size:9px;color:#aaa;text-align:center;word-break:break-all;padding:2px;';
+        itemLabel.textContent = itemName;
+        btn.appendChild(itemLabel);
+
+        if (label) {
+            const textLabel = document.createElement('span');
+            textLabel.style.cssText = 'font-size:11px;color:white;margin-top:2px;';
+            textLabel.textContent = label;
+            btn.appendChild(textLabel);
+        }
+
+        btn.addEventListener('mouseenter', () => {
+            btn.style.borderColor = '#aaa';
+        });
+        btn.addEventListener('mouseleave', () => {
+            btn.style.borderColor = 'rgba(255,255,255,0.1)';
+        });
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.fields[name] = label;
+            this.submitFields();
+        });
+        this.container!.appendChild(btn);
+    }
+
+    private handleAnchor(element: FormspecElement): void {
+        this.anchorX = Number(element.x || 0) * this.unitSize;
+        this.anchorY = Number(element.y || 0) * this.unitSize;
+    }
+
+    private handlePosition(element: FormspecElement): void {
+        if (!this.container) return;
+        const x = Number(element.x || 0) * this.unitSize + this.anchorX;
+        const y = Number(element.y || 0) * this.unitSize + this.anchorY;
+        this.container.style.left = `${x}px`;
+        this.container.style.top = `${y}px`;
+    }
+
+    private renderScrollContainer(element: FormspecElement): void {
+        const div = document.createElement('div');
+        const x = Number(element.x || 0) * this.unitSize;
+        const y = Number(element.y || 0) * this.unitSize;
+        const w = Number(element.width || 1) * this.unitSize;
+        const h = Number(element.height || 1) * this.unitSize;
+        const orientation = String(element.orientation || 'vertical');
+        const scrollDir = orientation === 'horizontal' ? 'overflow-x:auto;overflow-y:hidden;' : 'overflow-y:auto;overflow-x:hidden;';
+
+        div.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px;${scrollDir}background:rgba(0,0,0,0.2);border:1px solid rgba(100,100,100,0.3);border-radius:2px;`;
+        div.dataset.scrollContainer = String(element.scrollbarName || '');
+        this.container!.appendChild(div);
+    }
+
+    private handleContainerEnd(): void {
+        if (this.containerStack.length > 0) {
+            const prev = this.containerStack.pop()!;
+            this.containerOffsetX = prev.x;
+            this.containerOffsetY = prev.y;
+        }
+    }
+
+    private renderTextlist(element: FormspecElement): void {
+        const wrapper = document.createElement('div');
+        const x = Number(element.x || 0) * this.unitSize;
+        const y = Number(element.y || 0) * this.unitSize;
+        const w = Number(element.width || 1) * this.unitSize;
+        const h = Number(element.height || 1) * this.unitSize;
+        const name = String(element.name || '');
+        const itemsStr = String(element.items || '');
+        const selectedIdx = Number(element.selectedIndex || 0);
+        const transparent = element.transparent === true;
+
+        const bgStyle = transparent ? 'background:transparent;' : 'background:rgba(0,0,0,0.3);';
+        wrapper.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px;overflow-y:auto;${bgStyle}border:1px solid #555;border-radius:3px;`;
+
+        const items = itemsStr.split(',');
+        for (let i = 0; i < items.length; i++) {
+            const itemDiv = document.createElement('div');
+            const isSelected = i === selectedIdx;
+            itemDiv.style.cssText = `padding:4px 8px;color:white;font-size:13px;cursor:pointer;border-bottom:1px solid rgba(100,100,100,0.3);${isSelected ? 'background:rgba(80,120,180,0.5);' : ''}`;
+            itemDiv.textContent = items[i].trim();
+            const capturedIndex = i;
+            itemDiv.addEventListener('mouseenter', () => {
+                if (!itemDiv.dataset.selected) {
+                    itemDiv.style.background = 'rgba(80,120,180,0.3)';
+                }
+            });
+            itemDiv.addEventListener('mouseleave', () => {
+                if (!itemDiv.dataset.selected) {
+                    itemDiv.style.background = 'transparent';
+                }
+            });
+            itemDiv.addEventListener('click', () => {
+                const allItems = wrapper.querySelectorAll('[data-selected]');
+                allItems.forEach(el => {
+                    const htmlEl = el as HTMLElement;
+                    htmlEl.style.background = 'transparent';
+                    delete htmlEl.dataset.selected;
+                });
+                itemDiv.style.background = 'rgba(80,120,180,0.5)';
+                itemDiv.dataset.selected = 'true';
+                this.fields[name] = String(capturedIndex);
+            });
+            if (isSelected) {
+                itemDiv.dataset.selected = 'true';
+            }
+            wrapper.appendChild(itemDiv);
+        }
+
+        this.fields[name] = String(selectedIdx);
+        this.container!.appendChild(wrapper);
+    }
+
     private submitFields(): void {
         if (!this.currentFormName) return;
 
@@ -790,5 +1024,24 @@ export class FormspecRenderer {
         if (this.onResponse) {
             this.onResponse(formName, fields);
         }
+    }
+
+    private renderBackground9(element: FormspecElement): void {
+        const div = document.createElement('div');
+        const x = Number(element.x || 0) * this.unitSize;
+        const y = Number(element.y || 0) * this.unitSize;
+        const w = Number(element.width || 1) * this.unitSize;
+        const h = Number(element.height || 1) * this.unitSize;
+        const texture = String(element.texture || '');
+
+        div.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px;pointer-events:none;overflow:hidden;`;
+
+        if (texture && texture.endsWith('.png') && !texture.includes('..') && !texture.includes('/') && /^[a-zA-Z0-9_\-]+\.png$/.test(texture)) {
+            div.style.backgroundImage = `url(${texture})`;
+            div.style.backgroundSize = `${w}px ${h}px`;
+            div.style.backgroundPosition = 'center';
+        }
+
+        this.container!.appendChild(div);
     }
 }

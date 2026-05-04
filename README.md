@@ -155,6 +155,20 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Persistent Particle Spawners**: Server-driven spawner creation/deletion with configurable velocity/acceleration/size/expiration/collision parameters, time-based emission
 - **Item Definition Sync**: Server sends items.json to client on join for server-authoritative item definitions
 - **Minimap Modes**: Server-driven minimap mode list sent on join (surface/radar/normal)
+- **Invulnerable Mode**: Players with invulnerable flag (spectator mode) are immune to all damage sources
+- **Bouncy Block Physics**: Slime blocks apply velocity reversal on landing (percentage-based bounce), fall damage negated
+- **Slippery Block Physics**: Ice and slippery blocks reduce ground friction for sliding movement
+- **Block Floodable Property**: Blocks marked floodable can be replaced by liquid flow (plants, tall grass)
+- **Block Pointable Property**: Blocks can disable player pointing/interaction (pointable=false)
+- **Entity Glow**: Per-entity glow level for self-illumination rendering
+- **Static Spawnpoint**: Configurable fixed spawn position via server_config.json (StaticSpawnX/Y/Z)
+- **Find Free Position**: Teleport system finds safe non-solid positions near target coordinates
+- **Extended Formspec Elements**: image_button, item_image_button, button_exit, button_url, anchor, position, scroll_container, container_end, textlist, background9, allow_close, formspec_version, real_coordinates, style_type, no_prepend
+- **Weather Command**: `/weather <clear|rain|snow|thunder>` for manual weather control
+- **Player-to-Player Teleport**: `/tpplayer <source> <target>` command
+- **Use Tool Command**: `/use_tool <dig|hit> <group> [level] [uses]` for tool wear testing
+- **Detach Command**: `/detach [radius]` to detach objects near player
+- **Clear Objects Command**: `/clearobjects` to clear all entities
 
 ## Architecture
 
@@ -442,6 +456,11 @@ The Vite dev server proxies `/game` to the server.
 | `/emergeblocks <x1> <y1> <z1> <x2> <y2> <z2>` | Force-generate chunks in area |
 | `/deleteblocks <x1> <y1> <z1> <x2> <y2> <z2>` | Delete blocks in area |
 | `/fixlight <x1> <y1> <z1> <x2> <y2> <z2>` | Fix lighting in area |
+| `/weather <clear|rain|snow|thunder>` | Set weather manually |
+| `/tpplayer <source> <target>` | Teleport player to another player |
+| `/use_tool <dig|hit> <group> [level] [uses]` | Apply tool wear for testing |
+| `/detach [radius]` | Detach objects near player |
+| `/clearobjects` | Clear all entities |
 | `/pulverize` | Clear all entities |
 | `/gamemode [s/c/a/sp]` | Set game mode (sp=spectator) |
 

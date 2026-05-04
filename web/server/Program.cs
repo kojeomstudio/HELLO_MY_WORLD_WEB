@@ -11,6 +11,7 @@ using WebGameServer.Core.Physics;
 using WebGameServer.Core.Smelting;
 using WebGameServer.Core.World;
 using WebGameServer.Core.Player;
+using WebGameServer.Core.Weather;
 using WebGameServer.Services;
 
 using WebGameServer.Core.Inventory;
@@ -750,7 +751,37 @@ builder.Services.AddSingleton<ChatCommandManager>(sp =>
             var world = gameServer.DefaultWorld;
             world.FixLighting(x1, y1, z1, x2, y2, z2);
             return 0;
-        });
+        },
+        (playerName) => {
+            var player = gameServer.GetPlayer(playerName);
+            return player?.Position ?? Vector3.Zero;
+        },
+        (sourceName, targetName) => {
+            var source = gameServer.GetPlayer(sourceName);
+            var target = gameServer.GetPlayer(targetName);
+            if (source == null || target == null) return false;
+            gameServer.TeleportPlayer(sourceName, target.Position);
+            return true;
+        },
+        (playerName, group, level, uses) => {
+            var player = gameServer.GetPlayer(playerName);
+            if (player == null) return;
+            var item = player.GetSelectedHotbarItem();
+            if (item == null) return;
+            var metadata = item.Metadata ?? "";
+            var currentWear = 0;
+            if (metadata.StartsWith("wear:") && int.TryParse(metadata[5..], out var w))
+                currentWear = w;
+            var maxWear = 65536;
+            var wearPerUse = maxWear / (uses * 4 + 1);
+            var newWear = Math.Min(maxWear, currentWear + wearPerUse * uses);
+            player.Inventory[player.SelectedHotbarSlot] = item with { Metadata = $"wear:{newWear}" };
+        },
+        (_playerName, _radius) => 0,
+        (playerName) => { gameServer.Weather.SetWeather(WeatherType.None); },
+        (playerName) => { gameServer.Weather.SetWeather(WeatherType.Rain); },
+        (playerName) => { gameServer.Weather.SetWeather(WeatherType.Snow); },
+        (playerName) => { gameServer.Weather.SetWeather(WeatherType.Thunderstorm); });
 });
 builder.Services.AddSingleton<CraftingSystem>(sp =>
 {

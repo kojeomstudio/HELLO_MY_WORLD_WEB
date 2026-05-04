@@ -74,6 +74,10 @@ public class BlockDefinitionManager
             def.FallDamageAddPercent = el.TryGetProperty("fallDamageAddPercent", out var fdap) ? fdap.GetInt32() : 0;
             def.Waving = el.TryGetProperty("waving", out var wv) ? wv.GetInt32() : 0;
             def.DamageGroup = el.TryGetProperty("damageGroup", out var dg) ? dg.GetString() ?? "fleshy" : "fleshy";
+            def.Floodable = el.TryGetProperty("floodable", out var flb) && flb.GetBoolean();
+            def.Pointable = !el.TryGetProperty("pointable", out var pt) || pt.GetBoolean();
+            def.LiquidMovePhysics = el.TryGetProperty("liquidMovePhysics", out var lmp) && lmp.GetBoolean();
+            def.PostEffectColorShaded = !el.TryGetProperty("postEffectColorShaded", out var pcs) || pcs.GetBoolean();
 
             if (el.TryGetProperty("dropTable", out var dropTableEl) && dropTableEl.ValueKind == JsonValueKind.Array)
             {
@@ -175,7 +179,7 @@ public class BlockDefinitionManager
             [(ushort)BlockType.HayBale] = new() { Id = 67, Name = "hay_bale", Solid = true, Color = "#DAA520", Hardness = 0.5f, Groups = new() { ["snappy"] = 3 }, SoundGroup = "grass" },
             [(ushort)BlockType.DesertStone] = new() { Id = 68, Name = "desert_stone", Solid = true, Color = "#A0926B", Hardness = 1.5f, Groups = new() { ["cracky"] = 3 }, SoundGroup = "stone" },
             [(ushort)BlockType.DirtWithSnow] = new() { Id = 69, Name = "dirt_with_snow", Solid = true, Color = "#8B8B8B", Hardness = 0.6f, Drops = "dirt", Groups = new() { ["crumbly"] = 3 }, SoundGroup = "dirt" },
-            [(ushort)BlockType.JungleGrass] = new() { Id = 70, Name = "junglegrass", Solid = false, Transparent = true, Color = "#00AA00", Hardness = 0.0f, Groups = new() { ["dig_immediate"] = 3 }, Waving = 1, BuildableTo = true, SoundGroup = "grass" },
+            [(ushort)BlockType.JungleGrass] = new() { Id = 70, Name = "junglegrass", Solid = false, Transparent = true, Color = "#00AA00", Hardness = 0.0f, Groups = new() { ["dig_immediate"] = 3 }, Waving = 1, BuildableTo = true, Floodable = true, SoundGroup = "grass" },
             [(ushort)BlockType.JungleWood] = new() { Id = 71, Name = "jungle_wood", Solid = true, Color = "#6B5030", Hardness = 2.0f, Groups = new() { ["choppy"] = 3 }, SoundGroup = "wood" },
             [(ushort)BlockType.JungleLeaves] = new() { Id = 72, Name = "jungle_leaves", Solid = true, Transparent = true, Color = "#1A8C1A", Hardness = 0.2f, Groups = new() { ["snappy"] = 3 }, Waving = 2, SoundGroup = "leaves" },
             [(ushort)BlockType.PineWood] = new() { Id = 73, Name = "pine_wood", Solid = true, Color = "#5C3D1E", Hardness = 2.0f, Groups = new() { ["choppy"] = 3 }, SoundGroup = "wood" },
@@ -397,6 +401,10 @@ public class BlockDefinition
     public int FallDamageAddPercent { get; set; }
     public int Waving { get; set; }
     public string DamageGroup { get; set; } = "fleshy";
+    public bool Floodable { get; set; }
+    public bool Pointable { get; set; } = true;
+    public bool LiquidMovePhysics { get; set; }
+    public bool PostEffectColorShaded { get; set; } = true;
 
     public (string itemId, int count)[] GetDrops(string? toolItemName = null)
     {

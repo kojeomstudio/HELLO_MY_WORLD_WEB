@@ -140,6 +140,8 @@ public class PhysicsEngine
                 (int)Math.Floor(newState.Position.Y - PlayerHeight - 0.1), world);
             var groundJumpDef = BlockDefs?.Get((ushort)groundBlockForJump);
             var noJump = groundJumpDef != null && groundJumpDef.NoJump;
+            var isSlippery = groundJumpDef != null && groundJumpDef.Slippery;
+            var effectiveDrag = isSlippery ? Drag * 0.05f : Drag;
 
             if (state.IsOnGround && input.Jump && !noJump)
             {
@@ -148,9 +150,9 @@ public class PhysicsEngine
             }
 
             newState.Velocity = new Vector3(
-                newState.Velocity.X * (1 - Drag),
+                newState.Velocity.X * (1 - effectiveDrag),
                 newState.Velocity.Y - Gravity * dt,
-                newState.Velocity.Z * (1 - Drag));
+                newState.Velocity.Z * (1 - effectiveDrag));
 
             if (newState.Velocity.Y < -TerminalVelocity)
             {
@@ -177,7 +179,16 @@ public class PhysicsEngine
         {
             var groundBlockDef = BlockDefs?.Get((ushort)groundBlock.Type);
             var isBouncy = groundBlockDef != null && groundBlockDef.Bouncy > 0;
-            if (!isBouncy)
+            if (isBouncy)
+            {
+                var bouncePercent = groundBlockDef!.Bouncy / 100.0f;
+                newState = newState with
+                {
+                    Velocity = new Vector3(newState.Velocity.X, Math.Abs(state.Velocity.Y) * bouncePercent, newState.Velocity.Z),
+                    IsOnGround = false
+                };
+            }
+            else
             {
                 var fallDistance = state.LastGroundY - newPos.Y;
                 if (fallDistance > 3.0f)

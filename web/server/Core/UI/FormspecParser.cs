@@ -11,7 +11,11 @@ public class FormspecParser
         "dropdown", "textarea", "checkbox", "bgcolor", "container",
         "pwdfield", "table", "tabheader", "scrollbar", "tooltip",
         "background", "item_image", "hypertext", "animated_image",
-        "style", "listring", "vertlabel"
+        "style", "listring", "vertlabel",
+        "image_button", "item_image_button", "button_exit", "button_url",
+        "no_prepend", "anchor", "position", "style_type",
+        "formspec_version", "scroll_container", "real_coordinates",
+        "container_end", "textlist", "background9", "allow_close"
     ];
 
     public JsonArray Parse(string formspec)
@@ -236,6 +240,8 @@ public class FormspecParser
                         element["options"] = parameters[5];
                     if (parameters.Length >= 7 && int.TryParse(parameters[6], out var selIdx))
                         element["selectedIndex"] = selIdx;
+                    if (parameters.Length >= 8)
+                        element["indexEvent"] = parameters[7] != "false";
                 }
                 break;
 
@@ -464,6 +470,194 @@ public class FormspecParser
                     element["y"] = vlY;
                     element["text"] = parameters[2];
                 }
+                break;
+
+            case "image_button":
+                if (parameters.Length >= 6 &&
+                    float.TryParse(parameters[0], out var ibX) &&
+                    float.TryParse(parameters[1], out var ibY) &&
+                    float.TryParse(parameters[2], out var ibW) &&
+                    float.TryParse(parameters[3], out var ibH))
+                {
+                    element["x"] = ibX;
+                    element["y"] = ibY;
+                    element["width"] = ibW;
+                    element["height"] = ibH;
+                    element["texture"] = parameters[4];
+                    element["name"] = parameters[5];
+                    if (parameters.Length >= 7)
+                        element["label"] = parameters[6];
+                }
+                break;
+
+            case "item_image_button":
+                if (parameters.Length >= 6 &&
+                    float.TryParse(parameters[0], out var iibX) &&
+                    float.TryParse(parameters[1], out var iibY) &&
+                    float.TryParse(parameters[2], out var iibW) &&
+                    float.TryParse(parameters[3], out var iibH))
+                {
+                    element["x"] = iibX;
+                    element["y"] = iibY;
+                    element["width"] = iibW;
+                    element["height"] = iibH;
+                    element["itemName"] = parameters[4];
+                    element["name"] = parameters[5];
+                    if (parameters.Length >= 7)
+                        element["label"] = parameters[6];
+                }
+                break;
+
+            case "button_exit":
+                if (parameters.Length >= 5 &&
+                    float.TryParse(parameters[0], out var beX) &&
+                    float.TryParse(parameters[1], out var beY) &&
+                    float.TryParse(parameters[2], out var beW) &&
+                    float.TryParse(parameters[3], out var beH))
+                {
+                    element["x"] = beX;
+                    element["y"] = beY;
+                    element["width"] = beW;
+                    element["height"] = beH;
+                    element["name"] = parameters[4];
+                    if (parameters.Length >= 6)
+                        element["label"] = parameters[5];
+                    element["isExit"] = true;
+                }
+                break;
+
+            case "button_url":
+                if (parameters.Length >= 6 &&
+                    float.TryParse(parameters[0], out var buX) &&
+                    float.TryParse(parameters[1], out var buY) &&
+                    float.TryParse(parameters[2], out var buW) &&
+                    float.TryParse(parameters[3], out var buH))
+                {
+                    element["x"] = buX;
+                    element["y"] = buY;
+                    element["width"] = buW;
+                    element["height"] = buH;
+                    element["name"] = parameters[4];
+                    element["label"] = parameters[5];
+                    if (parameters.Length >= 7)
+                        element["url"] = parameters[6];
+                }
+                break;
+
+            case "no_prepend":
+                break;
+
+            case "anchor":
+                if (parameters.Length >= 2 &&
+                    float.TryParse(parameters[0], out var anX) &&
+                    float.TryParse(parameters[1], out var anY))
+                {
+                    element["x"] = anX;
+                    element["y"] = anY;
+                }
+                break;
+
+            case "position":
+                if (parameters.Length >= 2 &&
+                    float.TryParse(parameters[0], out var poX) &&
+                    float.TryParse(parameters[1], out var poY))
+                {
+                    element["x"] = poX;
+                    element["y"] = poY;
+                }
+                break;
+
+            case "style_type":
+                if (parameters.Length >= 2)
+                {
+                    element["selector"] = parameters[0];
+                    element["properties"] = parameters[1];
+                }
+                break;
+
+            case "formspec_version":
+                if (parameters.Length >= 1 &&
+                    int.TryParse(parameters[0], out var fvVer))
+                {
+                    element["version"] = fvVer;
+                }
+                break;
+
+            case "scroll_container":
+                if (parameters.Length >= 5 &&
+                    float.TryParse(parameters[0], out var scX) &&
+                    float.TryParse(parameters[1], out var scY) &&
+                    float.TryParse(parameters[2], out var scW) &&
+                    float.TryParse(parameters[3], out var scH))
+                {
+                    element["x"] = scX;
+                    element["y"] = scY;
+                    element["width"] = scW;
+                    element["height"] = scH;
+                    element["scrollbarName"] = parameters[4];
+                    if (parameters.Length >= 6)
+                        element["orientation"] = parameters[5];
+                    if (parameters.Length >= 7 && float.TryParse(parameters[6], out var scOff))
+                        element["scrollbarOffset"] = scOff;
+                }
+                break;
+
+            case "real_coordinates":
+                if (parameters.Length >= 1)
+                {
+                    element["enabled"] = parameters[0] == "true";
+                }
+                break;
+
+            case "container_end":
+                break;
+
+            case "textlist":
+                if (parameters.Length >= 5 &&
+                    float.TryParse(parameters[0], out var tlX) &&
+                    float.TryParse(parameters[1], out var tlY) &&
+                    float.TryParse(parameters[2], out var tlW) &&
+                    float.TryParse(parameters[3], out var tlH))
+                {
+                    element["x"] = tlX;
+                    element["y"] = tlY;
+                    element["width"] = tlW;
+                    element["height"] = tlH;
+                    element["name"] = parameters[4];
+                    if (parameters.Length >= 6)
+                        element["items"] = parameters[5];
+                    if (parameters.Length >= 7 && int.TryParse(parameters[6], out var tlSel))
+                        element["selectedIndex"] = tlSel;
+                    if (parameters.Length >= 8)
+                        element["transparent"] = parameters[7] == "true";
+                }
+                break;
+
+            case "background9":
+                if (parameters.Length >= 6 &&
+                    float.TryParse(parameters[0], out var b9X) &&
+                    float.TryParse(parameters[1], out var b9Y) &&
+                    float.TryParse(parameters[2], out var b9W) &&
+                    float.TryParse(parameters[3], out var b9H))
+                {
+                    element["x"] = b9X;
+                    element["y"] = b9Y;
+                    element["width"] = b9W;
+                    element["height"] = b9H;
+                    element["texture"] = parameters[4];
+                    element["autoClip"] = parameters[5] != "false";
+                    if (parameters.Length >= 8 &&
+                        float.TryParse(parameters[6], out var mX) &&
+                        float.TryParse(parameters[7], out var mY))
+                    {
+                        element["middleX"] = mX;
+                        element["middleY"] = mY;
+                    }
+                }
+                break;
+
+            case "allow_close":
+                element["enabled"] = parameters.Length >= 1 && parameters[0] != "false";
                 break;
         }
 
