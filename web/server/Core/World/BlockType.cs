@@ -240,5 +240,17 @@ public enum BlockType : ushort
     MudBrickSlab = 235,
     Vine = 236,
     RedstoneRepeater = 237,
-    RedstoneComparator = 238
+    RedstoneComparator = 238,
+    StoneStairs = 239,
+    MeseBlock = 240,
+    LockedChest = 241,
+    Rail = 242,
+    Sapling = 243,
+    Cloud = 244,
+    GrassFootsteps = 245,
+    NyanCat = 246,
+    NyanCatRainbow = 247,
+    Papyrus = 248,
+    Coalstone = 249,
+    MeseOre = 250
 }

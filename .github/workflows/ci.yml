@@ -109,6 +109,24 @@ jobs:
           fi
           echo "All required data files present"
 
+      - name: Verify block data consistency
+        run: |
+          python3 -c "
+          import json, sys
+          blocks = json.load(open('web/data/blocks.json'))['blocks']
+          items = json.load(open('web/data/items.json'))['items']
+          ids = sorted(int(k) for k in blocks.keys())
+          for i in range(max(ids) + 1):
+              if str(i) not in blocks:
+                  print(f'::error::Missing block ID {i}')
+                  sys.exit(1)
+          for name, item in items.items():
+              bid = item.get('blockId')
+              if bid is not None and str(bid) not in blocks:
+                  print(f'::warning::Item {name} references missing blockId {bid}')
+          print(f'Block data consistent: {len(ids)} blocks, IDs 0-{max(ids)}')
+          "
+
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest

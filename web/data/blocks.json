@@ -231,6 +231,25 @@
         "228": { "name": "stone_wall", "solid": true, "transparent": true, "color": "#808080", "hardness": 1.5, "groups": { "cracky": 3 }, "soundGroup": "stone", "drawType": "wall", "connectsTo": ["cobblestone_wall", "stone_wall", "mossy_cobblestone_wall", "cobblestone", "stone", "mossycobble"] },
         "229": { "name": "mossy_cobblestone_wall", "solid": true, "transparent": true, "color": "#5A7A5A", "hardness": 2.0, "groups": { "cracky": 3 }, "soundGroup": "stone", "drawType": "wall", "connectsTo": ["cobblestone_wall", "stone_wall", "mossy_cobblestone_wall", "cobblestone", "stone", "mossycobble"] },
         "230": { "name": "glass_pane", "solid": true, "transparent": true, "color": "#C0E0F0", "hardness": 0.3, "groups": { "cracky": 3 }, "soundGroup": "glass", "drawType": "glass_pane", "connectsTo": ["glass_pane", "glass", "iron_bars"] },
-        "231": { "name": "iron_bars", "solid": true, "transparent": true, "color": "#A0A0A0", "hardness": 5.0, "groups": { "cracky": 2 }, "soundGroup": "metal", "drawType": "glass_pane", "connectsTo": ["glass_pane", "glass", "iron_bars"] }
+        "231": { "name": "mud", "solid": true, "transparent": false, "color": "#5A4530", "hardness": 0.5, "groups": { "crumbly": 3 }, "soundGroup": "dirt" },
+        "232": { "name": "packed_mud", "solid": true, "transparent": false, "color": "#7A6540", "hardness": 1.0, "groups": { "crumbly": 2 }, "soundGroup": "dirt" },
+        "233": { "name": "mud_bricks", "solid": true, "transparent": false, "color": "#8A7550", "hardness": 2.0, "groups": { "cracky": 3 }, "soundGroup": "stone" },
+        "234": { "name": "mud_brick_stairs", "solid": true, "transparent": false, "color": "#8A7550", "hardness": 2.0, "groups": { "cracky": 3 }, "soundGroup": "stone" },
+        "235": { "name": "mud_brick_slab", "solid": true, "transparent": false, "color": "#8A7550", "hardness": 2.0, "groups": { "cracky": 3 }, "soundGroup": "stone" },
+        "236": { "name": "vine", "solid": false, "transparent": true, "color": "#2A8A2A", "hardness": 0.2, "climbable": false, "groups": { "snappy": 3, "dig_immediate": 3 }, "soundGroup": "grass" },
+        "237": { "name": "redstone_repeater", "solid": false, "transparent": true, "color": "#808080", "interactive": true, "hardness": 0.0, "groups": { "dig_immediate": 3 }, "soundGroup": "stone" },
+        "238": { "name": "redstone_comparator", "solid": false, "transparent": true, "color": "#808080", "interactive": true, "hardness": 0.0, "groups": { "dig_immediate": 3 }, "soundGroup": "stone" },
+        "239": { "name": "stone_stairs", "solid": true, "transparent": false, "color": "#808080", "hardness": 1.5, "groups": { "cracky": 3 }, "soundGroup": "stone", "textureName": "default_stone" },
+        "240": { "name": "mese_block", "solid": true, "transparent": false, "color": "#CCCC00", "hardness": 5.0, "light": 5, "groups": { "cracky": 1 }, "soundGroup": "stone" },
+        "241": { "name": "locked_chest", "solid": true, "transparent": false, "color": "#6B4020", "interactive": true, "hardness": 2.5, "groups": { "choppy": 2 }, "soundGroup": "wood" },
+        "242": { "name": "rail", "solid": false, "transparent": true, "color": "#A0A0A0", "hardness": 0.5, "groups": { "dig_immediate": 3, "cracky": 3 }, "soundGroup": "metal" },
+        "243": { "name": "sapling", "solid": false, "transparent": true, "color": "#4A8C3A", "hardness": 0.0, "groups": { "dig_immediate": 3, "snappy": 3 }, "soundGroup": "grass" },
+        "244": { "name": "cloud", "solid": true, "transparent": false, "color": "#F0F0F0", "hardness": 0.5, "groups": { "dig_immediate": 3 }, "soundGroup": "default" },
+        "245": { "name": "grass_footsteps", "solid": true, "transparent": false, "color": "#228B22", "hardness": 0.6, "drops": "dirt", "groups": { "crumbly": 3 }, "soundGroup": "grass" },
+        "246": { "name": "nyancat", "solid": true, "transparent": false, "color": "#FFD700", "hardness": 3.0, "groups": { "cracky": 2 }, "soundGroup": "stone" },
+        "247": { "name": "nyancat_rainbow", "solid": true, "transparent": false, "color": "#FF4444", "hardness": 3.0, "groups": { "cracky": 2 }, "soundGroup": "stone" },
+        "248": { "name": "papyrus", "solid": false, "transparent": true, "color": "#40A040", "hardness": 0.0, "groups": { "dig_immediate": 3 }, "soundGroup": "grass" },
+        "249": { "name": "coalstone", "solid": true, "transparent": false, "color": "#3A3A3A", "hardness": 2.0, "groups": { "cracky": 3 }, "soundGroup": "stone" },
+        "250": { "name": "mese_ore", "solid": true, "transparent": false, "color": "#CCCC00", "hardness": 3.0, "drops": "mese_crystal", "groups": { "cracky": 2 }, "soundGroup": "stone" }
     }
 }

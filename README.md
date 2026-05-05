@@ -6,9 +6,9 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 
 - **Voxel World**: Procedurally generated 3D world with noise-based terrain, caves, ores, schematic-based trees (oak, pine, jungle, birch, cactus), rivers, multi-room dungeons, and 10 biomes (grassland, forest, desert, snow, taiga, jungle, savanna, mountains, swamp, ocean) selected via heat/humidity noise
 - **162 Block Types**: Including stone variants, 9 ore types (diamond, gold, iron, coal, redstone, emerald, lapis, copper), wood types (oak, jungle, pine), stairs/slabs, fences, walls, glass panes, doors, decorative blocks, flowers, mushrooms, utility blocks, light sources, fire, cobweb, vine, Nether/End blocks, redstone components, mud/mud brick blocks, and all wood variants (spruce/birch/jungle/acacia/dark oak doors, fences, planks)
-- **226 Block Definitions**: Full block enum (IDs 0-231) with complete defaults in code and JSON data override
-- **220+ Items**: Tools (wood/stone/iron/diamond/gold/steel/mese/titanium), special weapons (fire sword, ice sword, blood sword, heal sword, elemental sword, daggers), steel shears, alchemy ingredients, crafting materials, armor (leather/iron/gold/diamond), food, resources, utility items, and fishing/breeding drops
-- **Crafting System**: 166+ recipes including shaped crafting, tool creation, special weapon recipes, ore block storage, copper processing, decoration recipes, gold tool recipes, titanium recipes, armor, building blocks, food, and tool repair. Grid-based crafting system with pattern offset matching and item group support.
+- **251 Block Definitions**: Full block enum (IDs 0-250) with complete defaults in code and JSON data override, including mese block/ore, locked chest, rail, sapling, cloud, grass footsteps, nyan cat/rainbow, papyrus, coalstone, stone stairs, redstone repeater/comparator
+- **247 Items**: Tools (wood/stone/iron/diamond/gold/steel/mese/titanium), special weapons (fire sword, ice sword, blood sword, heal sword, elemental sword, daggers), steel shears, alchemy ingredients, crafting materials, armor (leather/iron/gold/diamond), food, resources, utility items, and fishing/breeding drops
+- **183 Crafting Recipes**: Shaped and shapeless recipes with group-based matching, including mese block, stone stairs, locked chest, rail, redstone components, mud bricks, and all tool/armor sets
 - **Fuel Registry**: Configurable fuel items with burn times loaded from `items.json` (coal, charcoal, wood, lava bucket, etc.)
 - **Smelting System**: 20 smelting recipes via furnace with fuel consumption, correct ore-to-ingot and food mappings
 - **Redstone System**: Power propagation through wires, source blocks (torch, lever, button, pressure plate), consumer toggling (lamps), repeaters (4-tick delay, signal boost), comparators (compare/subtract modes)
@@ -274,8 +274,8 @@ web/
 │       ├── GameHub.cs            # SignalR hub
 │       └── GameLoopService.cs    # Background game loop
 ├── data/                # JSON configuration
-│   ├── blocks.json       # 232 block definitions (IDs 0-231, full defaults in code)
-│   ├── items.json        # 220+ items, 166+ recipes, food values, tool capabilities
+│   ├── blocks.json       # 251 block definitions (IDs 0-250, full defaults in code)
+│   ├── items.json        # 247 items, 183 recipes, food values, tool capabilities
 │   ├── mobs.json         # 6 mob definitions
 │   ├── tools.json        # 8 tool material definitions
 │   ├── biomes.json       # 10 biome definitions with tree types and decorations
