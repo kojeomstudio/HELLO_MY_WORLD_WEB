@@ -1,6 +1,6 @@
 # HelloMyWorld Web Game
 
-A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest engine) to a modern TypeScript/Three.js client + C# ASP.NET Core 10.0/SignalR server architecture.
+A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest engine) to a modern TypeScript/Three.js client + C# ASP.NET Core 8.0/SignalR server architecture.
 
 ## Features
 
@@ -104,7 +104,7 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Dungeon Loot Tables**: Tiered loot (common/uncommon/rare/special) with varied items
 - **Extended Drop Tables**: Per-block drop tables with rarity, tool group requirements, tool rating min/max, max drop items, inherit color support
 - **Cascade Falling Nodes**: Stack-based iterative falling with neighbor cascade propagation, attached node drop support
-- **VoxelArea**: Fast cuboid iteration utility with ZYX stride indexing
+- **VoxelArea**: Fast cuboid iteration utility with ZYX stride indexing, area operations (addArea, intersect, pad, contains, intersects)
 - **Forceloading**: Persistent and transient chunk forceloading with reference counting and JSON persistence
 - **Entity Lifecycle Callbacks**: Static events for entity spawn/despawn/step and mob activate/damage/death
 - **Item Entity Improvements**: Collection radius, stuck-in-solid pushout, slippery block sliding
@@ -112,6 +112,8 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Server-Driven HUD**: Add/remove/change/clear HUD elements (text, image, statbar, waypoint, compass) via SignalR
 - **Death Screen**: Formspec-styled death screen with respawn button
 - **VoxelManipulator**: Bulk node read/write utility for mapgen and world manipulation (CopyFrom/CopyTo/Fill/Replace/Blit)
+- **MMVManip**: Map-bound VoxelManipulator with InitialEmerge/BlitBackAll for map generation workflows
+- **MapEditEvent System**: World change event dispatching with typed events (AddNode/RemoveNode/SwapNode/MetadataChanged), receiver pattern for subscriber notification
 - **Advanced Ore Generation**: 6 ore placement algorithms — Scatter (noise-based), Vein (random-walk), Sheet (horizontal layer), Blob (spherical radius), Puff (3D thickness noise), Stratum (noise-contoured horizontal layers)
 - **Entity Interpolation**: Smooth position transitions for mobs and items using hermite spline interpolation
 - **Cloud Parameters Protocol**: Server-driven cloud density, thickness, height, and speed via SignalR `OnCloudParams` message
@@ -147,6 +149,7 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Schematic Placement System**: JSON-based structure placement with per-node probability, Y-slice probability, rotation (0/90/180/270), force-place option, surface placement API; 2 predefined schematics (small_house, outpost_tower)
 - **MapgenValleys**: River valley terrain generator with altitude-chill biome adjustment, noise-based river carving, configurable valley depth/width
 - **MapgenCarpathian**: Terraced mountain terrain generator with step-height quantization, ridge noise for mountain ridges, stone surface at high altitudes, optional rivers
+- **MapgenV7**: Full V7 terrain generator ported from minetest with dual terrain blending (base/alt via height_select noise), modulated persistence, 3D mountain terrain with density gradient, ridge/river carving via 3D noise, cave noise intersection (dual 3D), cavern noise with amplitude tapering, noise-driven dungeon placement, filler depth noise for surface variation
 - **Async Job System**: Background job queue with concurrency limiting (4 parallel), progress tracking, cancellation, job status (Pending/Running/Completed/Failed/Cancelled), automatic cleanup of completed jobs
 - **Tool Repair Crafting**: Combine two worn tools of the same type in the crafting grid to repair them; uses Minetest formula `new_wear = 65536 - (uses1 + uses2)`, respects disable_repair group
 - **ModChannel Communication**: Join/leave/send messages on named mod channels via SignalR hub methods, inter-mod communication framework
@@ -210,7 +213,7 @@ web/
 │           ├── blocks/              # 89+ block textures from minetest devtest
 │           └── ui/                  # 97 base UI textures
 │   └── package.json
-├── server/              # C# ASP.NET Core 10.0 backend
+├── server/              # C# ASP.NET Core 8.0 backend
 │   ├── Program.cs                # Entry point, DI setup
 │   ├── Core/
 │   │   ├── GameServer.cs         # Main game logic
@@ -237,7 +240,7 @@ web/
 │   │   ├── UI/                   # Formspec parser and system
 │   │   ├── Weather/              # Server weather system (rain, snow, thunderstorm)
 │   │   └── World/                # World, chunks, generators, lighting, ABMs, redstone
-│   │       ├── Generators/       # MapgenV5, V7/Noise, Valleys, Carpathian, Fractal, Singlenode, Flat
+│   │       ├── Generators/       # MapgenV5, V7, Noise, Valleys, Carpathian, Fractal, Singlenode, Flat
 │   │       │   ├── LSystemTree.cs        # L-system tree generation engine
 │   │       │   ├── SchematicPlacer.cs    # Schematic placement with rotation/probability
 │   │       │   ├── MapgenValleys.cs      # River valley terrain generator
@@ -270,7 +273,7 @@ web/
 ## Quick Start
 
 ### Prerequisites
-- .NET 10.0 SDK
+- .NET 8.0 SDK
 - Node.js 18+
 - npm
 
@@ -301,8 +304,12 @@ cd web/client && npm install && npm run dev
 
 ### Production mode (single server):
 ```bash
-# Builds client, then serves both via the C# server
+# Windows
 start-prod.bat
+
+# Linux/macOS
+chmod +x start-prod.sh
+./start-prod.sh
 ```
 
 ## Build
@@ -483,8 +490,8 @@ This project is a web port of the Luanti (formerly Minetest) voxel game engine, 
 - **Liquid Physics**: Water/lava flow with level system, lava-water interaction
 - **Day/Night Cycle**: Matching minetest's 24000-tick cycle
 - **Textures**: 89+ block textures from minetest devtest with nearest-neighbor filtering
-- **World Generation**: 10 biomes (grassland, forest, desert, snow, taiga, jungle, savanna, mountains, swamp, ocean) with heat/humidity noise, schematic-based trees (oak, pine, jungle, birch, cactus), river generation, 13 ore/mineral types with scatter, vein, and sheet placement, multi-room dungeons with corridors and loot chests, cave systems with large caverns, random-walk tunnel generation with variable radius
-- **Security**: XSS-safe rendering (textContent/DOM APIs, CSS color validation), CORS-restricted origins with scoped headers/methods, CSP headers (no unsafe-eval, no unsafe-inline scripts, frame-ancestors none), HSTS, Cross-Origin-Opener-Policy, Cross-Origin-Resource-Policy, Referrer-Policy, Permissions-Policy, HTML entity encoding for chat, sign text sanitization, player name sanitization, IP-based rate limiting with join cooldown, per-account brute-force lockout (5 failed attempts -> 5-minute lockout, keyed by IP+name to prevent cross-IP DoS), PBKDF2 password hashing (100k iterations, SHA256, random salt), constant-time comparison, privilege escalation protection (no self-grant/self-revoke/server privilege revocation), thread-safe privilege persistence, tiered privilege escalation protection, area protection with ownership checks, chest/furnace proximity validation, rollback recording, persistent ban database, block coordinate range validation, server-authoritative physics with speed hack detection and position correction, input validation on /give (item whitelist) and /spawn (entity type whitelist) commands, rate limiting on all SignalR hub methods, item ID validation on give commands, entity type validation on spawn commands, consistent password policy (8-char minimum), CI security scanning with fail-on-detect, npm audit in CI, minimal permissions for CI workflows, authenticated hub methods, explicit content-type whitelist for static files (no ServeUnknownFileTypes), SignalR max receive message size (256KB), runtime data files excluded from git, detached inventory creation restricted to server privilege, smelting item ID length validation, grid craft size validation
+- **World Generation**: 10 biomes (grassland, forest, desert, snow, taiga, jungle, savanna, mountains, swamp, ocean) with heat/humidity noise, schematic-based trees (oak, pine, jungle, birch, cactus), river generation, 13 ore/mineral types with scatter, vein, and sheet placement, multi-room dungeons with corridors and loot chests, cave systems with large caverns, random-walk tunnel generation with variable radius. 8 map generators: Flat, Noise, V5, V7 (default minetest terrain with dual-blend mountains/ridges/rivers), Valleys, Carpathian, Fractal, Singlenode
+- **Security**: XSS-safe rendering (textContent/DOM APIs, CSS color validation), CORS-restricted origins with scoped headers/methods, CSP headers with nonce-based styles (no unsafe-eval, no unsafe-inline scripts/styles, frame-ancestors none), HSTS, Cross-Origin-Opener-Policy, Cross-Origin-Resource-Policy, Referrer-Policy, Permissions-Policy, HTML entity encoding for chat, sign text sanitization, player name sanitization, IP-based rate limiting with join cooldown, per-account brute-force lockout (5 failed attempts -> 5-minute lockout, keyed by IP+name to prevent cross-IP DoS), PBKDF2 password hashing (100k iterations, SHA256, random salt), constant-time comparison, privilege escalation protection (no self-grant/self-revoke/server privilege revocation), thread-safe privilege persistence, tiered privilege escalation protection, area protection with ownership checks, chest/furnace proximity validation, rollback recording, persistent ban database, block coordinate range validation, server-authoritative physics with speed hack detection and position correction, input validation on /give (item whitelist) and /spawn (entity type whitelist) commands, rate limiting on all SignalR hub methods, configurable chat rate limit from server config, item ID validation on give commands, entity type validation on spawn commands, consistent password policy (8-char minimum, 128-char max), CI security scanning with fail-on-detect, npm audit in CI, minimal permissions for CI workflows, authenticated hub methods, explicit content-type whitelist for static files (no ServeUnknownFileTypes), SignalR max receive message size (128KB), runtime data files excluded from git, detached inventory creation restricted to server privilege, smelting item ID length validation, grid craft size validation
 - **CI**: GitHub Actions pipeline with Ubuntu + Windows server builds, client typecheck+build, security scan, data integrity verification (JSON parsing + required file checks)
 
 ## License

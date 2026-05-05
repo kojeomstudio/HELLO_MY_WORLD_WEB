@@ -8,7 +8,7 @@ echo.
 
 where dotnet >nul 2>&1
 if %ERRORLEVEL% neq 0 (
-    echo ERROR: dotnet SDK not found. Please install .NET 10.0 SDK.
+    echo ERROR: dotnet SDK not found. Please install .NET 8.0 SDK.
     pause
     exit /b 1
 )

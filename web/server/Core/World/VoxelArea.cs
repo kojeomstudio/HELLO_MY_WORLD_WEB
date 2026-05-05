@@ -74,4 +74,51 @@ public class VoxelArea
             }
         }
     }
+
+    public VoxelArea AddArea(VoxelArea other)
+    {
+        return new VoxelArea(
+            Math.Min(_minX, other._minX),
+            Math.Min(_minY, other._minY),
+            Math.Min(_minZ, other._minZ),
+            Math.Max(MaxX, other.MaxX),
+            Math.Max(MaxY, other.MaxY),
+            Math.Max(MaxZ, other.MaxZ));
+    }
+
+    public VoxelArea? Intersect(VoxelArea other)
+    {
+        var minX = Math.Max(_minX, other._minX);
+        var minY = Math.Max(_minY, other._minY);
+        var minZ = Math.Max(_minZ, other._minZ);
+        var maxX = Math.Min(MaxX, other.MaxX);
+        var maxY = Math.Min(MaxY, other.MaxY);
+        var maxZ = Math.Min(MaxZ, other.MaxZ);
+
+        if (minX > maxX || minY > maxY || minZ > maxZ)
+            return null;
+
+        return new VoxelArea(minX, minY, minZ, maxX, maxY, maxZ);
+    }
+
+    public VoxelArea Pad(int d)
+    {
+        return new VoxelArea(
+            _minX - d, _minY - d, _minZ - d,
+            MaxX + d, MaxY + d, MaxZ + d);
+    }
+
+    public bool Contains(VoxelArea other)
+    {
+        return other._minX >= _minX && other.MaxX <= MaxX &&
+               other._minY >= _minY && other.MaxY <= MaxY &&
+               other._minZ >= _minZ && other.MaxZ <= MaxZ;
+    }
+
+    public bool Intersects(VoxelArea other)
+    {
+        return _minX <= other.MaxX && MaxX >= other._minX &&
+               _minY <= other.MaxY && MaxY >= other._minY &&
+               _minZ <= other.MaxZ && MaxZ >= other._minZ;
+    }
 }

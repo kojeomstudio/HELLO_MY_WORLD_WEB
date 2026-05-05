@@ -65,7 +65,7 @@ builder.Services.AddSingleton(serverConfig);
 
 builder.Services.AddSignalR(options =>
 {
-    options.MaximumReceiveMessageSize = 256 * 1024;
+    options.MaximumReceiveMessageSize = 128 * 1024;
 });
 builder.Services.AddSingleton<BlockDefinitionManager>(sp =>
 {
@@ -852,10 +852,12 @@ app.Use(async (context, next) =>
     context.Response.Headers["Cross-Origin-Resource-Policy"] = "same-origin";
     if (!app.Environment.IsDevelopment())
         context.Response.Headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains";
+    var cspNonce = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16));
+    context.Items["CspNonce"] = cspNonce;
     context.Response.Headers["Content-Security-Policy"] =
         "default-src 'self'; " +
         "script-src 'self'; " +
-        "style-src 'self' 'unsafe-inline'; " +
+        $"style-src 'self' 'nonce-{cspNonce}'; " +
         "img-src 'self' data: blob:; " +
         $"connect-src 'self' ws: wss: {string.Join(' ', serverConfig.CorsOrigins.Where(IsValidOrigin))}; " +
         "media-src 'self' blob:; " +

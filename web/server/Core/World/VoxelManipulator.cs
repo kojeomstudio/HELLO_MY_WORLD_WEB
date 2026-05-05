@@ -2,13 +2,13 @@ namespace WebGameServer.Core.World;
 
 public class VoxelManipulator
 {
-    private readonly Block?[, ,] _data;
-    private readonly int _minX;
-    private readonly int _minY;
-    private readonly int _minZ;
-    private readonly int _sizeX;
-    private readonly int _sizeY;
-    private readonly int _sizeZ;
+    private Block?[, ,] _data;
+    private int _minX;
+    private int _minY;
+    private int _minZ;
+    private int _sizeX;
+    private int _sizeY;
+    private int _sizeZ;
     private bool _modified;
 
     public int MinX => _minX;
@@ -114,6 +114,18 @@ public class VoxelManipulator
     public void Clear()
     {
         Array.Clear(_data);
+        _modified = false;
+    }
+
+    protected void Resize(int minX, int minY, int minZ, int sizeX, int sizeY, int sizeZ)
+    {
+        _minX = minX;
+        _minY = minY;
+        _minZ = minZ;
+        _sizeX = sizeX;
+        _sizeY = sizeY;
+        _sizeZ = sizeZ;
+        _data = new Block[sizeX, sizeY, sizeZ];
         _modified = false;
     }
 

@@ -365,7 +365,7 @@ public class GameHub : Hub<IGameClient>
 
         if (string.IsNullOrEmpty(message) || message.Length > 256) return;
 
-        if (!CheckChatRateLimit(Context.ConnectionId)) return;
+        if (!CheckChatRateLimit(Context.ConnectionId, _config.ChatMessageLimitPer10Sec)) return;
 
         message = SanitizeChatMessage(message);
 
@@ -2184,7 +2184,7 @@ public class GameHub : Hub<IGameClient>
         return true;
     }
 
-    private static bool CheckChatRateLimit(string connectionId)
+    private static bool CheckChatRateLimit(string connectionId, int limit)
     {
         var now = DateTime.UtcNow;
         var window = TimeSpan.FromSeconds(10);
@@ -2198,7 +2198,7 @@ public class GameHub : Hub<IGameClient>
                 timestamps.Dequeue();
             }
 
-            if (timestamps.Count >= 8)
+            if (timestamps.Count >= limit)
             {
                 return false;
             }

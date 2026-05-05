@@ -66,6 +66,35 @@ Biome selection uses two independent Perlin noise maps (heat and humidity), matc
 
 ## World Generation
 
+### Map Generators (8 types)
+| Generator | Description |
+|-----------|-------------|
+| flat | Flat world with configurable ground level |
+| noise | Default procedural terrain with biomes, caves, ores, dungeons |
+| v5 | MapgenV5 with 3D ground noise and factor-based height |
+| v7 | Full V7 terrain: dual terrain blending (base/alt), modulated persistence, 3D mountains with density gradient, ridge/river carving, cave noise intersection, caverns |
+| valleys | River valley terrain with altitude-chill biome adjustment |
+| carpathian | Terraced mountains with step-height quantization |
+| fractal | Fractal-based terrain generation |
+| singlenode | Empty world (air only) |
+
+### MapgenV7 Features
+- **Dual terrain blending**: Two 2D noise layers (terrain_base, terrain_alt) blended via height_select noise
+- **Modulated persistence**: terrain_persist noise modulates roughness regionally
+- **3D Mountains**: Density gradient with mount_height envelope and 3D mountain noise
+- **Ridge/River carving**: 3D ridge noise creates river channels where |ridge_uwater| < threshold
+- **Cave noise intersection**: Two 3D cave noises intersect to create tunnel networks
+- **Cavern generation**: Large underground caverns with amplitude tapering
+- **Noise-driven dungeons**: Dungeon count from 3D dungeon noise
+- **Filler depth variation**: Surface dirt depth varies via noise
+
+### Map Utilities
+- **VoxelArea**: Cuboid area math (index, position, contains, iterate, addArea, intersect, pad, intersects)
+- **VoxelManipulator**: Standalone bulk read/write (CopyFrom/CopyTo, Fill, Replace, Blit, FillArea)
+- **MMVManip**: Map-bound VoxelManipulator (InitialEmerge, BlitBackAll, Clone, chunk tracking)
+- **MapEditEventManager**: World change event dispatch (AddNode/RemoveNode/SwapNode/MetadataChanged)
+- **MapEditEventReceiver**: Queue-based event subscription with configurable max size
+
 ### Terrain
 - Base height: Y=32, with Perlin noise variation (Height=20)
 - Water level: Y=28
