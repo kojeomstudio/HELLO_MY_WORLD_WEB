@@ -57,6 +57,7 @@ web/data/worlds/
 web/data/bans.json
 web/data/player_privileges.json
 web/data/protection/
+web/server/data/
 
 # NuGet
 *.nupkg
