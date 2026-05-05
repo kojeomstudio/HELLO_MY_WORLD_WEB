@@ -26,6 +26,14 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('web/server/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
       - name: Restore dependencies
         run: dotnet restore web/server/WebGameServer.csproj
 
@@ -96,7 +104,7 @@ jobs:
 
       - name: Check required data files exist
         run: |
-          REQUIRED_FILES="blocks.json items.json mobs.json server_config.json tools.json smelting.json physics_constants.json privileges.json"
+          REQUIRED_FILES="blocks.json items.json mobs.json server_config.json tools.json smelting.json physics_constants.json privileges.json abm_config.json biomes.json ores.json decorations.json sounds.json"
           MISSING=0
           for f in $REQUIRED_FILES; do
             if [ ! -f "web/data/$f" ]; then
@@ -125,6 +133,36 @@ jobs:
               if bid is not None and str(bid) not in blocks:
                   print(f'::warning::Item {name} references missing blockId {bid}')
           print(f'Block data consistent: {len(ids)} blocks, IDs 0-{max(ids)}')
+          "
+
+      - name: Verify JSON schema consistency
+        run: |
+          python3 -c "
+          import json
+
+          blocks = json.load(open('web/data/blocks.json'))['blocks']
+          for bid, block in blocks.items():
+              required = ['name', 'solid']
+              for field in required:
+                  if field not in block:
+                      print(f'::error::Block {bid} missing required field: {field}')
+              if block.get('light', 0) < 0 or block.get('light', 0) > 15:
+                  print(f'::warning::Block {bid} has invalid light level: {block.get(\"light\")}')
+
+          items = json.load(open('web/data/items.json'))
+          if 'items' not in items:
+              print('::error::items.json missing \"items\" key')
+          if 'recipes' in items:
+              for i, recipe in enumerate(items['recipes']):
+                  if 'result' not in recipe or 'ingredients' not in recipe:
+                      print(f'::warning::Recipe {i} missing result or ingredients')
+
+          config = json.load(open('web/data/server_config.json'))
+          for section in ['server', 'world', 'player', 'physics', 'auth', 'security']:
+              if section not in config:
+                  print(f'::warning::server_config.json missing section: {section}')
+
+          print('Schema consistency checks passed')
           "
 
   security-scan:

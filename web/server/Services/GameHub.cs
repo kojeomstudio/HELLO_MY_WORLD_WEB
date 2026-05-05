@@ -107,6 +107,7 @@ public class GameHub : Hub<IGameClient>
     private readonly DetachedInventoryManager _detachedInventory;
     private readonly FormspecSystem _formspecSystem;
     private readonly ModStorageDatabase _modStorage;
+    private readonly AntiCheatValidator _antiCheat;
 
     private static readonly Dictionary<string, int> DefaultStartItemCounts = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -136,7 +137,8 @@ public class GameHub : Hub<IGameClient>
         SoundSpecManager soundSpecManager,
         DetachedInventoryManager detachedInventory,
         FormspecSystem formspecSystem,
-        ModStorageDatabase modStorage)
+        ModStorageDatabase modStorage,
+        AntiCheatValidator antiCheat)
     {
         _gameServer = gameServer;
         _logger = logger;
@@ -155,10 +157,12 @@ public class GameHub : Hub<IGameClient>
         _detachedInventory = detachedInventory;
         _formspecSystem = formspecSystem;
         _modStorage = modStorage;
+        _antiCheat = antiCheat;
     }
 
     public override async Task OnConnectedAsync()
     {
+        _antiCheat.TrackPlayer(Context.ConnectionId);
         _logger.LogInformation("Client connected: {ConnectionId}", Context.ConnectionId);
         await base.OnConnectedAsync();
     }
@@ -174,6 +178,7 @@ public class GameHub : Hub<IGameClient>
             await Clients.All.OnPlayerLeft(player.Name);
             await SendPlayerList();
         }
+        _antiCheat.RemovePlayer(Context.ConnectionId);
         await base.OnDisconnectedAsync(exception);
     }
 
@@ -327,13 +332,28 @@ public class GameHub : Hub<IGameClient>
         var border = _gameServer.WorldBorderSize;
         if (Math.Abs(x) > border || Math.Abs(z) > border) return;
 
-        var maxSpeed = player.IsFlying ? _config.Physics.FlySpeed : _config.Physics.SprintSpeed;
+        var oldPosition = player.Position;
+        var newPosition = new Vector3(x, y, z);
         var positionUpdateInterval = (float)_config.Network.PositionUpdateInterval / 1000f;
-        var maxDistancePerTick = maxSpeed * positionUpdateInterval * 1.5f;
-        var distance = Vector3.Distance(player.Position, new Vector3(x, y, z));
-        if (distance > maxDistancePerTick && distance > 2.0f)
+
+        var physicsOverride = new PhysicsOverride
         {
-            await Clients.Caller.OnPositionCorrection(player.Position.X, player.Position.Y, player.Position.Z);
+            Gravity = _config.Physics.Gravity,
+            JumpForce = _config.Physics.JumpForce,
+            WalkSpeed = _config.Physics.WalkSpeed,
+            SprintSpeed = _config.Physics.SprintSpeed,
+            FlySpeed = _config.Physics.FlySpeed,
+            ClimbSpeed = _config.Physics.ClimbSpeed,
+            LiquidDrag = _config.Physics.LiquidDrag
+        };
+
+        if (!_antiCheat.ValidateMovement(
+            Context.ConnectionId, newPosition, oldPosition, positionUpdateInterval,
+            physicsOverride, player.IsFlying, isSneaking ? false : true,
+            isSneaking, false, false, false,
+            player.Mode == GameMode.Spectator, 0))
+        {
+            await Clients.Caller.OnPositionCorrection(oldPosition.X, oldPosition.Y, oldPosition.Z);
             return;
         }
 

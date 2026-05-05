@@ -45,6 +45,18 @@ if (File.Exists(configPath))
     serverConfig = JsonSerializer.Deserialize<ServerConfig>(configJson) ?? new ServerConfig();
 }
 
+var envSeed = Environment.GetEnvironmentVariable("WORLD_SEED");
+if (!string.IsNullOrEmpty(envSeed) && int.TryParse(envSeed, out var seed))
+{
+    serverConfig.World.WorldSeed = seed;
+}
+
+var envMaxConnections = Environment.GetEnvironmentVariable("MAX_CONNECTIONS");
+if (!string.IsNullOrEmpty(envMaxConnections) && long.TryParse(envMaxConnections, out var maxConn) && maxConn > 0)
+{
+    serverConfig.Security.MaxConcurrentConnections = (int)maxConn;
+}
+
 var dataPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "data");
 if (!Directory.Exists(dataPath))
     dataPath = Path.Combine(Directory.GetCurrentDirectory(), "data");
@@ -556,6 +568,7 @@ builder.Services.AddSingleton<ActiveBlockModifierSystem>(sp =>
 
     return system;
 });
+builder.Services.AddSingleton<AntiCheatValidator>();
 builder.Services.AddSingleton<KnockbackSystem>();
 
 var dataDir = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "data", "worlds", "default");
@@ -822,6 +835,14 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+if (serverConfig.Security.MaxConcurrentConnections > 0)
+{
+    builder.WebHost.ConfigureKestrel(options =>
+    {
+        options.Limits.MaxConcurrentConnections = (long)serverConfig.Security.MaxConcurrentConnections;
+    });
+}
 
 if (!app.Environment.IsDevelopment() && serverConfig.Security.EnableHttpsRedirection)
 {

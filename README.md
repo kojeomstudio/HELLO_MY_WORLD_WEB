@@ -43,7 +43,7 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Active Block Modifiers**: Sand/gravel falling, farmland decay, grass spreading (aggressive), dirt-to-grass, ice melting, fire spread, cactus/sugar cane growth, mushroom spreading, snow spread, attached node drop check, vine growth, coral spread/coral death, mud formation
 - **Agriculture**: Farmable crops (wheat, carrot, potato), farmland hydration
 - **Persistence**: Player data, world chunks, block metadata, chest inventories, node timers, and player privileges saved to disk
-- **Server-Authoritative Physics**: Anti-cheat with speed validation, teleport detection, noclip prevention, position correction
+- **Server-Authoritative Physics**: Anti-cheat with dedicated AntiCheatValidator integration (speed validation per movement mode, fly speed check, jump height validation, teleport detection, violation counting with progressive enforcement, move resistance awareness), noclip prevention, position correction
 - **Lightning Damage**: Thunderstorm lightning strikes damage nearby players (falloff over 5 blocks) and can ignite fires on exposed surfaces
 - **Explosion System**: Radius-based block destruction with per-block resistance, item drops, entity/player damage with knockback, rollback integration
 - **Projectile System**: Arrow/snowball entities with gravity, drag, block collision, entity hit detection, and piercing support
@@ -145,7 +145,7 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Player-Centric ABM Processing**: Active Block Modifiers only process chunks within player radius (3-chunk range) for scalable server performance
 - **MapBlock Monoblock Optimization**: Chunks with all identical blocks serialize to 5 bytes (with 0xFF marker) instead of 16KB
 - **Per-Block Dirty Tracking**: Chunks track modification state; only dirty chunks need saving
-- **Anti-Cheat Validator**: Server-side movement validation (speed, fly, jump height), violation counting with auto-correction, teleport distance threshold, move resistance awareness
+- **Anti-Cheat Validator**: Dedicated server-side AntiCheatValidator class integrated into SignalR hub, tracking per-player movement state with speed/fly/jump-height checks, violation counting with auto-correction, teleport distance threshold, physics override and move resistance awareness
 - **Particle Spawner Lifecycle**: Server-side spawner expiration based on lifetime, automatic cleanup in update loop
 - **Leveled NodeBox**: Dynamic-height blocks (snow layers, farmland) rendered with param2-based height and neighbor-aware side faces
 - **Mod Channels**: Server-side inter-mod communication framework
@@ -363,6 +363,10 @@ Run the integration test script to verify client-server communication:
 # Windows - builds and tests
 test-protocol.bat
 
+# Linux/macOS - builds and tests
+chmod +x test-protocol.sh
+./test-protocol.sh
+
 # Manual - requires server already running
 node test-protocol.mjs
 ```
@@ -375,7 +379,11 @@ Comprehensive CLI-based feature testing with 20+ individual test suites:
 
 ```bash
 # Run all tests (auto-starts server)
+# Windows:
 cli-test.bat
+# Linux/macOS:
+chmod +x cli-test.sh
+./cli-test.sh
 
 # Run specific suites
 cli-test.bat quick              # Quick smoke test
@@ -526,8 +534,9 @@ This project is a web port of the Luanti (formerly Minetest) voxel game engine, 
 - **Enhanced Biome System**: Weighted biome selection, vertical blending at biome transitions, heat/humidity blend noise for smooth borders, biome-specific cave liquids (water/lava), dust node placement (snow on surfaces), water top blocks (ice in cold biomes with configurable depth), river water/riverbed per biome, dungeon stair blocks per biome, underground biomes with lava cave liquid
 - **Vein Ore Generation**: 6th ore placement algorithm using 3D noise contour intersection for continuous ore vein generation (diamond, iron, gold)
 - **World Generation**: 10 biomes (grassland, forest, desert, snow, taiga, jungle, savanna, mountains, swamp, ocean) with heat/humidity noise, weighted biome selection with vertical blending, heat/humidity blend noise for smooth transitions, biome-specific cave liquids (water in jungle/swamp, lava in deep underground), dust nodes (snow in tundra/taiga/mountains), water top blocks (ice in cold biomes), river water/riverbed support, schematic-based trees (oak, pine, jungle, birch, cactus), river generation, 13 ore/mineral types with scatter, vein (3D noise contour), blob, puff, sheet, and stratum placement, multi-room dungeons with corridors and loot chests, cave systems with large caverns, random-walk tunnel generation with variable radius, biome-aware cave liquid filling. 9 map generators: Flat, Noise, V5, V6 (legacy with mud flow, 5 biome types, desert temples), V7 (default minetest terrain with dual-blend mountains/ridges/rivers), Valleys, Carpathian, Fractal, Singlenode
-- **Security**: XSS-safe rendering (textContent/DOM APIs, CSS color validation), CORS-restricted origins with scoped headers/methods, CSP headers with nonce-based styles (no unsafe-eval, no unsafe-inline scripts/styles, frame-ancestors none), HSTS, Cross-Origin-Opener-Policy, Cross-Origin-Resource-Policy, Referrer-Policy, Permissions-Policy, HTML entity encoding for chat, sign text sanitization, player name sanitization, IP-based rate limiting with join cooldown, per-account brute-force lockout (5 failed attempts -> 5-minute lockout, keyed by IP+name to prevent cross-IP DoS), PBKDF2 password hashing (100k iterations, SHA256, random salt), constant-time comparison, privilege escalation protection (no self-grant/self-revoke/server privilege revocation), thread-safe privilege persistence, tiered privilege escalation protection, area protection with ownership checks, chest/furnace proximity validation, rollback recording, persistent ban database, block coordinate range validation, server-authoritative physics with speed hack detection and position correction, input validation on /give (item whitelist) and /spawn (entity type whitelist) commands, rate limiting on all SignalR hub methods, configurable chat rate limit from server config, item ID validation on give commands, entity type validation on spawn commands, consistent password policy (8-char minimum, 128-char max), CI security scanning with fail-on-detect, npm audit in CI, minimal permissions for CI workflows, authenticated hub methods, explicit content-type whitelist for static files (no ServeUnknownFileTypes), SignalR max receive message size (128KB), runtime data files excluded from git, detached inventory creation restricted to server privilege, smelting item ID length validation, grid craft size validation
-- **CI**: GitHub Actions pipeline with Ubuntu + Windows server builds, client typecheck+build, security scan, data integrity verification (JSON parsing + required file checks), root dependency install for test scripts, fail-on-missing .gitignore patterns
+- **Security**: XSS-safe rendering (textContent/DOM APIs, CSS color validation), CORS-restricted origins with scoped headers/methods, CSP headers with nonce-based styles (no unsafe-eval, no unsafe-inline scripts/styles, frame-ancestors none), HSTS, Cross-Origin-Opener-Policy, Cross-Origin-Resource-Policy, Referrer-Policy, Permissions-Policy, HTML entity encoding for chat, sign text sanitization, player name sanitization, IP-based rate limiting with join cooldown, per-account brute-force lockout (5 failed attempts -> 5-minute lockout, keyed by IP+name to prevent cross-IP DoS), PBKDF2 password hashing (100k iterations, SHA256, random salt), constant-time comparison, privilege escalation protection (no self-grant/self-revoke/server privilege revocation), thread-safe privilege persistence, tiered privilege escalation protection, area protection with ownership checks, chest/furnace proximity validation, rollback recording, persistent ban database, block coordinate range validation, integrated AntiCheatValidator with per-player movement tracking (speed/fly/jump validation per physics mode, violation counting, position correction), input validation on /give (item whitelist) and /spawn (entity type whitelist) commands, rate limiting on all SignalR hub methods, configurable chat rate limit from server config, item ID validation on give commands, entity type validation on spawn commands, consistent password policy (8-char minimum, 128-char max), CI security scanning with fail-on-detect, npm audit in CI, minimal permissions for CI workflows, authenticated hub methods, explicit content-type whitelist for static files (no ServeUnknownFileTypes), SignalR max receive message size (128KB), runtime data files excluded from git, detached inventory creation restricted to server privilege, smelting item ID length validation, grid craft size validation, configurable Kestrel connection limit via MAX_CONNECTIONS env var, WORLD_SEED env var for deployment-safe seed configuration
+- **CI**: GitHub Actions pipeline with Ubuntu + Windows server builds, NuGet caching, client typecheck+build, security scan, data integrity verification (JSON parsing + required file checks + schema consistency), root dependency install for test scripts, fail-on-missing .gitignore patterns
+- **Environment Variables**: `WORLD_SEED` overrides server seed, `MAX_CONNECTIONS` sets Kestrel connection limit, `SERVER_URL` overrides test script target
 
 ## License
 
