@@ -24,7 +24,8 @@ public class AuthenticationService
     private static readonly Regex NameRegex = new("^[a-zA-Z0-9_-]{1,20}$", RegexOptions.Compiled);
     private static readonly HashSet<string> ReservedNames = new(StringComparer.OrdinalIgnoreCase)
     {
-        "server", "admin", "system", "console", "root", "moderator"
+        "server", "admin", "system", "console", "root", "moderator",
+        "administrator", "owner", "staff", "system", "operator"
     };
 
     private readonly HashSet<string> _bannedNames = new(StringComparer.OrdinalIgnoreCase);

@@ -1,6 +1,6 @@
 # Architecture Overview
 
-HelloMyWorld is a web-based voxel game with a **TypeScript/Three.js client** and **C# ASP.NET Core 10.0/SignalR server**.
+HelloMyWorld is a web-based voxel game with a **TypeScript/Three.js client** and **C# ASP.NET Core 8.0/SignalR server**.
 
 ## System Overview
 
@@ -52,7 +52,7 @@ See [server-api.md](server-api.md) for full method/event signatures.
 2. Processes item entity pickups (range: 2 blocks)
 3. Broadcasts entity spawn/update/despawn events
 4. Processes falling blocks (every 10 ticks)
-5. Auto-saves world every 300 seconds
+5. Auto-saves player data and metadata every 60 seconds (1200 ticks)
 6. Tracks TPS and logs warnings when behind
 
 ### World Management
@@ -67,9 +67,15 @@ See [server-api.md](server-api.md) for full method/event signatures.
 - Each block stored as `Block(Type, Param1, Param2, Light)` — 4 bytes per block
 - Serialized as 16,384-byte array (16^3 * 4 bytes)
 
-**WorldGenerator** (`World/Generators/`) — Two generators:
+- **WorldGenerator** (`World/Generators/`) — Eight generators:
 - `NoiseWorldGenerator`: Perlin noise terrain with caves, ores, trees (default)
 - `FlatWorldGenerator`: Flat grass world
+- `MapgenV5`: 3D noise based terrain
+- `MapgenV7`: Advanced terrain with mountains, rivers, floatlands (default in Minetest)
+- `MapgenValleys`: River valley terrain with altitude-chill system
+- `MapgenCarpathian`: Stepped mountain terrain
+- `MapgenFractal`: Fractal-based terrain (Mandelbrot/Julia)
+- `MapgenSinglenode`: Single block type world
 
 **LightingEngine** (`World/LightingEngine.cs`) — Static class:
 - Sun light propagation from sky (flood fill downward)
@@ -112,16 +118,16 @@ See [server-api.md](server-api.md) for full method/event signatures.
 
 - **AgricultureSystem** (`World/AgricultureSystem.cs`) — Crop growth (wheat, carrot, potato)
 - **NodeTimerSystem** (`World/NodeTimerSystem.cs`) — Scheduled block actions (farmland dehydration, grass spread, ice melting)
-- **ActiveBlockModifierSystem** (`World/ActiveBlockModifier.cs`) — Sand/gravel falling
-- **ChatCommandManager** (`Chat/ChatCommandManager.cs`) — Commands: /time, /gamemode, /tp, /give, /kill, /clear, /kick, /ban, /spawn, /privs, /setborder, /protect, /unprotect, /areas, /area_info
+- **ActiveBlockModifierSystem** (`World/ActiveBlockModifier.cs`) — 14 registered ABMs: sand/gravel falling, dirt-to-grass, ice melt, fire spread, cactus/sugarcane growth, mushroom spread, snow spread, vine growth, coral spread/death, mud formation, attached node check, grass aggressive spread
+- **ChatCommandManager** (`Chat/ChatCommandManager.cs`) — 70+ commands: /time, /gamemode, /tp, /give, /kill, /clear, /kick, /ban, /spawn, /privs, /setborder, /protect, /unprotect, /areas, /area_info, /setsky, /lighting, /hud, /fov, /weather, /spawnentity, /killall, /settime, /rollback, /emergeblocks, /fixlight, /setpassword, /deleteplayer, /reloadauth, /lastlogin, /mobs, /sethotbar, /physics, /invisible, /waypoint, /statistics, /deletewaypoint
 - **PrivilegeSystem** (`Auth/PrivilegeSystem.cs`) — Permission management (interact, shout, fly, etc.)
 - **AreaProtectionSystem** (`Protection/AreaProtection.cs`) — Advanced area protection with claim system, overlap detection, ownership transfer, bypass grants, JSON persistence
-- **AuthenticationService** (`Auth/AuthenticationService.cs`) — Name validation (regex + reserved names), ban checks, IP ban enforcement, server capacity, PBKDF2 (100k iterations, SHA256) password hashing with per-user random salt, constant-time comparison
+- **AuthenticationService** (`Auth/AuthenticationService.cs`) — Name validation (regex + reserved names including administrator, owner, staff, operator), ban checks, IP ban enforcement, server capacity, PBKDF2 (100k iterations, SHA256) password hashing with per-user random salt, constant-time comparison
 - **PhysicsEngine** (`Physics/PhysicsEngine.cs`) — Server-authoritative movement validation with position correction, NaN/Infinity checks, block type range validation, player AABB overlap checks on placement
 - **KnockbackSystem** (`Physics/KnockbackSystem.cs`) — Damage knockback calculation
 - **ToolWearSystem** (`ToolWear/ToolWearSystem.cs`) — 65536-scale tool wear matching Minetest's wear system, integrated into dig and combat actions
 - **SoundSpecManager** (`Sound/SoundSpecManager.cs`) — Block sound group definitions loaded from `sounds.json`, positional sound events
-- **Security**: HTML/XML tag stripping in chat, security headers (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, CSP, Referrer-Policy, Permissions-Policy), configurable CORS origins from `server_config.json`, enhanced rate limiting (join spam, punch, interact), privilege escalation protection (no self-grant/self-revoke/server privilege protection)
+- **Security**: HTML/XML tag stripping in chat, security headers (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, CSP with nonce, Referrer-Policy, Permissions-Policy, HSTS in production), configurable CORS origins from `server_config.json`, enhanced rate limiting (join spam, punch, interact), privilege escalation protection (no self-grant/self-revoke/server privilege protection), HTTPS redirection (configurable), periodic auto-save (player data + metadata every 60s)
 
 ## Client Architecture
 
@@ -327,15 +333,17 @@ Client                          Server
 ## Configuration
 
 All configuration loaded from `web/data/server_config.json`:
-- Server: max players (100), tick rate (20), port (5000)
-- World: generator type, chunk size (16), render distance (4), seed, tree/cave/ore generation
+- Server: max players (100), tick rate (20), port (5266)
+- World: generator type, chunk size (16), render distance (4), seed, tree/cave/ore generation, world border
 - Player: health (20), breath (10), inventory size (32), hotbar size (8), fall damage, start items
-- Physics: gravity, jump force, speeds, terminal velocity
+- Physics: gravity, jump force, speeds, terminal velocity, ranges, drag
 - Day/night: cycle length, phase start times
-- Network: protocol version, broadcast intervals
+- Network: protocol version, broadcast intervals, chunk compression
 - Liquid: flow intervals
+- Auth: PBKDF2 iterations, salt/hash sizes, password length, lockout policy, name pattern, reserved names
+- Security: HTTPS redirection, HSTS max-age, CSP nonce size, max concurrent connections
 - CORS: configurable allowed origins (`corsOrigins` array)
-- World border: configurable border size (`worldBorderSize`, default 1000)
+- Chat: max length, rate limit per 10 seconds
 
 ## Texture System
 
@@ -437,10 +445,20 @@ All server services registered as **Singleton** in `Program.cs`:
 - **Screenshot system**: F12 key captures canvas to PNG and triggers download with timestamped filename
 - **Mob pathfinding integration**: Mob AI chase state calls A* pathfinder (`Pathfinding.Pathfinder`) with jump/drop limits for obstacle avoidance
 
+### Stability & Security Improvements (Round 6)
+- **Periodic auto-save**: GameServer now auto-saves all player data and block metadata every 1200 ticks (60 seconds at 20 TPS), preventing data loss on server crash
+- **SpawnEntity fix**: `SpawnEntity("item", ...)` no longer hardcodes "torch" — accepts actual item name and count via parameters
+- **Graceful shutdown**: Server shutdown now saves all online players (not just metadata), uses timeout-based async wait instead of blocking `.GetAwaiter().GetResult()`
+- **HTTPS redirection**: Configurable HTTPS redirection middleware for production environments (`security.enableHttpsRedirection` in config)
+- **Expanded reserved names**: Added administrator, owner, staff, operator to reserved name list preventing impersonation
+- **Configurable security parameters**: Auth settings (PBKDF2 iterations, lockout policy, password length, reserved names) and security settings (HSTS max-age, CSP nonce size, max connections) externalized to `server_config.json`
+- **CSP nonce size from config**: Content Security Policy nonce generation uses configurable byte size from `security.cspNonceSize`
+- **Port validation in CORS**: Origin validation now checks for valid port numbers (1-65535) to prevent malformed origin injection
+
 ## Security Model
 
 ### Authentication & Authorization
-- Player name validation: regex `^[a-zA-Z0-9_-]{1,20}$` + reserved name list (server, admin, system, console, root, moderator)
+- Player name validation: regex `^[a-zA-Z0-9_-]{1,20}$` + reserved name list (server, admin, system, console, root, moderator, administrator, owner, staff, operator)
 - Password authentication with PBKDF2 (100,000 iterations, SHA256, 16-byte random salt, constant-time comparison)
 - Legacy SHA256 hashes (no salt) are rejected — forced password reset required
 - IP-based and name-based ban system (`AuthenticationService`)
@@ -448,6 +466,7 @@ All server services registered as **Singleton** in `Program.cs`:
 - Privilege escalation protection: cannot self-grant, cannot self-revoke, `server` privilege cannot be revoked via command
 - Server capacity enforcement (max players check)
 - Per-account brute-force lockout (5 failed attempts → 5-minute lockout)
+- Password length: 8-128 characters
 
 ### Input Validation
 - HTML/XML tag stripping in chat messages (XSS prevention)
@@ -467,10 +486,13 @@ All server services registered as **Singleton** in `Program.cs`:
 - Join spam prevention
 
 ### Network Security
-- CORS origins restricted to configured list in `server_config.json`
-- Security headers: X-Content-Type-Options: nosniff, X-Frame-Options: DENY, X-XSS-Protection: 1; mode=block
+- CORS origins restricted to configured list in `server_config.json` with port validation
+- Security headers: X-Content-Type-Options: nosniff, X-Frame-Options: DENY, X-XSS-Protection: 1; mode=block, CSP with nonce
 - SignalR WebSocket transport (no raw HTTP API exposure)
 - Server-authoritative physics validation (anti-cheat)
+- HTTPS redirection available for production (configurable)
+- HSTS headers in production (configurable max-age)
+- Graceful shutdown with timeout-based async data persistence
 
 ### Data Security
 - No hardcoded secrets or credentials in source code

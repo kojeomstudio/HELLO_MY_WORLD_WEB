@@ -413,6 +413,15 @@ public class GameServer
         {
             _ = _hubContext.Clients.All.OnTimeUpdate(GameTime, TimeSpeed, DayNight.SkyBrightness);
         }
+
+        if (_tickCount % 1200 == 0)
+        {
+            SaveAllMetadata();
+            foreach (var player in _players.Values)
+            {
+                _playerDatabase.SavePlayer(player);
+            }
+        }
     }
 
     private void UpdatePlayer(PlayerEnt player)
@@ -1460,11 +1469,11 @@ public class GameServer
         GameTime = time % 24000;
     }
 
-    public bool SpawnEntity(string entityType, Vector3 position)
+    public bool SpawnEntity(string entityType, Vector3 position, string? itemName = null, int itemCount = 1)
     {
         if (entityType.Equals("item", StringComparison.OrdinalIgnoreCase))
         {
-            var entity = new ItemEntity("torch", 1, position);
+            var entity = new ItemEntity(itemName ?? "torch", itemCount, position);
             _entityManager.Add(entity);
             return true;
         }

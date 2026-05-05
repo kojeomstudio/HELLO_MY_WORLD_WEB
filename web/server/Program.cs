@@ -28,7 +28,8 @@ static bool IsValidOrigin(string origin)
     return Uri.TryCreate(origin, UriKind.Absolute, out var uri)
         && (uri.Scheme == "http" || uri.Scheme == "https")
         && uri.Host.Length > 0
-        && uri.Host.All(c => char.IsLetterOrDigit(c) || c == '.' || c == '-' || c == '_');
+        && uri.Host.All(c => char.IsLetterOrDigit(c) || c == '.' || c == '-' || c == '_')
+        && uri.Port > 0 && uri.Port <= 65535;
 }
 
 var builder = WebApplication.CreateBuilder(args);
@@ -821,6 +822,11 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+if (!app.Environment.IsDevelopment() && serverConfig.Security.EnableHttpsRedirection)
+{
+    app.UseHttpsRedirection();
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -854,14 +860,14 @@ app.Use(async (context, next) =>
     context.Response.Headers["Cross-Origin-Resource-Policy"] = "same-origin";
     if (!app.Environment.IsDevelopment())
         context.Response.Headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains";
-    var cspNonce = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16));
+    var cspNonce = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(serverConfig.Security.CspNonceSize));
     context.Items["CspNonce"] = cspNonce;
     context.Response.Headers["Content-Security-Policy"] =
         "default-src 'self'; " +
         "script-src 'self'; " +
         $"style-src 'self' 'nonce-{cspNonce}'; " +
         "img-src 'self' data: blob:; " +
-        $"connect-src 'self' ws: wss: {string.Join(' ', serverConfig.CorsOrigins.Where(IsValidOrigin))}; " +
+        $"connect-src 'self' ws: wss: {string.Join(' ', serverConfig.CorsOrigins.Where(o => IsValidOrigin(o)))}; " +
         "media-src 'self' blob:; " +
         "font-src 'self'; " +
         "object-src 'none'; " +
@@ -919,15 +925,26 @@ Directory.CreateDirectory(worldDataPath);
 gameServer.DefaultWorld.Load(worldDataPath);
 gameServer.LoadEntities(worldDataPath);
 
+var shutdownCts = new CancellationTokenSource();
 app.Lifetime.ApplicationStopping.Register(() =>
 {
+    shutdownCts.Cancel();
     gameServer.SaveAllMetadata();
+    foreach (var player in gameServer.OnlinePlayers)
+    {
+        var playerDb = app.Services.GetRequiredService<PlayerDatabase>();
+        playerDb.SavePlayer(player);
+    }
     gameServer.DefaultWorld.Save(worldDataPath);
     gameServer.SaveEntities(worldDataPath);
     privilegeSystem.Save();
     var areaProtection = app.Services.GetRequiredService<AreaProtectionSystem>();
     var protectionSavePath = Path.Combine(dataDir, "protection");
-    areaProtection.SaveProtection(protectionSavePath).GetAwaiter().GetResult();
+    try
+    {
+        areaProtection.SaveProtection(protectionSavePath).Wait(TimeSpan.FromSeconds(10));
+    }
+    catch (AggregateException) { }
     gameServer.Stop();
 });
 

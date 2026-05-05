@@ -77,5 +77,24 @@
     },
     "corsOrigins": ["http://localhost:5173", "http://localhost:3000"],
     "chatMessageLimitPer10Sec": 8,
-    "itemEntityTTLSeconds": 900
+    "chatMaxLength": 256,
+    "itemEntityTTLSeconds": 900,
+    "autoSaveIntervalTicks": 1200,
+    "auth": {
+        "pbkdf2Iterations": 100000,
+        "saltSize": 16,
+        "hashSize": 32,
+        "minPasswordLength": 8,
+        "maxPasswordLength": 128,
+        "accountLockoutAttempts": 5,
+        "accountLockoutMinutes": 5,
+        "namePattern": "^[a-zA-Z0-9_-]{1,20}$",
+        "reservedNames": ["server", "admin", "system", "console", "root", "moderator", "administrator", "owner", "staff", "operator"]
+    },
+    "security": {
+        "enableHttpsRedirection": false,
+        "hstsMaxAge": 31536000,
+        "cspNonceSize": 16,
+        "maxConcurrentConnections": 0
+    }
 }

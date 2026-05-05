@@ -14,7 +14,11 @@ public class ServerConfig
     public LiquidSettings Liquid { get; set; } = new();
     public string[] CorsOrigins { get; set; } = ["http://localhost:5173", "http://localhost:3000"];
     public int ChatMessageLimitPer10Sec { get; set; } = 8;
+    public int ChatMaxLength { get; set; } = 256;
     public int ItemEntityTTLSeconds { get; set; } = 900;
+    public int AutoSaveIntervalTicks { get; set; } = 1200;
+    public AuthSettings Auth { get; set; } = new();
+    public SecuritySettings Security { get; set; } = new();
 }
 
 public class LiquidSettings
@@ -140,4 +144,25 @@ public class NetworkSettings
     public int PositionUpdateInterval { get; set; } = 50;
     public bool ChunkCompression { get; set; } = true;
     public int TimeBroadcastInterval { get; set; } = 100;
+}
+
+public class AuthSettings
+{
+    public int Pbkdf2Iterations { get; set; } = 100000;
+    public int SaltSize { get; set; } = 16;
+    public int HashSize { get; set; } = 32;
+    public int MinPasswordLength { get; set; } = 8;
+    public int MaxPasswordLength { get; set; } = 128;
+    public int AccountLockoutAttempts { get; set; } = 5;
+    public int AccountLockoutMinutes { get; set; } = 5;
+    public string NamePattern { get; set; } = @"^[a-zA-Z0-9_-]{1,20}$";
+    public string[] ReservedNames { get; set; } = ["server", "admin", "system", "console", "root", "moderator", "administrator", "owner", "staff"];
+}
+
+public class SecuritySettings
+{
+    public bool EnableHttpsRedirection { get; set; } = false;
+    public int HstsMaxAge { get; set; } = 31536000;
+    public int CspNonceSize { get; set; } = 16;
+    public int MaxConcurrentConnections { get; set; } = 0;
 }

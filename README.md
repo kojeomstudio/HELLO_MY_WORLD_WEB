@@ -173,6 +173,10 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Use Tool Command**: `/use_tool <dig|hit> <group> [level] [uses]` for tool wear testing
 - **Detach Command**: `/detach [radius]` to detach objects near player
 - **Clear Objects Command**: `/clearobjects` to clear all entities
+- **Periodic Auto-Save**: Player data and block metadata auto-saved every 60 seconds (1200 ticks), preventing data loss on server crash
+- **Configurable Security Settings**: Auth parameters (PBKDF2 iterations, lockout policy, reserved names) and security settings (HTTPS redirection, HSTS, CSP nonce size) externalized to `server_config.json`
+- **HTTPS Redirection**: Optional HTTPS enforcement for production deployments
+- **Expanded Reserved Names**: Administrator, owner, staff, operator names blocked from registration to prevent impersonation
 
 ## Architecture
 
