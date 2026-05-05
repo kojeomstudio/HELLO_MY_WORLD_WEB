@@ -702,6 +702,11 @@ const testSuites = {
     }
 };
 
+async function connectAndJoin() {
+    await connect();
+    await join();
+}
+
 testSuites['waypoint'] = {
     description: 'Test waypoint system',
     run: async () => {

@@ -131,8 +131,9 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Mod Storage**: Persistent key-value storage per mod with JSON persistence, CRUD operations via SignalR hub methods
 - **Connected NodeBox**: Fence, wall, and glass_pane blocks with bidirectional `connectsTo` connectivity (fences connect to all wood variants, walls connect to stone variants, glass panes connect to glass/iron bars)
 - **Modding API**: Client-side mod loading system with lifecycle hooks and game API
+- **Internationalization (i18n)**: Auto-detected browser locale with English/Korean translations, extensible framework
 - **LiquidSimulator**: Full liquid flow simulation with viscosity-based speed, range-limited spread, source renewal, and water-lava interaction (obsidian/cobblestone/stone generation)
-- **Post-Processing Pipeline**: Three.js EffectComposer with UnrealBloomPass (server-toggleable glow effects), FXAA anti-aliasing, and tone mapping output
+- **Post-Processing Pipeline**: Three.js EffectComposer with UnrealBloomPass (server-toggleable glow effects), FXAA anti-aliasing, ACES filmic tone mapping with auto-exposure (configurable min/max range), and tone mapping output
 - **Player-Centric ABM Processing**: Active Block Modifiers only process chunks within player radius (3-chunk range) for scalable server performance
 - **MapBlock Monoblock Optimization**: Chunks with all identical blocks serialize to 5 bytes (with 0xFF marker) instead of 16KB
 - **Per-Block Dirty Tracking**: Chunks track modification state; only dirty chunks need saving
@@ -208,6 +209,10 @@ web/
 │   │   │   └── SettingsPanel.ts
 │   │   └── audio/
 │   │       └── AudioManager.ts  # Procedural audio
+│   ├── modding/
+│   │   └── ModLoader.ts        # Client mod system
+│   └── i18n/
+│       └── I18n.ts             # Internationalization
 │   └── public/
 │       └── textures/
 │           ├── blocks/              # 89+ block textures from minetest devtest

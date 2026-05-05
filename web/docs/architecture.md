@@ -192,6 +192,9 @@ Creates `UIManager`, then `GameClient`, connects to server.
 - **BlockRegistry** (`world/BlockRegistry.ts`) — Block definitions loaded from server, maps block types to texture atlas regions (101 block types with textures)
 - **ItemRegistry** (`world/ItemRegistry.ts`) — Item definitions loaded from server, texture URL resolution for inventory display
 - **SettingsPanel** (`ui/SettingsPanel.ts`) — Settings UI with persistence
+- **ModLoader** (`modding/ModLoader.ts`) — Client-side mod loading system with lifecycle hooks (`onInit`, `onUpdate`, `onChatMessage`, `onDestroy`), custom chat command registration, and game API (player position, block get/set, chat). Wired into GameClient game loop and chat dispatch.
+- **I18n** (`i18n/I18n.ts`) — Internationalization framework with translation lookup, parameter interpolation, locale auto-detection from browser settings. Supports English and Korean with 17 translation keys. Used in chat join/leave messages and UI labels.
+- **AutoExposurePass** (`rendering/AutoExposurePass.ts`) — Post-processing auto-exposure pass with ACES filmic tone mapping, luminance extraction, configurable exposure range. Integrated into Renderer's post-processing pipeline, toggleable via `setLighting({ autoExposure: true })`.
 
 ## World System
 

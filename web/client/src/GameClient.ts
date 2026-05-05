@@ -15,6 +15,8 @@ import { WeatherSystem } from './world/WeatherSystem';
 import { ItemRegistry } from './world/ItemRegistry';
 import { FormspecRenderer } from './ui/FormspecRenderer';
 import { setLeavesStyle as applyLeavesStyle, setTranslucentLiquids as applyTranslucentLiquids } from './world/ChunkMesh';
+import { ModLoader } from './modding/ModLoader';
+import { t, setLocale, getAvailableLocales } from './i18n/I18n';
 
 enum ClientState {
     Created = 'created',
@@ -84,6 +86,9 @@ export class GameClient {
         this.inputManager.setScreenshotCallback(() => {
             this.takeScreenshot();
         });
+
+        this.initI18n();
+        this.initModLoader();
     }
 
     get items() { return this.itemRegistry; }
@@ -163,11 +168,11 @@ export class GameClient {
         });
 
         this.connection.on('OnPlayerJoined', (name: string) => {
-            this.uiManager.addChatMessage('Server', `${name} joined the game`);
+            this.uiManager.addChatMessage('Server', t('chat.join', { player: name }));
         });
 
         this.connection.on('OnPlayerLeft', (name: string) => {
-            this.uiManager.addChatMessage('Server', `${name} left the game`);
+            this.uiManager.addChatMessage('Server', t('chat.leave', { player: name }));
             this.worldManager.removePlayer(name);
         });
 
@@ -421,7 +426,41 @@ export class GameClient {
         });
     }
 
+    private initI18n(): void {
+        const browserLang = navigator.language.split('-')[0];
+        if (getAvailableLocales().includes(browserLang)) {
+            setLocale(browserLang);
+        }
+    }
+
+    private initModLoader(): void {
+        ModLoader.setPositionProvider(() => {
+            const pos = this.playerController.getPosition();
+            return { x: pos.x, y: pos.y, z: pos.z };
+        });
+        ModLoader.setBlockGetter((x, y, z) => this.worldManager.getBlock(x, y, z));
+        ModLoader.setBlockSetter((x, y, z, blockType) => {
+            this.connection?.invoke('PlaceBlock', x, y, z, blockType);
+        });
+        ModLoader.setChatSender((message) => {
+            this.connection?.invoke('SendChat', message);
+        });
+    }
+
+    loadMod(mod: { name: string; version: string; description: string; onInit?: any; onUpdate?: any; onChatMessage?: any; onDestroy?: any }): void {
+        ModLoader.loadMod(mod);
+    }
+
+    getLoadedMods(): string[] {
+        return ModLoader.getLoadedMods();
+    }
+
+    getTranslation(key: string, params?: Record<string, string>): string {
+        return t(key, params);
+    }
+
     sendChat(message: string): void {
+        if (ModLoader.handleChatMessage(message)) return;
         this.connection?.invoke('SendChat', message);
     }
 
@@ -549,6 +588,7 @@ export class GameClient {
         }
 
         this.worldManager.update(dt);
+        ModLoader.update(dt);
         this.renderer.updateClouds(dt);
         this.renderer.updateEffects(dt);
 

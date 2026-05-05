@@ -8,6 +8,7 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { CloudSystem } from './CloudSystem';
 import { OcclusionCuller } from './OcclusionCuller';
 import { CascadeShadowMap } from './CascadeShadowMap';
+import { AutoExposurePass } from './AutoExposurePass';
 
 const SKY_COLORS = {
     day: new THREE.Color(0.412, 0.647, 0.863),
@@ -147,6 +148,7 @@ export class Renderer {
     private occlusionCuller: OcclusionCuller | null = null;
     private occlusionGetBlock: ((x: number, y: number, z: number) => number) | null = null;
     private cascadeShadowMap: CascadeShadowMap;
+    private autoExposurePass: AutoExposurePass | null = null;
 
     constructor(container: HTMLElement) {
         this.canvas = document.createElement('canvas');
@@ -198,6 +200,13 @@ export class Renderer {
 
         this.initPostProcessing();
         this.cascadeShadowMap = new CascadeShadowMap();
+
+        try {
+            this.autoExposurePass = new AutoExposurePass(window.innerWidth, window.innerHeight);
+            this.autoExposurePass.setEnabled(false);
+        } catch (_e) {
+            this.autoExposurePass = null;
+        }
     }
 
     private initPostProcessing(): void {
@@ -349,7 +358,7 @@ export class Renderer {
         this.camera.updateProjectionMatrix();
     }
 
-    setLighting(params: { shadowIntensity?: number; exposureMin?: number; exposureMax?: number; ambientBoost?: number; bloomStrength?: number }): void {
+    setLighting(params: { shadowIntensity?: number; exposureMin?: number; exposureMax?: number; ambientBoost?: number; bloomStrength?: number; autoExposure?: boolean }): void {
         if (params.shadowIntensity !== undefined) this.shadowIntensity = params.shadowIntensity;
         if (params.exposureMin !== undefined) this.exposureMin = params.exposureMin;
         if (params.exposureMax !== undefined) this.exposureMax = params.exposureMax;
@@ -360,6 +369,12 @@ export class Renderer {
                 this.bloomPass.enabled = this.bloomStrength > 0;
                 this.bloomPass.strength = this.bloomStrength;
             }
+        }
+        if (params.autoExposure !== undefined && this.autoExposurePass) {
+            this.autoExposurePass.setEnabled(params.autoExposure);
+        }
+        if (this.autoExposurePass && this.autoExposurePass.isEnabled()) {
+            this.autoExposurePass.setExposureParams(this.exposureMin, this.exposureMax, 1.0 + this.ambientBoost);
         }
     }
 
