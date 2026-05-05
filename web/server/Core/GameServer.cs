@@ -348,7 +348,7 @@ public class GameServer
     {
         if (!IsRunning) return;
 
-        GameTime = (GameTime + (long)(TimeSpeed * 100)) % 24000;
+        GameTime = (GameTime + (long)(TimeSpeed * 100)) % _config.DayNight.CycleLength;
         DayNight.Update(GameTime);
         _weatherSystem.Update(GameTime);
 
@@ -414,7 +414,7 @@ public class GameServer
             _ = _hubContext.Clients.All.OnTimeUpdate(GameTime, TimeSpeed, DayNight.SkyBrightness);
         }
 
-        if (_tickCount % 1200 == 0)
+        if (_tickCount % _config.AutoSaveIntervalTicks == 0)
         {
             SaveAllMetadata();
             foreach (var player in _players.Values)

@@ -859,7 +859,7 @@ app.Use(async (context, next) =>
     context.Response.Headers["Cross-Origin-Opener-Policy"] = "same-origin";
     context.Response.Headers["Cross-Origin-Resource-Policy"] = "same-origin";
     if (!app.Environment.IsDevelopment())
-        context.Response.Headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains";
+        context.Response.Headers["Strict-Transport-Security"] = $"max-age={serverConfig.Security.HstsMaxAge}; includeSubDomains";
     var cspNonce = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(serverConfig.Security.CspNonceSize));
     context.Items["CspNonce"] = cspNonce;
     context.Response.Headers["Content-Security-Policy"] =

@@ -17,6 +17,8 @@ public class MapgenV7 : IWorldGenerator
     private bool _generateMountains = true;
     private bool _generateRivers = true;
     private bool _generateCaverns = true;
+    private bool _generateOres = true;
+    private bool _generateDust = true;
 
     private const int ChunkSize = 16;
     private const int WaterLevel = 1;
@@ -35,6 +37,7 @@ public class MapgenV7 : IWorldGenerator
     private int _largeCaveNumMax = 2;
     private int _largeCaveFlooded = 50;
     private float _mountZeroLevel = 0f;
+    private float _riverWidth = 0.2f;
 
     private record DungeonChestData(int X, int Y, int Z, List<ItemStack> Loot);
 
@@ -43,7 +46,8 @@ public class MapgenV7 : IWorldGenerator
         string TopBlock, string FillerBlock, int FillerDepth,
         string StoneBlock, string WaterBlock,
         string TreeType, float TreeChance,
-        string[] Decorations, string DungeonBlock, string DungeonAltBlock);
+        string[] Decorations, string DungeonBlock, string DungeonAltBlock,
+        string DustBlock, string WaterTopBlock, int WaterTopDepth);
 
     private record BiomeNoiseConfig(
         float HeatOffset, float HeatScale, float[] HeatSpread,
@@ -53,19 +57,19 @@ public class MapgenV7 : IWorldGenerator
         float Offset, float Scale, float SpreadX, float SpreadY, float SpreadZ,
         int Seed, int Octaves, float Persistence, float Lacunarity);
 
-    private readonly NoiseParams _npTerrainBase = new(4f, 70f, 600f, 600f, 600f, 82341, 5, 0.6f, 2f);
-    private readonly NoiseParams _npTerrainAlt = new(4f, 25f, 600f, 600f, 600f, 5934, 5, 0.6f, 2f);
-    private readonly NoiseParams _npTerrainPersist = new(0.6f, 0.1f, 2000f, 2000f, 2000f, 539, 3, 0.6f, 2f);
-    private readonly NoiseParams _npHeightSelect = new(-8f, 16f, 500f, 500f, 500f, 4213, 6, 0.7f, 2f);
-    private readonly NoiseParams _npFillerDepth = new(0f, 1.2f, 150f, 150f, 150f, 261, 3, 0.7f, 2f);
-    private readonly NoiseParams _npMountHeight = new(256f, 112f, 1000f, 1000f, 1000f, 72449, 3, 0.6f, 2f);
-    private readonly NoiseParams _npRidgeUwater = new(0f, 1f, 1000f, 1000f, 1000f, 85039, 5, 0.6f, 2f);
-    private readonly NoiseParams _npMountain = new(-0.6f, 1f, 250f, 350f, 250f, 5333, 5, 0.63f, 2f);
-    private readonly NoiseParams _npRidge = new(0f, 1f, 100f, 100f, 100f, 6467, 4, 0.75f, 2f);
-    private readonly NoiseParams _npCave1 = new(0f, 12f, 61f, 61f, 61f, 52534, 3, 0.5f, 2f);
-    private readonly NoiseParams _npCave2 = new(0f, 12f, 67f, 67f, 67f, 10325, 3, 0.5f, 2f);
-    private readonly NoiseParams _npCavern = new(0f, 1f, 384f, 128f, 384f, 723, 5, 0.63f, 2f);
-    private readonly NoiseParams _npDungeons = new(0.9f, 0.5f, 500f, 500f, 500f, 0, 2, 0.8f, 2f);
+    private NoiseParams _npTerrainBase = new(4f, 70f, 600f, 600f, 600f, 82341, 5, 0.6f, 2f);
+    private NoiseParams _npTerrainAlt = new(4f, 25f, 600f, 600f, 600f, 5934, 5, 0.6f, 2f);
+    private NoiseParams _npTerrainPersist = new(0.6f, 0.1f, 2000f, 2000f, 2000f, 539, 3, 0.6f, 2f);
+    private NoiseParams _npHeightSelect = new(-8f, 16f, 500f, 500f, 500f, 4213, 6, 0.7f, 2f);
+    private NoiseParams _npFillerDepth = new(0f, 1.2f, 150f, 150f, 150f, 261, 3, 0.7f, 2f);
+    private NoiseParams _npMountHeight = new(256f, 112f, 1000f, 1000f, 1000f, 72449, 3, 0.6f, 2f);
+    private NoiseParams _npRidgeUwater = new(0f, 1f, 1000f, 1000f, 1000f, 85039, 5, 0.6f, 2f);
+    private NoiseParams _npMountain = new(-0.6f, 1f, 250f, 350f, 250f, 5333, 5, 0.63f, 2f);
+    private NoiseParams _npRidge = new(0f, 1f, 100f, 100f, 100f, 6467, 4, 0.75f, 2f);
+    private NoiseParams _npCave1 = new(0f, 12f, 61f, 61f, 61f, 52534, 3, 0.5f, 2f);
+    private NoiseParams _npCave2 = new(0f, 12f, 67f, 67f, 67f, 10325, 3, 0.5f, 2f);
+    private NoiseParams _npCavern = new(0f, 1f, 384f, 128f, 384f, 723, 5, 0.63f, 2f);
+    private NoiseParams _npDungeons = new(0.9f, 0.5f, 500f, 500f, 500f, 0, 2, 0.8f, 2f);
 
     public void ConfigureCaves(bool generateCaves) => _generateCaves = generateCaves;
     public void ConfigureDungeons(bool generateDungeons) => _generateDungeons = generateDungeons;
@@ -73,6 +77,65 @@ public class MapgenV7 : IWorldGenerator
     public void ConfigureMountains(bool generateMountains) => _generateMountains = generateMountains;
     public void ConfigureRivers(bool generateRivers) => _generateRivers = generateRivers;
     public void ConfigureCaverns(bool generateCaverns) => _generateCaverns = generateCaverns;
+    public void ConfigureOres(bool generateOres) => _generateOres = generateOres;
+
+    public void LoadConfig(string dataPath)
+    {
+        var configPath = Path.Combine(dataPath, "mapgen_v7.json");
+        if (!File.Exists(configPath)) return;
+
+        var json = File.ReadAllText(configPath);
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+
+        if (root.TryGetProperty("caveWidth", out var cw)) _caveWidth = (float)cw.GetDouble();
+        if (root.TryGetProperty("cavernLimit", out var cl)) _cavernLimit = (float)cl.GetDouble();
+        if (root.TryGetProperty("cavernTaper", out var ct)) _cavernTaper = (float)ct.GetDouble();
+        if (root.TryGetProperty("cavernThreshold", out var cth)) _cavernThreshold = (float)cth.GetDouble();
+        if (root.TryGetProperty("largeCaveDepth", out var lcd)) _largeCaveDepth = (float)lcd.GetDouble();
+        if (root.TryGetProperty("largeCaveNumMax", out var lcn)) _largeCaveNumMax = lcn.GetInt32();
+        if (root.TryGetProperty("largeCaveFlooded", out var lcf)) _largeCaveFlooded = lcf.GetInt32();
+        if (root.TryGetProperty("mountZeroLevel", out var mzl)) _mountZeroLevel = (float)mzl.GetDouble();
+        if (root.TryGetProperty("riverWidth", out var rw)) _riverWidth = (float)rw.GetDouble();
+        if (root.TryGetProperty("generateCaves", out var gc)) _generateCaves = gc.GetBoolean();
+        if (root.TryGetProperty("generateDungeons", out var gd)) _generateDungeons = gd.GetBoolean();
+        if (root.TryGetProperty("generateTrees", out var gt)) _generateTrees = gt.GetBoolean();
+        if (root.TryGetProperty("generateMountains", out var gm)) _generateMountains = gm.GetBoolean();
+        if (root.TryGetProperty("generateRivers", out var gr)) _generateRivers = gr.GetBoolean();
+        if (root.TryGetProperty("generateCaverns", out var gcv)) _generateCaverns = gcv.GetBoolean();
+        if (root.TryGetProperty("generateOres", out var go)) _generateOres = go.GetBoolean();
+        if (root.TryGetProperty("generateDust", out var gdu)) _generateDust = gdu.GetBoolean();
+
+        _npTerrainBase = LoadNoiseParams(root, "npTerrainBase", _npTerrainBase);
+        _npTerrainAlt = LoadNoiseParams(root, "npTerrainAlt", _npTerrainAlt);
+        _npTerrainPersist = LoadNoiseParams(root, "npTerrainPersist", _npTerrainPersist);
+        _npHeightSelect = LoadNoiseParams(root, "npHeightSelect", _npHeightSelect);
+        _npFillerDepth = LoadNoiseParams(root, "npFillerDepth", _npFillerDepth);
+        _npMountHeight = LoadNoiseParams(root, "npMountHeight", _npMountHeight);
+        _npRidgeUwater = LoadNoiseParams(root, "npRidgeUwater", _npRidgeUwater);
+        _npMountain = LoadNoiseParams(root, "npMountain", _npMountain);
+        _npRidge = LoadNoiseParams(root, "npRidge", _npRidge);
+        _npCave1 = LoadNoiseParams(root, "npCave1", _npCave1);
+        _npCave2 = LoadNoiseParams(root, "npCave2", _npCave2);
+        _npCavern = LoadNoiseParams(root, "npCavern", _npCavern);
+        _npDungeons = LoadNoiseParams(root, "npDungeons", _npDungeons);
+    }
+
+    private static NoiseParams LoadNoiseParams(JsonElement root, string name, NoiseParams defaults)
+    {
+        if (!root.TryGetProperty(name, out var el)) return defaults;
+        return new NoiseParams(
+            el.TryGetProperty("offset", out var o) ? (float)o.GetDouble() : defaults.Offset,
+            el.TryGetProperty("scale", out var s) ? (float)s.GetDouble() : defaults.Scale,
+            el.TryGetProperty("spreadX", out var sx) ? (float)sx.GetDouble() : defaults.SpreadX,
+            el.TryGetProperty("spreadY", out var sy) ? (float)sy.GetDouble() : defaults.SpreadY,
+            el.TryGetProperty("spreadZ", out var sz) ? (float)sz.GetDouble() : defaults.SpreadZ,
+            el.TryGetProperty("seed", out var sd) ? sd.GetInt32() : defaults.Seed,
+            el.TryGetProperty("octaves", out var oc) ? oc.GetInt32() : defaults.Octaves,
+            el.TryGetProperty("persistence", out var pe) ? (float)pe.GetDouble() : defaults.Persistence,
+            el.TryGetProperty("lacunarity", out var la) ? (float)la.GetDouble() : defaults.Lacunarity
+        );
+    }
 
     public void Initialize(int seed)
     {
@@ -93,6 +156,8 @@ public class MapgenV7 : IWorldGenerator
 
     public void LoadBiomes(string dataPath)
     {
+        LoadConfig(dataPath);
+
         var biomesPath = Path.Combine(dataPath, "biomes.json");
         if (File.Exists(biomesPath))
         {
@@ -126,7 +191,10 @@ public class MapgenV7 : IWorldGenerator
                         biome.TryGetProperty("treeChance", out var tcEl) ? (float)tcEl.GetDouble() : 0f,
                         decorations.ToArray(),
                         biome.TryGetProperty("dungeonBlock", out var dbEl) ? dbEl.GetString() ?? "cobblestone" : "cobblestone",
-                        biome.TryGetProperty("dungeonAltBlock", out var daEl) ? daEl.GetString() ?? "mossy_cobblestone" : "mossy_cobblestone"
+                        biome.TryGetProperty("dungeonAltBlock", out var daEl) ? daEl.GetString() ?? "mossy_cobblestone" : "mossy_cobblestone",
+                        biome.TryGetProperty("dustBlock", out var dustEl) ? dustEl.GetString() ?? "" : "",
+                        biome.TryGetProperty("waterTopBlock", out var wtEl) ? wtEl.GetString() ?? "" : "",
+                        biome.TryGetProperty("waterTopDepth", out var wtdEl) ? wtdEl.GetInt32() : 0
                     ));
                 }
             }
@@ -187,10 +255,16 @@ public class MapgenV7 : IWorldGenerator
         if (_generateDungeons && baseY >= 0 && baseY < GroundBase)
             GenerateDungeons(blocks, baseX, baseY, baseZ);
 
+        if (_generateOres)
+            GenerateOres(blocks, baseX, baseY, baseZ);
+
         if (_generateTrees)
             GenerateTrees(blocks, baseX, baseY, baseZ, heightMap);
 
         GenerateDecorations(blocks, baseX, baseY, baseZ, heightMap);
+
+        if (_generateDust)
+            ApplyDustTopNodes(blocks, baseX, baseY, baseZ, heightMap);
 
         return blocks;
     }
@@ -297,7 +371,6 @@ public class MapgenV7 : IWorldGenerator
     private void ApplyRivers(ushort[,,] blocks, int baseX, int baseY, int baseZ,
         float[,] surfaceYMap, int[,] heightMap)
     {
-        var riverWidth = 0.2f;
 
         for (int x = 0; x < ChunkSize; x++)
         {
@@ -308,7 +381,7 @@ public class MapgenV7 : IWorldGenerator
 
                 var absUwaterN = MathF.Abs(OctaveNoise2D(_npRidgeUwater, worldX, worldZ)) * 2f;
 
-                if (absUwaterN > riverWidth) continue;
+                if (absUwaterN > _riverWidth) continue;
 
                 for (int y = 0; y < ChunkSize; y++)
                 {
@@ -317,7 +390,7 @@ public class MapgenV7 : IWorldGenerator
 
                     var altitude = worldY - WaterLevel;
                     var heightMod = (altitude + 17f) / 2.5f;
-                    var widthMod = riverWidth - absUwaterN;
+                    var widthMod = _riverWidth - absUwaterN;
                     var ridgeNoise = OctaveNoise3D(_npRidge, worldX, worldY, worldZ);
                     var nridge = ridgeNoise * MathF.Max(altitude, 0f) / 7f;
 
@@ -663,14 +736,132 @@ public class MapgenV7 : IWorldGenerator
         }
     }
 
+    private void GenerateOres(ushort[,,] blocks, int baseX, int baseY, int baseZ)
+    {
+        var rng = new Random(unchecked((int)(_seed + baseX * 6364136223846793005L ^ baseZ * 6364136223846793005L)));
+
+        var veinDefinitions = new (BlockType oreType, int yMin, int yMax, float chance, int minSize, int maxSize)[]
+        {
+            (BlockType.OreIron, 0, 64, 0.02f, 3, 8),
+            (BlockType.Coal, 0, 96, 0.03f, 4, 10),
+            (BlockType.GoldOre, 0, 32, 0.008f, 2, 5),
+            (BlockType.OreDiamond, 0, 16, 0.004f, 2, 4),
+            (BlockType.RedstoneOre, 0, 16, 0.006f, 2, 6),
+            (BlockType.LapisOre, 0, 32, 0.005f, 2, 5),
+            (BlockType.CopperOre, 0, 96, 0.012f, 3, 7),
+            (BlockType.EmeraldOre, 4, 32, 0.002f, 1, 1)
+        };
+
+        foreach (var (oreType, yMin, yMax, chance, minSize, maxSize) in veinDefinitions)
+        {
+            for (int attempt = 0; attempt < 3; attempt++)
+            {
+                if (rng.NextDouble() > chance * 16) continue;
+
+                var cx = rng.Next(0, ChunkSize);
+                var cy = rng.Next(0, ChunkSize);
+                var cz = rng.Next(0, ChunkSize);
+                var worldY = baseY + cy;
+
+                if (worldY < yMin || worldY > yMax) continue;
+
+                var size = rng.Next(minSize, maxSize + 1);
+                var dx = (float)(rng.NextDouble() * 2 - 1) * 0.5f;
+                var dy = (float)(rng.NextDouble() * 0.4 - 0.2);
+                var dz = (float)(rng.NextDouble() * 2 - 1) * 0.5f;
+
+                for (int s = 0; s < size; s++)
+                {
+                    var ox = cx + (int)(dx * s);
+                    var oy = cy + (int)(dy * s);
+                    var oz = cz + (int)(dz * s);
+
+                    if (ox < 0 || ox >= ChunkSize || oy < 0 || oy >= ChunkSize || oz < 0 || oz >= ChunkSize) continue;
+
+                    var bt = blocks[ox, oy, oz];
+                    if (bt == (ushort)BlockType.Stone || bt == (ushort)BlockType.DesertStone)
+                        blocks[ox, oy, oz] = (ushort)oreType;
+
+                    dx += (float)(rng.NextDouble() - 0.5) * 0.3f;
+                    dy += (float)(rng.NextDouble() - 0.5) * 0.1f;
+                    dz += (float)(rng.NextDouble() - 0.5) * 0.3f;
+                }
+            }
+        }
+
+        for (int x = 0; x < ChunkSize; x++)
+        {
+            for (int z = 0; z < ChunkSize; z++)
+            {
+                for (int y = 0; y < ChunkSize; y++)
+                {
+                    var worldX = baseX + x;
+                    var worldY = baseY + y;
+                    var worldZ = baseZ + z;
+
+                    if (blocks[x, y, z] != (ushort)BlockType.Stone && blocks[x, y, z] != (ushort)BlockType.DesertStone)
+                        continue;
+
+                    var oreType = GetOreAt(worldX, worldY, worldZ);
+                    if (oreType != (ushort)BlockType.Air)
+                        blocks[x, y, z] = oreType;
+                }
+            }
+        }
+    }
+
+    private ushort GetOreAt(int x, int y, int z)
+    {
+        var oreNoise = PerlinNoise3D(x * 0.1f, y * 0.1f, z * 0.1f);
+        if (y < 16 && oreNoise > 0.85f) return (ushort)BlockType.OreDiamond;
+        if (y < 16 && PerlinNoise3D(x * 0.13f + 8000, y * 0.13f, z * 0.13f + 8000) > 0.88f) return (ushort)BlockType.EmeraldOre;
+        if (y < 32 && oreNoise > 0.8f) return (ushort)BlockType.GoldOre;
+        if (y < 32 && PerlinNoise3D(x * 0.11f + 7000, y * 0.11f, z * 0.11f + 7000) > 0.87f) return (ushort)BlockType.RedstoneOre;
+        if (y < 32 && PerlinNoise3D(x * 0.1f + 9500, y * 0.1f, z * 0.1f + 9500) > 0.86f) return (ushort)BlockType.LapisOre;
+        if (y < 48 && oreNoise > 0.75f) return (ushort)BlockType.OreIron;
+        if (y < 48 && PerlinNoise3D(x * 0.12f + 6000, y * 0.12f, z * 0.12f + 6000) > 0.85f) return (ushort)BlockType.GoldOre;
+        if (y < 96 && PerlinNoise3D(x * 0.14f + 9000, y * 0.14f, z * 0.14f + 9000) > 0.84f) return (ushort)BlockType.CopperOre;
+        if (y < 96 && oreNoise > 0.82f) return (ushort)BlockType.Coal;
+        return (ushort)BlockType.Air;
+    }
+
+    private void ApplyDustTopNodes(ushort[,,] blocks, int baseX, int baseY, int baseZ, int[,] heightMap)
+    {
+        for (int x = 0; x < ChunkSize; x++)
+        {
+            for (int z = 0; z < ChunkSize; z++)
+            {
+                var surfaceY = heightMap[x, z];
+                var localSurfaceY = surfaceY - baseY;
+
+                if (localSurfaceY < 0 || localSurfaceY >= ChunkSize) continue;
+
+                var worldX = baseX + x;
+                var worldZ = baseZ + z;
+                var biome = GetBiomeAt(worldX, surfaceY, worldZ, surfaceY);
+
+                if (string.IsNullOrEmpty(biome.DustBlock)) continue;
+
+                var aboveLocalY = localSurfaceY + 1;
+                if (aboveLocalY >= ChunkSize) continue;
+
+                if (blocks[x, aboveLocalY, z] != (ushort)BlockType.Air) continue;
+
+                var dustType = GetBlockTypeByName(biome.DustBlock);
+                if (dustType != (ushort)BlockType.Air)
+                    blocks[x, aboveLocalY, z] = dustType;
+            }
+        }
+    }
+
     private BiomeDefinition GetBiomeAt(int x, int y, int z, int surfaceHeight)
     {
         if (_biomes.Count == 0)
         {
             var biomeNoise = PerlinNoise2D(x * 0.005f + 1000, z * 0.005f + 1000);
-            if (biomeNoise > 0.3f) return new BiomeDefinition("desert", 4, 31000, 90, 10, "sand", "sand", 3, "desert_stone", "water", "none", 0, Array.Empty<string>(), "cobblestone", "mossy_cobblestone");
-            if (biomeNoise < -0.4f) return new BiomeDefinition("snow", 4, 31000, 10, 40, "snow", "dirt", 1, "stone", "water", "pine", 0.006f, new[] { "tall_grass" }, "cobblestone", "mossy_cobblestone");
-            return new BiomeDefinition("grassland", 4, 31000, 50, 50, "grass", "dirt", 1, "stone", "water", "oak", 0.003f, new[] { "tall_grass", "flower_red" }, "cobblestone", "mossy_cobblestone");
+            if (biomeNoise > 0.3f) return new BiomeDefinition("desert", 4, 31000, 90, 10, "sand", "sand", 3, "desert_stone", "water", "none", 0, Array.Empty<string>(), "cobblestone", "mossy_cobblestone", "", "", 0);
+            if (biomeNoise < -0.4f) return new BiomeDefinition("snow", 4, 31000, 10, 40, "snow", "dirt", 1, "stone", "water", "pine", 0.006f, new[] { "tall_grass" }, "cobblestone", "mossy_cobblestone", "snow_layer", "", 0);
+            return new BiomeDefinition("grassland", 4, 31000, 50, 50, "grass", "dirt", 1, "stone", "water", "oak", 0.003f, new[] { "tall_grass", "flower_red" }, "cobblestone", "mossy_cobblestone", "", "", 0);
         }
 
         float heat = 50f;
@@ -789,6 +980,8 @@ public class MapgenV7 : IWorldGenerator
         "sand" => (ushort)BlockType.Sand,
         "desert_sand" => (ushort)BlockType.DesertSand,
         "snow" => (ushort)BlockType.Snow,
+        "snow_layer" => (ushort)BlockType.SnowLayer,
+        "snowblock" => (ushort)BlockType.Snow,
         "stone" => (ushort)BlockType.Stone,
         "desert_stone" => (ushort)BlockType.DesertStone,
         "water" => (ushort)BlockType.Water,

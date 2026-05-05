@@ -225,9 +225,9 @@ public class GameHub : Hub<IGameClient>
                     (_, old) => (old.FailCount + 1, old.LockoutEnd));
 
                 var (_, lockoutEnd) = _accountFailures.TryGetValue(failKey, out var f) ? (true, f.LockoutEnd) : (true, DateTime.UtcNow);
-                if (f.FailCount >= 5)
+                if (f.FailCount >= _config.Auth.AccountLockoutAttempts)
                 {
-                    _accountFailures[failKey] = (f.FailCount, DateTime.UtcNow.AddMinutes(5));
+                    _accountFailures[failKey] = (f.FailCount, DateTime.UtcNow.AddMinutes(_config.Auth.AccountLockoutMinutes));
                 }
             }
 
@@ -275,9 +275,9 @@ public class GameHub : Hub<IGameClient>
 
         if (isNewPlayer && !string.IsNullOrEmpty(password))
         {
-            if (password.Length < 8 || password.Length > 128)
+            if (password.Length < _config.Auth.MinPasswordLength || password.Length > _config.Auth.MaxPasswordLength)
             {
-                await Clients.Caller.OnChatMessage("Server", "Password must be 8-128 characters.", "system");
+                await Clients.Caller.OnChatMessage("Server", $"Password must be {_config.Auth.MinPasswordLength}-{_config.Auth.MaxPasswordLength} characters.", "system");
                 _gameServer.PlayerLeave(Context.ConnectionId);
                 return;
             }
@@ -363,11 +363,11 @@ public class GameHub : Hub<IGameClient>
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
 
-        if (string.IsNullOrEmpty(message) || message.Length > 256) return;
+        if (string.IsNullOrEmpty(message) || message.Length > _config.ChatMaxLength) return;
 
         if (!CheckChatRateLimit(Context.ConnectionId, _config.ChatMessageLimitPer10Sec)) return;
 
-        message = SanitizeChatMessage(message);
+        message = SanitizeChatMessage(message, _config.ChatMaxLength);
 
         if (!string.IsNullOrEmpty(message) && message[0] == '/')
         {
@@ -2099,7 +2099,7 @@ public class GameHub : Hub<IGameClient>
         _ = SendInventoryUpdate(player);
     }
 
-    private static string SanitizeChatMessage(string message)
+    private static string SanitizeChatMessage(string message, int maxLength = 256)
     {
         var sb = new System.Text.StringBuilder(message.Length);
         foreach (char c in message)
@@ -2118,7 +2118,7 @@ public class GameHub : Hub<IGameClient>
             }
         }
         var result = sb.ToString();
-        if (result.Length > 256) result = result[..256];
+        if (result.Length > maxLength) result = result[..maxLength];
         return result;
     }
 

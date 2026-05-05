@@ -91,6 +91,7 @@ Biome features:
 | singlenode | Empty world (air only) |
 
 ### MapgenV7 Features
+- **External Config**: All noise parameters and feature toggles configurable via `mapgen_v7.json`
 - **Dual terrain blending**: Two 2D noise layers (terrain_base, terrain_alt) blended via height_select noise
 - **Modulated persistence**: terrain_persist noise modulates roughness regionally
 - **3D Mountains**: Density gradient with mount_height envelope and 3D mountain noise
@@ -98,6 +99,8 @@ Biome features:
 - **Cave noise intersection**: Two 3D cave noises intersect to create tunnel networks
 - **Cavern generation**: Large underground caverns with amplitude tapering
 - **Noise-driven dungeons**: Dungeon count from 3D dungeon noise
+- **Ore generation**: Scatter and vein ore placement (coal, iron, gold, diamond, redstone, lapis, copper, emerald)
+- **Biome dust**: Biome-specific dust nodes (snow layers in cold biomes) placed on exposed surfaces
 - **Filler depth variation**: Surface dirt depth varies via noise
 
 ### MapgenV6 Features

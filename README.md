@@ -177,6 +177,10 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Configurable Security Settings**: Auth parameters (PBKDF2 iterations, lockout policy, reserved names) and security settings (HTTPS redirection, HSTS, CSP nonce size) externalized to `server_config.json`
 - **HTTPS Redirection**: Optional HTTPS enforcement for production deployments
 - **Expanded Reserved Names**: Administrator, owner, staff, operator names blocked from registration to prevent impersonation
+- **Config-Driven Game Systems**: All game balance values (auto-save interval, day/night cycle length, chat max length, password policy, account lockout) read from `server_config.json` instead of hardcoded
+- **MapgenV7 External Config**: All noise parameters and feature toggles configurable via `mapgen_v7.json` (caves, dungeons, mountains, rivers, caverns, ores, dust)
+- **MapgenV7 Ore Generation**: Scatter and vein ore placement integrated into V7 terrain pipeline (coal, iron, gold, diamond, redstone, lapis, copper, emerald)
+- **MapgenV7 Biome Dust**: Biome-specific dust nodes (snow layers in cold biomes) placed on exposed surfaces
 
 ## Architecture
 
@@ -269,6 +273,7 @@ web/
 │   ├── schematics.json      # Structure schematics (small_house, outpost_tower)
 │   ├── mapgen_valleys.json  # Valleys generator config
 │   ├── mapgen_carpathian.json # Carpathian generator config
+│   ├── mapgen_v7.json      # V7 generator config (noise params, features)
 │   ├── physics_constants.json
 │   ├── privileges.json   # 19 privileges
 │   ├── abm_config.json   # ABM modifier parameters (intervals, chances)
