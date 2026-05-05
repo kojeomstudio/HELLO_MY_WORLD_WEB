@@ -441,6 +441,69 @@ EmergeManager (스레드/큐/생성기 관리)
             │
             결과: CANCELLED | ERRORED | FROM_MEMORY | FROM_DISK | GENERATED
             │
-       각 스레드는 독립적인 BiomeGen, OreManager, DecorationManager 소유
-       (공유 가변 상태 없음 → 스레드 안전)
+        각 스레드는 독립적인 BiomeGen, OreManager, DecorationManager 소유
+        (공유 가변 상태 없음 → 스레드 안전)
+        ```
+
+## 16. 웹 포팅 MapgenV7 데이터 기반 아키텍처
+
+### 16.1 데이터 기반 설정 (Data-Driven Configuration)
+
+MapgenV7은 다음 JSON 데이터 파일을 로드하여 모든 콘텐츠를 구성합니다:
+
+| 파일 | 내용 | 로드 위치 |
+|------|------|-----------|
+| `mapgen_v7.json` | 노이즈 파라미터, 기능 토글, 동굴/던전 설정 | `LoadConfig()` |
+| `biomes.json` | 14개 생물군계 정의 (블렌드 노이즈 포함) | `LoadBiomes()` |
+| `ores.json` | 11개 광석 정의 (scatter 타입) | `LoadOres()` |
+| `decorations.json` | 12개 장식 정의 (plantlike + schematic) | `LoadDecorations()` |
+| `tree_schematics.json` | 5종 나무 도면 (sphere/cone/cylinder/none) | `LoadTreeSchematics()` |
+| `lsystem_trees.json` | 5종 L-시스템 나무 (공리/규칙 기반) | `LSystemTreeGenerator.LoadDefinitions()` |
+
+### 16.2 생물군계 선택 (블렌드 노이즈)
+
+```
+1. 기본 열/습도 = heatOffset + heatScale × perlin(x/heatSpread, z/heatSpread)
+2. 블렌드 추가 = octaveNoise2D(npHeatBlend, x/heatBlendSpread, z/heatBlendSpread)
+3. 최종 열 = 기본 열 + 블렌드
+4. 최종 습도 = 기본 습도 + 습도 블렌드
+5. 가중 거리 = (dHeat² + dHumidity²) / weight
+6. 최소 가중 거리 생물군계 선택
+```
+
+### 16.3 나무 생성 파이프라인
+
+```
+GenerateTrees() → 각 (X,Z) 열:
+  1. tree_schematics.json에서 생물군계 매칭 도면 검색
+  2. 발견 시: PlaceTreeFromSchematic() → canopyShape별 (sphere/cone/cylinder)
+  3. 미발견 시: lsystem_trees.json에서 L-시스템 정의 검색
+  4. L-시스템 발견 시: LSystemTreeGenerator.GenerateTree()
+  5. 둘 다 없으면: PlaceDefaultTree() (기본 구형 캐노피)
+```
+
+### 16.4 장식 배치 파이프라인
+
+```
+GenerateDecorations() → decorations.json 로드 시:
+  각 (X,Z) 열에 대해:
+    1. 생물군계의 decorations 배열 대신, decorations.json의 전체 항목 스캔
+    2. Biomes 필터 매칭 확인
+    3. PlaceOn 블록 매칭 확인 (표면 블록 검증)
+    4. SpawnChance 확률 테스트
+    5. schematic 타입: HeightMin~HeightMax 만큼 수직 배치
+    6. plantlike 타입: 단일 블록 배치
+```
+
+### 16.5 광석 배치 파이프라인
+
+```
+GenerateOres() → ores.json 로드 시:
+  각 광석 정의에 대해:
+    1. clustScarcity 기반 시도 횟수: 16³ / clustScarcity
+    2. Y 범위 (yMin/yMax) 필터
+    3. Biomes 필터 (비어있으면 모든 생물군계)
+    4. clustNumOres ~ clustSize 범위의 클러스터 크기
+    5. 랜덤 워크로 클러스터 배치 (Stone/DesertStone 대체)
+  이후: PerlinNoise 기반 보조 광석 배치 (GetOreAt)
 ```

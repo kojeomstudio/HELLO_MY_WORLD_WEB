@@ -28,6 +28,10 @@ public class MapgenV7 : IWorldGenerator
     private readonly List<BiomeDefinition> _biomes = new();
     private BiomeNoiseConfig? _biomeNoiseConfig;
     private readonly ConcurrentBag<DungeonChestData> _pendingDungeonChests = new();
+    private readonly List<OreDefinition> _ores = new();
+    private readonly List<DecorationDefinition> _decorations = new();
+    private readonly List<TreeSchematicDefinition> _treeSchematics = new();
+    private readonly LSystemTreeGenerator _lsystemTreeGen = new();
 
     private float _caveWidth = 0.09f;
     private float _cavernLimit = -256f;
@@ -43,15 +47,40 @@ public class MapgenV7 : IWorldGenerator
 
     private record BiomeDefinition(
         string Name, int YMin, int YMax, float HeatPoint, float HumidityPoint,
+        float Weight, int VerticalBlend,
         string TopBlock, string FillerBlock, int FillerDepth,
         string StoneBlock, string WaterBlock,
+        string WaterTopBlock, int WaterTopDepth,
+        string RiverWaterBlock, string RiverbedBlock,
+        string DustBlock, string CaveLiquid,
         string TreeType, float TreeChance,
-        string[] Decorations, string DungeonBlock, string DungeonAltBlock,
-        string DustBlock, string WaterTopBlock, int WaterTopDepth);
+        string[] Decorations, string DungeonBlock, string DungeonAltBlock, string DungeonStairBlock);
 
     private record BiomeNoiseConfig(
         float HeatOffset, float HeatScale, float[] HeatSpread,
-        float HumidityOffset, float HumidityScale, float[] HumiditySpread);
+        float HumidityOffset, float HumidityScale, float[] HumiditySpread,
+        float HeatBlendOffset, float HeatBlendScale, float[] HeatBlendSpread,
+        float HumidityBlendOffset, float HumidityBlendScale, float[] HumidityBlendSpread);
+
+    private record OreDefinition(
+        string Name, string BlockType, string OreType,
+        int YMin, int YMax,
+        int ClustSize, int ClustNumOres, int ClustScarcity,
+        float NoiseThreshold, float NoiseScale,
+        string[] Biomes);
+
+    private record DecorationDefinition(
+        string Name, string Type, string BlockType,
+        string[] Biomes, int YMin, int YMax,
+        float NoiseThreshold, float NoiseScale,
+        string PlaceOn, float SpawnChance,
+        int HeightMin, int HeightMax);
+
+    private record TreeSchematicDefinition(
+        string Name, string TrunkBlock, string LeavesBlock,
+        int MinHeight, int MaxHeight,
+        string CanopyShape, int CanopyBaseOffset, int CanopyTopOffset,
+        int CanopyRadius, string[] Biomes);
 
     private record NoiseParams(
         float Offset, float Scale, float SpreadX, float SpreadY, float SpreadZ,
@@ -70,6 +99,8 @@ public class MapgenV7 : IWorldGenerator
     private NoiseParams _npCave2 = new(0f, 12f, 67f, 67f, 67f, 10325, 3, 0.5f, 2f);
     private NoiseParams _npCavern = new(0f, 1f, 384f, 128f, 384f, 723, 5, 0.63f, 2f);
     private NoiseParams _npDungeons = new(0.9f, 0.5f, 500f, 500f, 500f, 0, 2, 0.8f, 2f);
+    private NoiseParams _npHeatBlend = new(0f, 3f, 8f, 8f, 8f, 0, 1, 0.5f, 2f);
+    private NoiseParams _npHumidityBlend = new(0f, 3f, 8f, 8f, 8f, 0, 1, 0.5f, 2f);
 
     public void ConfigureCaves(bool generateCaves) => _generateCaves = generateCaves;
     public void ConfigureDungeons(bool generateDungeons) => _generateDungeons = generateDungeons;
@@ -182,34 +213,154 @@ public class MapgenV7 : IWorldGenerator
                         biome.TryGetProperty("yMax", out var yMaxEl) ? yMaxEl.GetInt32() : 31000,
                         (float)biome.GetProperty("heatPoint").GetDouble(),
                         (float)biome.GetProperty("humidityPoint").GetDouble(),
+                        biome.TryGetProperty("weight", out var wEl) ? (float)wEl.GetDouble() : 1f,
+                        biome.TryGetProperty("verticalBlend", out var vbEl) ? vbEl.GetInt32() : 0,
                         biome.GetProperty("topBlock").GetString() ?? "grass",
                         biome.GetProperty("fillerBlock").GetString() ?? "dirt",
                         biome.GetProperty("fillerDepth").GetInt32(),
                         biome.GetProperty("stoneBlock").GetString() ?? "stone",
                         biome.GetProperty("waterBlock").GetString() ?? "water",
+                        biome.TryGetProperty("waterTopBlock", out var wtEl) ? wtEl.GetString() ?? "" : "",
+                        biome.TryGetProperty("depthWaterTop", out var wtdEl) ? wtdEl.GetInt32() : 0,
+                        biome.TryGetProperty("riverWaterBlock", out var rwEl) ? rwEl.GetString() ?? "water" : "water",
+                        biome.TryGetProperty("riverbedBlock", out var rbEl) ? rbEl.GetString() ?? "sand" : "sand",
+                        biome.TryGetProperty("dustBlock", out var dustEl) ? dustEl.GetString() ?? "" : "",
+                        biome.TryGetProperty("caveLiquid", out var clEl) ? clEl.GetString() ?? "" : "",
                         biome.TryGetProperty("treeType", out var ttEl) ? ttEl.GetString() ?? "none" : "none",
                         biome.TryGetProperty("treeChance", out var tcEl) ? (float)tcEl.GetDouble() : 0f,
                         decorations.ToArray(),
                         biome.TryGetProperty("dungeonBlock", out var dbEl) ? dbEl.GetString() ?? "cobblestone" : "cobblestone",
                         biome.TryGetProperty("dungeonAltBlock", out var daEl) ? daEl.GetString() ?? "mossy_cobblestone" : "mossy_cobblestone",
-                        biome.TryGetProperty("dustBlock", out var dustEl) ? dustEl.GetString() ?? "" : "",
-                        biome.TryGetProperty("waterTopBlock", out var wtEl) ? wtEl.GetString() ?? "" : "",
-                        biome.TryGetProperty("waterTopDepth", out var wtdEl) ? wtdEl.GetInt32() : 0
+                        biome.TryGetProperty("dungeonStairBlock", out var dsEl) ? dsEl.GetString() ?? "stone_brick" : "stone_brick"
                     ));
                 }
             }
 
             if (root.TryGetProperty("noise", out var noiseEl))
             {
+                float[] defaultBlendSpread = { 8f, 8f, 8f };
                 _biomeNoiseConfig = new BiomeNoiseConfig(
                     (float)noiseEl.GetProperty("heatOffset").GetDouble(),
                     (float)noiseEl.GetProperty("heatScale").GetDouble(),
                     noiseEl.GetProperty("heatSpread").EnumerateArray().Select(e => (float)e.GetDouble()).ToArray(),
                     (float)noiseEl.GetProperty("humidityOffset").GetDouble(),
                     (float)noiseEl.GetProperty("humidityScale").GetDouble(),
-                    noiseEl.GetProperty("humiditySpread").EnumerateArray().Select(e => (float)e.GetDouble()).ToArray()
+                    noiseEl.GetProperty("humiditySpread").EnumerateArray().Select(e => (float)e.GetDouble()).ToArray(),
+                    noiseEl.TryGetProperty("heatBlendOffset", out var hbo) ? (float)hbo.GetDouble() : 0f,
+                    noiseEl.TryGetProperty("heatBlendScale", out var hbs) ? (float)hbs.GetDouble() : 3f,
+                    noiseEl.TryGetProperty("heatBlendSpread", out var hbsp) ? hbsp.EnumerateArray().Select(e => (float)e.GetDouble()).ToArray() : defaultBlendSpread,
+                    noiseEl.TryGetProperty("humidityBlendOffset", out var hubo) ? (float)hubo.GetDouble() : 0f,
+                    noiseEl.TryGetProperty("humidityBlendScale", out var hubs) ? (float)hubs.GetDouble() : 3f,
+                    noiseEl.TryGetProperty("humidityBlendSpread", out var hubsp) ? hubsp.EnumerateArray().Select(e => (float)e.GetDouble()).ToArray() : defaultBlendSpread
                 );
             }
+        }
+
+        LoadOres(dataPath);
+        LoadDecorations(dataPath);
+        LoadTreeSchematics(dataPath);
+        _lsystemTreeGen.LoadDefinitions(dataPath);
+    }
+
+    private void LoadOres(string dataPath)
+    {
+        var oresPath = Path.Combine(dataPath, "ores.json");
+        if (!File.Exists(oresPath)) return;
+
+        var json = File.ReadAllText(oresPath);
+        using var doc = JsonDocument.Parse(json);
+        if (!doc.RootElement.TryGetProperty("ores", out var oresEl)) return;
+
+        foreach (var ore in oresEl.EnumerateArray())
+        {
+            var biomes = new List<string>();
+            if (ore.TryGetProperty("biomes", out var bEl))
+            {
+                foreach (var b in bEl.EnumerateArray())
+                    biomes.Add(b.GetString() ?? "");
+            }
+
+            _ores.Add(new OreDefinition(
+                ore.GetProperty("name").GetString() ?? "",
+                ore.GetProperty("blockType").GetString() ?? "",
+                ore.TryGetProperty("oreType", out var ot) ? ot.GetString() ?? "scatter" : "scatter",
+                ore.GetProperty("yMin").GetInt32(),
+                ore.GetProperty("yMax").GetInt32(),
+                ore.TryGetProperty("clustSize", out var cs) ? cs.GetInt32() : 4,
+                ore.TryGetProperty("clustNumOres", out var cn) ? cn.GetInt32() : 3,
+                ore.TryGetProperty("clustScarcity", out var csc) ? csc.GetInt32() : 1000,
+                ore.TryGetProperty("noiseThreshold", out var nt) ? (float)nt.GetDouble() : 0.8f,
+                ore.TryGetProperty("noiseScale", out var ns) ? (float)ns.GetDouble() : 0.1f,
+                biomes.ToArray()
+            ));
+        }
+    }
+
+    private void LoadDecorations(string dataPath)
+    {
+        var decosPath = Path.Combine(dataPath, "decorations.json");
+        if (!File.Exists(decosPath)) return;
+
+        var json = File.ReadAllText(decosPath);
+        using var doc = JsonDocument.Parse(json);
+        if (!doc.RootElement.TryGetProperty("decorations", out var decosEl)) return;
+
+        foreach (var deco in decosEl.EnumerateArray())
+        {
+            var biomes = new List<string>();
+            if (deco.TryGetProperty("biomes", out var bEl))
+            {
+                foreach (var b in bEl.EnumerateArray())
+                    biomes.Add(b.GetString() ?? "");
+            }
+
+            _decorations.Add(new DecorationDefinition(
+                deco.GetProperty("name").GetString() ?? "",
+                deco.TryGetProperty("type", out var t) ? t.GetString() ?? "plantlike" : "plantlike",
+                deco.GetProperty("blockType").GetString() ?? "",
+                biomes.ToArray(),
+                deco.TryGetProperty("yMin", out var ymin) ? ymin.GetInt32() : 1,
+                deco.TryGetProperty("yMax", out var ymax) ? ymax.GetInt32() : 31000,
+                deco.TryGetProperty("noiseThreshold", out var nt) ? (float)nt.GetDouble() : 0.5f,
+                deco.TryGetProperty("noiseScale", out var ns) ? (float)ns.GetDouble() : 0.05f,
+                deco.TryGetProperty("placeOn", out var po) ? po.GetString() ?? "" : "",
+                deco.TryGetProperty("spawnChance", out var sc) ? (float)sc.GetDouble() : 0.1f,
+                deco.TryGetProperty("heightMin", out var hmin) ? hmin.GetInt32() : 1,
+                deco.TryGetProperty("heightMax", out var hmax) ? hmax.GetInt32() : 1
+            ));
+        }
+    }
+
+    private void LoadTreeSchematics(string dataPath)
+    {
+        var treesPath = Path.Combine(dataPath, "tree_schematics.json");
+        if (!File.Exists(treesPath)) return;
+
+        var json = File.ReadAllText(treesPath);
+        using var doc = JsonDocument.Parse(json);
+        if (!doc.RootElement.TryGetProperty("schematics", out var treesEl)) return;
+
+        foreach (var tree in treesEl.EnumerateArray())
+        {
+            var biomes = new List<string>();
+            if (tree.TryGetProperty("biomes", out var bEl))
+            {
+                foreach (var b in bEl.EnumerateArray())
+                    biomes.Add(b.GetString() ?? "");
+            }
+
+            _treeSchematics.Add(new TreeSchematicDefinition(
+                tree.GetProperty("name").GetString() ?? "",
+                tree.TryGetProperty("trunkBlock", out var tb) ? tb.GetString() ?? "wood" : "wood",
+                tree.TryGetProperty("leavesBlock", out var lb) ? lb.GetString() ?? "leaves" : "leaves",
+                tree.TryGetProperty("minHeight", out var minh) ? minh.GetInt32() : 4,
+                tree.TryGetProperty("maxHeight", out var maxh) ? maxh.GetInt32() : 6,
+                tree.TryGetProperty("canopyShape", out var cs) ? cs.GetString() ?? "sphere" : "sphere",
+                tree.TryGetProperty("canopyBaseOffset", out var cbo) ? cbo.GetInt32() : -1,
+                tree.TryGetProperty("canopyTopOffset", out var cto) ? cto.GetInt32() : 3,
+                tree.TryGetProperty("canopyRadius", out var cr) ? cr.GetInt32() : 2,
+                biomes.ToArray()
+            ));
         }
     }
 
@@ -639,6 +790,8 @@ public class MapgenV7 : IWorldGenerator
 
     private void GenerateTrees(ushort[,,] blocks, int baseX, int baseY, int baseZ, int[,] heightMap)
     {
+        var lsystemDef = _lsystemTreeGen.GetDefinitionForBiome("");
+
         for (int x = 2; x < ChunkSize - 2; x++)
         {
             for (int z = 2; z < ChunkSize - 2; z++)
@@ -648,7 +801,7 @@ public class MapgenV7 : IWorldGenerator
                 var surfaceY = heightMap[x, z];
                 var localSurfaceY = surfaceY - baseY;
 
-                if (localSurfaceY < 2 || localSurfaceY >= ChunkSize - 8) continue;
+                if (localSurfaceY < 2 || localSurfaceY >= ChunkSize - 10) continue;
                 if (surfaceY <= WaterLevel) continue;
 
                 var biome = GetBiomeAt(worldX, surfaceY, worldZ, surfaceY);
@@ -657,47 +810,171 @@ public class MapgenV7 : IWorldGenerator
                 var treeRng = new Random(_seed + worldX * 73856093 ^ worldZ * 19349663);
                 if (treeRng.NextDouble() > biome.TreeChance) continue;
 
-                var treeType = biome.TreeType;
-                var height = treeRng.Next(4, 7);
-                var trunkType = GetBlockTypeByName(treeType switch
-                {
-                    "pine" => "pine_wood",
-                    "jungle" => "jungle_wood",
-                    _ => "wood"
-                });
-                var leavesType = GetBlockTypeByName(treeType switch
-                {
-                    "pine" => "pine_needles",
-                    "jungle" => "jungle_leaves",
-                    _ => "leaves"
-                });
+                var matchingSchematic = _treeSchematics.FirstOrDefault(s =>
+                    s.Biomes.Contains(biome.Name) || s.Name.StartsWith(biome.TreeType));
 
-                for (int ty = 1; ty <= height; ty++)
+                if (matchingSchematic != null)
                 {
-                    var ly = localSurfaceY + ty;
-                    if (ly >= 0 && ly < ChunkSize)
-                        blocks[x, ly, z] = trunkType;
+                    PlaceTreeFromSchematic(blocks, x, localSurfaceY, z, matchingSchematic, treeRng);
+                    continue;
                 }
 
-                var canopyBase = localSurfaceY + height - 1;
-                for (int dy = 0; dy <= 3; dy++)
+                var biomeLsystem = _lsystemTreeGen.GetDefinitionForBiome(biome.Name);
+                if (biomeLsystem != null)
                 {
-                    var ly = canopyBase + dy;
-                    if (ly < 0 || ly >= ChunkSize) continue;
+                    _lsystemTreeGen.GenerateTree(biomeLsystem, blocks, x, localSurfaceY + 1, z, ChunkSize, treeRng);
+                    continue;
+                }
 
-                    var radius = dy <= 1 ? 2 : 1;
-                    for (int dx = -radius; dx <= radius; dx++)
-                    {
-                        for (int dz = -radius; dz <= radius; dz++)
-                        {
-                            if (dx * dx + dz * dz > radius * radius + 1) continue;
-                            var lx = x + dx;
-                            var lz = z + dz;
-                            if (lx < 0 || lx >= ChunkSize || lz < 0 || lz >= ChunkSize) continue;
-                            if (blocks[lx, ly, lz] == (ushort)BlockType.Air)
-                                blocks[lx, ly, lz] = leavesType;
-                        }
-                    }
+                PlaceDefaultTree(blocks, x, localSurfaceY, z, biome, treeRng);
+            }
+        }
+    }
+
+    private void PlaceTreeFromSchematic(ushort[,,] blocks, int x, int localSurfaceY, int z,
+        TreeSchematicDefinition schematic, Random rng)
+    {
+        var height = rng.Next(schematic.MinHeight, schematic.MaxHeight + 1);
+        var trunkType = GetBlockTypeByName(schematic.TrunkBlock);
+        var leavesType = schematic.LeavesBlock == "none" ? (ushort)BlockType.Air : GetBlockTypeByName(schematic.LeavesBlock);
+
+        for (int ty = 1; ty <= height; ty++)
+        {
+            var ly = localSurfaceY + ty;
+            if (ly >= 0 && ly < ChunkSize)
+                blocks[x, ly, z] = trunkType;
+        }
+
+        if (leavesType == (ushort)BlockType.Air) return;
+
+        var canopyBase = localSurfaceY + height + schematic.CanopyBaseOffset;
+        var canopyTop = localSurfaceY + height + schematic.CanopyTopOffset;
+
+        switch (schematic.CanopyShape)
+        {
+            case "cone":
+                PlaceConeCanopy(blocks, x, canopyBase, z, canopyTop - canopyBase + 1, schematic.CanopyRadius, leavesType);
+                break;
+            case "cylinder":
+                PlaceCylinderCanopy(blocks, x, canopyBase, z, canopyTop - canopyBase + 1, schematic.CanopyRadius, leavesType);
+                break;
+            case "none":
+                break;
+            default:
+                PlaceSphereCanopy(blocks, x, canopyBase, z, canopyTop - canopyBase + 1, schematic.CanopyRadius, leavesType);
+                break;
+        }
+    }
+
+    private void PlaceDefaultTree(ushort[,,] blocks, int x, int localSurfaceY, int z,
+        BiomeDefinition biome, Random rng)
+    {
+        var height = rng.Next(4, 7);
+        var trunkType = GetBlockTypeByName(biome.TreeType switch
+        {
+            "pine" => "pine_wood",
+            "jungle" => "jungle_wood",
+            _ => "wood"
+        });
+        var leavesType = GetBlockTypeByName(biome.TreeType switch
+        {
+            "pine" => "pine_needles",
+            "jungle" => "jungle_leaves",
+            _ => "leaves"
+        });
+
+        for (int ty = 1; ty <= height; ty++)
+        {
+            var ly = localSurfaceY + ty;
+            if (ly >= 0 && ly < ChunkSize)
+                blocks[x, ly, z] = trunkType;
+        }
+
+        var canopyBase = localSurfaceY + height - 1;
+        for (int dy = 0; dy <= 3; dy++)
+        {
+            var ly = canopyBase + dy;
+            if (ly < 0 || ly >= ChunkSize) continue;
+
+            var radius = dy <= 1 ? 2 : 1;
+            for (int dx = -radius; dx <= radius; dx++)
+            {
+                for (int dz = -radius; dz <= radius; dz++)
+                {
+                    if (dx * dx + dz * dz > radius * radius + 1) continue;
+                    var lx = x + dx;
+                    var lz = z + dz;
+                    if (lx < 0 || lx >= ChunkSize || lz < 0 || lz >= ChunkSize) continue;
+                    if (blocks[lx, ly, lz] == (ushort)BlockType.Air)
+                        blocks[lx, ly, lz] = leavesType;
+                }
+            }
+        }
+    }
+
+    private void PlaceConeCanopy(ushort[,,] blocks, int cx, int baseY, int cz, int layers, int maxRadius, ushort leavesType)
+    {
+        for (int dy = 0; dy < layers; dy++)
+        {
+            var ly = baseY + dy;
+            if (ly < 0 || ly >= ChunkSize) continue;
+            var radius = maxRadius - (dy * maxRadius / Math.Max(layers, 1));
+            radius = Math.Max(radius, 0);
+            for (int dx = -radius; dx <= radius; dx++)
+            {
+                for (int dz = -radius; dz <= radius; dz++)
+                {
+                    if (Math.Abs(dx) + Math.Abs(dz) > radius + 1) continue;
+                    var lx = cx + dx;
+                    var lz = cz + dz;
+                    if (lx < 0 || lx >= ChunkSize || lz < 0 || lz >= ChunkSize) continue;
+                    if (blocks[lx, ly, lz] == (ushort)BlockType.Air)
+                        blocks[lx, ly, lz] = leavesType;
+                }
+            }
+        }
+    }
+
+    private void PlaceCylinderCanopy(ushort[,,] blocks, int cx, int baseY, int cz, int layers, int radius, ushort leavesType)
+    {
+        for (int dy = 0; dy < layers; dy++)
+        {
+            var ly = baseY + dy;
+            if (ly < 0 || ly >= ChunkSize) continue;
+            for (int dx = -radius; dx <= radius; dx++)
+            {
+                for (int dz = -radius; dz <= radius; dz++)
+                {
+                    if (dx * dx + dz * dz > radius * radius + 1) continue;
+                    var lx = cx + dx;
+                    var lz = cz + dz;
+                    if (lx < 0 || lx >= ChunkSize || lz < 0 || lz >= ChunkSize) continue;
+                    if (blocks[lx, ly, lz] == (ushort)BlockType.Air)
+                        blocks[lx, ly, lz] = leavesType;
+                }
+            }
+        }
+    }
+
+    private void PlaceSphereCanopy(ushort[,,] blocks, int cx, int baseY, int cz, int layers, int maxRadius, ushort leavesType)
+    {
+        for (int dy = 0; dy < layers; dy++)
+        {
+            var ly = baseY + dy;
+            if (ly < 0 || ly >= ChunkSize) continue;
+            var t = layers > 1 ? (float)dy / (layers - 1) : 0f;
+            var radius = (int)(maxRadius * MathF.Sin(t * MathF.PI));
+            radius = Math.Max(radius, 1);
+            for (int dx = -radius; dx <= radius; dx++)
+            {
+                for (int dz = -radius; dz <= radius; dz++)
+                {
+                    if (dx * dx + dz * dz > radius * radius + 1) continue;
+                    var lx = cx + dx;
+                    var lz = cz + dz;
+                    if (lx < 0 || lx >= ChunkSize || lz < 0 || lz >= ChunkSize) continue;
+                    if (blocks[lx, ly, lz] == (ushort)BlockType.Air)
+                        blocks[lx, ly, lz] = leavesType;
                 }
             }
         }
@@ -705,32 +982,91 @@ public class MapgenV7 : IWorldGenerator
 
     private void GenerateDecorations(ushort[,,] blocks, int baseX, int baseY, int baseZ, int[,] heightMap)
     {
-        for (int x = 0; x < ChunkSize; x++)
+        if (_decorations.Count > 0)
         {
-            for (int z = 0; z < ChunkSize; z++)
+            for (int x = 0; x < ChunkSize; x++)
             {
-                var worldX = baseX + x;
-                var worldZ = baseZ + z;
-                var surfaceY = heightMap[x, z];
-                var localSurfaceY = surfaceY - baseY;
-
-                if (localSurfaceY < 0 || localSurfaceY >= ChunkSize - 1) continue;
-                if (surfaceY <= WaterLevel) continue;
-
-                var biome = GetBiomeAt(worldX, surfaceY, worldZ, surfaceY);
-                if (biome.Decorations.Length == 0) continue;
-
-                var rng = new Random(_seed + worldX * 73856093 ^ worldZ * 19349663);
-                var fillerDepthNoise = OctaveNoise2D(_npFillerDepth, worldX, worldZ);
-                var decoChance = 0.3f + fillerDepthNoise * 0.2f;
-
-                if (rng.NextDouble() < decoChance && blocks[x, localSurfaceY + 1, z] == (ushort)BlockType.Air)
+                for (int z = 0; z < ChunkSize; z++)
                 {
-                    var decoIndex = rng.Next(biome.Decorations.Length);
-                    var deco = biome.Decorations[decoIndex];
-                    var decoType = GetDecorationBlockType(deco);
-                    if (decoType != BlockType.Air)
-                        blocks[x, localSurfaceY + 1, z] = (ushort)decoType;
+                    var worldX = baseX + x;
+                    var worldZ = baseZ + z;
+                    var surfaceY = heightMap[x, z];
+                    var localSurfaceY = surfaceY - baseY;
+
+                    if (localSurfaceY < 0 || localSurfaceY >= ChunkSize - 1) continue;
+                    if (surfaceY <= WaterLevel) continue;
+
+                    var biome = GetBiomeAt(worldX, surfaceY, worldZ, surfaceY);
+                    var rng = new Random(_seed + worldX * 73856093 ^ worldZ * 19349663);
+
+                    foreach (var deco in _decorations)
+                    {
+                        if (deco.Biomes.Length > 0 && !deco.Biomes.Contains(biome.Name)) continue;
+                        if (surfaceY < deco.YMin || surfaceY > deco.YMax) continue;
+
+                        var decoBlockType = GetDecorationBlockType(deco.BlockType);
+                        if (decoBlockType == BlockType.Air) continue;
+
+                        if (!string.IsNullOrEmpty(deco.PlaceOn))
+                        {
+                            var surfaceBlock = blocks[x, localSurfaceY, z];
+                            var expectedBlock = GetBlockTypeByName(deco.PlaceOn);
+                            if (surfaceBlock != expectedBlock) continue;
+                        }
+
+                        if (rng.NextDouble() >= deco.SpawnChance) continue;
+
+                        var aboveY = localSurfaceY + 1;
+                        if (aboveY >= ChunkSize) continue;
+                        if (blocks[x, aboveY, z] != (ushort)BlockType.Air) continue;
+
+                        if (deco.Type == "schematic" && deco.HeightMax > 1)
+                        {
+                            var height = rng.Next(deco.HeightMin, deco.HeightMax + 1);
+                            for (int h = 0; h < height; h++)
+                            {
+                                var hy = aboveY + h;
+                                if (hy < ChunkSize && blocks[x, hy, z] == (ushort)BlockType.Air)
+                                    blocks[x, hy, z] = (ushort)decoBlockType;
+                            }
+                        }
+                        else
+                        {
+                            blocks[x, aboveY, z] = (ushort)decoBlockType;
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            for (int x = 0; x < ChunkSize; x++)
+            {
+                for (int z = 0; z < ChunkSize; z++)
+                {
+                    var worldX = baseX + x;
+                    var worldZ = baseZ + z;
+                    var surfaceY = heightMap[x, z];
+                    var localSurfaceY = surfaceY - baseY;
+
+                    if (localSurfaceY < 0 || localSurfaceY >= ChunkSize - 1) continue;
+                    if (surfaceY <= WaterLevel) continue;
+
+                    var biome = GetBiomeAt(worldX, surfaceY, worldZ, surfaceY);
+                    if (biome.Decorations.Length == 0) continue;
+
+                    var rng = new Random(_seed + worldX * 73856093 ^ worldZ * 19349663);
+                    var fillerDepthNoise = OctaveNoise2D(_npFillerDepth, worldX, worldZ);
+                    var decoChance = 0.3f + fillerDepthNoise * 0.2f;
+
+                    if (rng.NextDouble() < decoChance && blocks[x, localSurfaceY + 1, z] == (ushort)BlockType.Air)
+                    {
+                        var decoIndex = rng.Next(biome.Decorations.Length);
+                        var deco = biome.Decorations[decoIndex];
+                        var decoType = GetDecorationBlockType(deco);
+                        if (decoType != BlockType.Air)
+                            blocks[x, localSurfaceY + 1, z] = (ushort)decoType;
+                    }
                 }
             }
         }
@@ -740,51 +1076,102 @@ public class MapgenV7 : IWorldGenerator
     {
         var rng = new Random(unchecked((int)(_seed + baseX * 6364136223846793005L ^ baseZ * 6364136223846793005L)));
 
-        var veinDefinitions = new (BlockType oreType, int yMin, int yMax, float chance, int minSize, int maxSize)[]
+        if (_ores.Count > 0)
         {
-            (BlockType.OreIron, 0, 64, 0.02f, 3, 8),
-            (BlockType.Coal, 0, 96, 0.03f, 4, 10),
-            (BlockType.GoldOre, 0, 32, 0.008f, 2, 5),
-            (BlockType.OreDiamond, 0, 16, 0.004f, 2, 4),
-            (BlockType.RedstoneOre, 0, 16, 0.006f, 2, 6),
-            (BlockType.LapisOre, 0, 32, 0.005f, 2, 5),
-            (BlockType.CopperOre, 0, 96, 0.012f, 3, 7),
-            (BlockType.EmeraldOre, 4, 32, 0.002f, 1, 1)
-        };
-
-        foreach (var (oreType, yMin, yMax, chance, minSize, maxSize) in veinDefinitions)
-        {
-            for (int attempt = 0; attempt < 3; attempt++)
+            foreach (var ore in _ores)
             {
-                if (rng.NextDouble() > chance * 16) continue;
+                var oreBlockType = GetOreBlockTypeByName(ore.BlockType);
+                if (oreBlockType == BlockType.Air) continue;
 
-                var cx = rng.Next(0, ChunkSize);
-                var cy = rng.Next(0, ChunkSize);
-                var cz = rng.Next(0, ChunkSize);
-                var worldY = baseY + cy;
+                var numAttempts = Math.Max(16 * 16 * 16 / Math.Max(ore.ClustScarcity, 1), 1);
 
-                if (worldY < yMin || worldY > yMax) continue;
-
-                var size = rng.Next(minSize, maxSize + 1);
-                var dx = (float)(rng.NextDouble() * 2 - 1) * 0.5f;
-                var dy = (float)(rng.NextDouble() * 0.4 - 0.2);
-                var dz = (float)(rng.NextDouble() * 2 - 1) * 0.5f;
-
-                for (int s = 0; s < size; s++)
+                for (int attempt = 0; attempt < numAttempts; attempt++)
                 {
-                    var ox = cx + (int)(dx * s);
-                    var oy = cy + (int)(dy * s);
-                    var oz = cz + (int)(dz * s);
+                    var cx = rng.Next(0, ChunkSize);
+                    var cy = rng.Next(0, ChunkSize);
+                    var cz = rng.Next(0, ChunkSize);
+                    var worldY = baseY + cy;
 
-                    if (ox < 0 || ox >= ChunkSize || oy < 0 || oy >= ChunkSize || oz < 0 || oz >= ChunkSize) continue;
+                    if (worldY < ore.YMin || worldY > ore.YMax) continue;
 
-                    var bt = blocks[ox, oy, oz];
-                    if (bt == (ushort)BlockType.Stone || bt == (ushort)BlockType.DesertStone)
-                        blocks[ox, oy, oz] = (ushort)oreType;
+                    if (ore.Biomes.Length > 0)
+                    {
+                        var biome = GetBiomeAt(baseX + cx, worldY, baseZ + cz, worldY);
+                        if (!ore.Biomes.Contains(biome.Name)) continue;
+                    }
 
-                    dx += (float)(rng.NextDouble() - 0.5) * 0.3f;
-                    dy += (float)(rng.NextDouble() - 0.5) * 0.1f;
-                    dz += (float)(rng.NextDouble() - 0.5) * 0.3f;
+                    var size = rng.Next(Math.Max(ore.ClustNumOres, 1), ore.ClustSize + 1);
+                    var dx = (float)(rng.NextDouble() * 2 - 1) * 0.5f;
+                    var dy = (float)(rng.NextDouble() * 0.4 - 0.2);
+                    var dz = (float)(rng.NextDouble() * 2 - 1) * 0.5f;
+
+                    for (int s = 0; s < size; s++)
+                    {
+                        var ox = cx + (int)(dx * s);
+                        var oy = cy + (int)(dy * s);
+                        var oz = cz + (int)(dz * s);
+
+                        if (ox < 0 || ox >= ChunkSize || oy < 0 || oy >= ChunkSize || oz < 0 || oz >= ChunkSize) continue;
+
+                        var bt = blocks[ox, oy, oz];
+                        if (bt == (ushort)BlockType.Stone || bt == (ushort)BlockType.DesertStone)
+                            blocks[ox, oy, oz] = (ushort)oreBlockType;
+
+                        dx += (float)(rng.NextDouble() - 0.5) * 0.3f;
+                        dy += (float)(rng.NextDouble() - 0.5) * 0.1f;
+                        dz += (float)(rng.NextDouble() - 0.5) * 0.3f;
+                    }
+                }
+            }
+        }
+        else
+        {
+            var veinDefinitions = new (BlockType oreType, int yMin, int yMax, float chance, int minSize, int maxSize)[]
+            {
+                (BlockType.OreIron, 0, 64, 0.02f, 3, 8),
+                (BlockType.Coal, 0, 96, 0.03f, 4, 10),
+                (BlockType.GoldOre, 0, 32, 0.008f, 2, 5),
+                (BlockType.OreDiamond, 0, 16, 0.004f, 2, 4),
+                (BlockType.RedstoneOre, 0, 16, 0.006f, 2, 6),
+                (BlockType.LapisOre, 0, 32, 0.005f, 2, 5),
+                (BlockType.CopperOre, 0, 96, 0.012f, 3, 7),
+                (BlockType.EmeraldOre, 4, 32, 0.002f, 1, 1)
+            };
+
+            foreach (var (oreType, yMin, yMax, chance, minSize, maxSize) in veinDefinitions)
+            {
+                for (int attempt = 0; attempt < 3; attempt++)
+                {
+                    if (rng.NextDouble() > chance * 16) continue;
+
+                    var cx = rng.Next(0, ChunkSize);
+                    var cy = rng.Next(0, ChunkSize);
+                    var cz = rng.Next(0, ChunkSize);
+                    var worldY = baseY + cy;
+
+                    if (worldY < yMin || worldY > yMax) continue;
+
+                    var size = rng.Next(minSize, maxSize + 1);
+                    var dx = (float)(rng.NextDouble() * 2 - 1) * 0.5f;
+                    var dy = (float)(rng.NextDouble() * 0.4 - 0.2);
+                    var dz = (float)(rng.NextDouble() * 2 - 1) * 0.5f;
+
+                    for (int s = 0; s < size; s++)
+                    {
+                        var ox = cx + (int)(dx * s);
+                        var oy = cy + (int)(dy * s);
+                        var oz = cz + (int)(dz * s);
+
+                        if (ox < 0 || ox >= ChunkSize || oy < 0 || oy >= ChunkSize || oz < 0 || oz >= ChunkSize) continue;
+
+                        var bt = blocks[ox, oy, oz];
+                        if (bt == (ushort)BlockType.Stone || bt == (ushort)BlockType.DesertStone)
+                            blocks[ox, oy, oz] = (ushort)oreType;
+
+                        dx += (float)(rng.NextDouble() - 0.5) * 0.3f;
+                        dy += (float)(rng.NextDouble() - 0.5) * 0.1f;
+                        dz += (float)(rng.NextDouble() - 0.5) * 0.3f;
+                    }
                 }
             }
         }
@@ -809,6 +1196,23 @@ public class MapgenV7 : IWorldGenerator
             }
         }
     }
+
+    private static BlockType GetOreBlockTypeByName(string name) => name switch
+    {
+        "Coal" => BlockType.Coal,
+        "OreIron" => BlockType.OreIron,
+        "GoldOre" => BlockType.GoldOre,
+        "OreDiamond" => BlockType.OreDiamond,
+        "RedstoneOre" => BlockType.RedstoneOre,
+        "LapisOre" => BlockType.LapisOre,
+        "CopperOre" => BlockType.CopperOre,
+        "EmeraldOre" => BlockType.EmeraldOre,
+        "Gravel" => BlockType.Gravel,
+        "Clay" => BlockType.Clay,
+        "OreGold" => BlockType.GoldOre,
+        "CoalOre" => BlockType.Coal,
+        _ => BlockType.Air
+    };
 
     private ushort GetOreAt(int x, int y, int z)
     {
@@ -859,9 +1263,9 @@ public class MapgenV7 : IWorldGenerator
         if (_biomes.Count == 0)
         {
             var biomeNoise = PerlinNoise2D(x * 0.005f + 1000, z * 0.005f + 1000);
-            if (biomeNoise > 0.3f) return new BiomeDefinition("desert", 4, 31000, 90, 10, "sand", "sand", 3, "desert_stone", "water", "none", 0, Array.Empty<string>(), "cobblestone", "mossy_cobblestone", "", "", 0);
-            if (biomeNoise < -0.4f) return new BiomeDefinition("snow", 4, 31000, 10, 40, "snow", "dirt", 1, "stone", "water", "pine", 0.006f, new[] { "tall_grass" }, "cobblestone", "mossy_cobblestone", "snow_layer", "", 0);
-            return new BiomeDefinition("grassland", 4, 31000, 50, 50, "grass", "dirt", 1, "stone", "water", "oak", 0.003f, new[] { "tall_grass", "flower_red" }, "cobblestone", "mossy_cobblestone", "", "", 0);
+            if (biomeNoise > 0.3f) return new BiomeDefinition("desert", 4, 31000, 90, 10, 1f, 1, "sand", "sand", 3, "desert_stone", "water", "", 0, "water", "sand", "", "", "none", 0, Array.Empty<string>(), "cobblestone", "mossy_cobblestone", "stone_brick");
+            if (biomeNoise < -0.4f) return new BiomeDefinition("snow", 4, 31000, 10, 40, 1f, 2, "snow", "dirt", 1, "stone", "water", "ice", 2, "ice", "dirt", "snow", "", "pine", 0.006f, new[] { "tall_grass" }, "cobblestone", "mossy_cobblestone", "stone_brick");
+            return new BiomeDefinition("grassland", 4, 31000, 50, 50, 1f, 2, "grass", "dirt", 1, "stone", "water", "", 0, "water", "sand", "", "", "oak", 0.003f, new[] { "tall_grass", "flower_red" }, "cobblestone", "mossy_cobblestone", "stone_brick");
         }
 
         float heat = 50f;
@@ -875,6 +1279,11 @@ public class MapgenV7 : IWorldGenerator
             var huSpread = _biomeNoiseConfig.HumiditySpread;
             humidity = _biomeNoiseConfig.HumidityOffset + _biomeNoiseConfig.HumidityScale * PerlinNoise2D(
                 x / Math.Max(huSpread[0], 1f) + 100, z / Math.Max(huSpread[2], 1f) + 100);
+
+            var hblSpread = _biomeNoiseConfig.HeatBlendSpread;
+            heat += OctaveNoise2D(_npHeatBlend, x / Math.Max(hblSpread[0], 1f), z / Math.Max(hblSpread[2], 1f));
+            var hublSpread = _biomeNoiseConfig.HumidityBlendSpread;
+            humidity += OctaveNoise2D(_npHumidityBlend, x / Math.Max(hublSpread[0], 1f), z / Math.Max(hublSpread[2], 1f));
         }
 
         BiomeDefinition bestBiome = _biomes[0];
@@ -885,7 +1294,7 @@ public class MapgenV7 : IWorldGenerator
             if (y < biome.YMin || y > biome.YMax) continue;
             var dx = heat - biome.HeatPoint;
             var dz = humidity - biome.HumidityPoint;
-            var dist = dx * dx + dz * dz;
+            var dist = (dx * dx + dz * dz) / Math.Max(biome.Weight, 0.01f);
             if (dist < bestDist)
             {
                 bestDist = dist;
@@ -959,16 +1368,19 @@ public class MapgenV7 : IWorldGenerator
 
     private static BlockType GetDecorationBlockType(string name) => name switch
     {
-        "tall_grass" => BlockType.TallGrass,
-        "flower_red" => BlockType.FlowerRed,
-        "flower_yellow" => BlockType.FlowerYellow,
-        "flower_rose" => BlockType.FlowerRose,
-        "flower_tulip" => BlockType.FlowerTulip,
-        "mushroom_red" => BlockType.MushroomRedBlock,
-        "mushroom_brown" => BlockType.MushroomBrownBlock,
-        "dead_bush" => BlockType.DeadBush,
-        "junglegrass" => BlockType.JungleGrass,
-        "cactus" => BlockType.Cactus,
+        "tall_grass" or "TallGrass" => BlockType.TallGrass,
+        "flower_red" or "FlowerRed" => BlockType.FlowerRed,
+        "flower_yellow" or "FlowerYellow" => BlockType.FlowerYellow,
+        "flower_rose" or "FlowerRose" => BlockType.FlowerRose,
+        "flower_tulip" or "FlowerTulip" => BlockType.FlowerTulip,
+        "mushroom_red" or "MushroomRedBlock" => BlockType.MushroomRedBlock,
+        "mushroom_brown" or "MushroomBrownBlock" => BlockType.MushroomBrownBlock,
+        "dead_bush" or "DeadBush" => BlockType.DeadBush,
+        "junglegrass" or "JungleGrass" => BlockType.JungleGrass,
+        "cactus" or "Cactus" => BlockType.Cactus,
+        "apple" or "Apple" => BlockType.Apple,
+        "SugarCane" or "sugar_cane" => BlockType.SugarCane,
+        "PumpkinBlock" or "pumpkin" => BlockType.PumpkinBlock,
         _ => BlockType.Air
     };
 
@@ -985,6 +1397,9 @@ public class MapgenV7 : IWorldGenerator
         "stone" => (ushort)BlockType.Stone,
         "desert_stone" => (ushort)BlockType.DesertStone,
         "water" => (ushort)BlockType.Water,
+        "river_water" => (ushort)BlockType.Water,
+        "lava" => (ushort)BlockType.Lava,
+        "ice" => (ushort)BlockType.Ice,
         "wood" => (ushort)BlockType.Wood,
         "leaves" => (ushort)BlockType.Leaves,
         "pine_wood" => (ushort)BlockType.PineWood,
@@ -996,6 +1411,7 @@ public class MapgenV7 : IWorldGenerator
         "sandstone" => (ushort)BlockType.SandStone,
         "stone_brick" => (ushort)BlockType.StoneBrick,
         "cactus" => (ushort)BlockType.Cactus,
+        "none" or "" => (ushort)BlockType.Air,
         _ => (ushort)BlockType.Dirt
     };
 

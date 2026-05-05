@@ -187,8 +187,11 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Expanded Reserved Names**: Administrator, owner, staff, operator names blocked from registration to prevent impersonation
 - **Config-Driven Game Systems**: All game balance values (auto-save interval, day/night cycle length, chat max length, password policy, account lockout) read from `server_config.json` instead of hardcoded
 - **MapgenV7 External Config**: All noise parameters and feature toggles configurable via `mapgen_v7.json` (caves, dungeons, mountains, rivers, caverns, ores, dust)
-- **MapgenV7 Ore Generation**: Scatter and vein ore placement integrated into V7 terrain pipeline (coal, iron, gold, diamond, redstone, lapis, copper, emerald)
-- **MapgenV7 Biome Dust**: Biome-specific dust nodes (snow layers in cold biomes) placed on exposed surfaces
+- **MapgenV7 Data-Driven Ores**: Ore definitions loaded from `ores.json` (11 ores with biome filtering, cluster size/scarcity, Y range) with fallback to hardcoded defaults
+- **MapgenV7 Data-Driven Decorations**: Decoration definitions loaded from `decorations.json` (12 decorations with biome filtering, place-on validation, schematic height variation)
+- **MapgenV7 Data-Driven Trees**: Tree schematics loaded from `tree_schematics.json` (5 types with canopy shapes: sphere, cone, cylinder, none), L-system trees from `lsystem_trees.json`, biome-matched placement
+- **Biome Blend Noises**: Smooth biome transitions using heat_blend and humidity_blend noises from `biomes.json`, weighted biome selection
+- **Biome Dust**: Biome-specific dust nodes (snow layers in cold biomes) placed on exposed surfaces
 
 ## Architecture
 
