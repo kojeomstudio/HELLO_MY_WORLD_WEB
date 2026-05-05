@@ -47,31 +47,43 @@ Blocks have groups that determine tool effectiveness:
 
 ## Biome System
 
-10 biomes loaded from `biomes.json`, selected by heat/humidity noise in `NoiseWorldGenerator`:
+14 biomes loaded from `biomes.json`, selected by heat/humidity noise with blend transitions in `NoiseWorldGenerator`:
 
 | Biome | Description | Surface Block | Tree Types |
 |-------|-------------|---------------|------------|
 | Grassland | Default temperate biome | Grass | Oak, Birch |
+| Grassland Ocean | Underwater grassland | Sand | None |
 | Forest | Dense tree coverage | Grass | Oak, Birch, Pine |
 | Desert | Hot, dry biome | DesertSand | None (cactus) |
-| Snow | Cold biome | DirtWithSnow | Pine |
+| Desert Ocean | Underwater desert | Sand | None |
+| Snow | Cold biome | Snow | Pine |
 | Taiga | Cold forest | DirtWithSnow | Pine |
-| Jungle | Hot, humid biome | JungleGrass | Jungle |
-| Savanna | Warm, dry grassland | Grass | None |
+| Jungle | Hot, humid biome | Grass | Jungle |
+| Jungle Ocean | Underwater jungle | Sand | None |
+| Savanna | Warm, dry grassland | Grass | Oak |
 | Mountains | High altitude | Stone | None |
 | Swamp | Wet lowland | Grass | Oak |
-| Ocean | Deep water biome | Sand (below water) | None |
+| Underground | Deep underground | Stone | None |
+| Lava Underground | Very deep lava zone | Stone | None |
 
-Biome selection uses two independent Perlin noise maps (heat and humidity), matching minetest's biome selection approach.
+Biome features:
+- Weighted selection with vertical blending at transitions
+- Heat/humidity blend noise for smooth borders
+- Per-biome cave liquids (water in jungle/swamp, lava in deep underground)
+- Dust node placement (snow in tundra/taiga/mountains)
+- Water top blocks (ice in cold biomes with configurable depth)
+- River water and riverbed blocks per biome
+- Dungeon stair blocks per biome
 
 ## World Generation
 
-### Map Generators (8 types)
+### Map Generators (9 types)
 | Generator | Description |
 |-----------|-------------|
 | flat | Flat world with configurable ground level |
-| noise | Default procedural terrain with biomes, caves, ores, dungeons |
+| noise | Default procedural terrain with biomes, caves, ores, dungeons, enhanced biome system |
 | v5 | MapgenV5 with 3D ground noise and factor-based height |
+| v6 | Legacy V6: 5 biome types, mud flow simulation, desert temples, integer-noise biome selection |
 | v7 | Full V7 terrain: dual terrain blending (base/alt), modulated persistence, 3D mountains with density gradient, ridge/river carving, cave noise intersection, caverns |
 | valleys | River valley terrain with altitude-chill biome adjustment |
 | carpathian | Terraced mountains with step-height quantization |
@@ -87,6 +99,35 @@ Biome selection uses two independent Perlin noise maps (heat and humidity), matc
 - **Cavern generation**: Large underground caverns with amplitude tapering
 - **Noise-driven dungeons**: Dungeon count from 3D dungeon noise
 - **Filler depth variation**: Surface dirt depth varies via noise
+
+### MapgenV6 Features
+- **5 Biome Types**: Normal, Desert, Jungle, Tundra, Taiga with integer-noise-based selection
+- **Biome Blending**: Configurable blend noise at biome borders
+- **baseTerrainLevel**: Dual-noise terrain (terrain_base + terrain_higher) blended via steepness/height_select
+- **Mud Flow Simulation**: 2-pass iterative slope simulation sliding dirt/gravel downhill
+- **Mud Layer**: Noise-driven mud depth with beach, desert, and altitude adjustments
+- **V6 Cave Generation**: PRNG-seeded tunnels with configurable diameter, large cave flooding with water
+- **Desert Temples**: Large dungeons with desert_stone walls when MGV6_TEMPLES flag enabled
+- **Biome-specific Trees**: Jungle (4x density), pine (taiga), oak (normal with apple trees by noise)
+- **Surface Conversion**: Dirt→grass, dirt→snow, stone→snowblock in appropriate biomes
+- **Configurable Flags**: Jungles, BiomeBlend, MudFlow, SnowBiomes, Flat, Trees, Temples
+
+### Noise System
+- **PerlinNoise**: Shared class with 3D/2D noise, fractal octave summation (configurable octaves/persistence/lacunarity)
+- **NoiseParams**: Structured noise configuration (offset, scale, spread, seed, octaves, persistence, lacunarity, flags)
+- **PcgRandom**: Deterministic 32-bit PRNG (Permuted Congruential Generator) for reproducible generation
+- **NoiseBuffer2D/3D**: Pre-computed noise grid buffers for efficient chunk-wide noise queries
+- **NoiseFlags**: Eased (quintic fade curve), AbsValue, Default=Eased
+
+### Ore Generation (6 algorithms)
+| Algorithm | Description |
+|-----------|-------------|
+| Scatter | Random walk vein clusters (noise-gated probability) |
+| Vein | 3D noise contour intersection for continuous ore veins |
+| Blob | Spherical distance-decay clusters |
+| Puff | 3D noise upper/lower thickness |
+| Sheet | Horizontal layer placement |
+| Stratum | Noise-contoured horizontal layers |
 
 ### Map Utilities
 - **VoxelArea**: Cuboid area math (index, position, contains, iterate, addArea, intersect, pad, intersects)

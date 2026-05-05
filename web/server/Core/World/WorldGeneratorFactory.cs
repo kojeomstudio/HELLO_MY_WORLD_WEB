@@ -17,6 +17,7 @@ public class WorldGeneratorFactory
         Register("singlenode", () => new MapgenSinglenode());
         Register("valleys", () => new MapgenValleys());
         Register("carpathian", () => new MapgenCarpathian());
+        Register("v6", () => new MapgenV6());
     }
 
     public void Register(string name, Func<IWorldGenerator> factory)

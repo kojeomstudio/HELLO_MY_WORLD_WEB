@@ -30,14 +30,20 @@ public class NoiseWorldGenerator : IWorldGenerator
 
     private record BiomeDefinition(
         string Name, int YMin, int YMax, float HeatPoint, float HumidityPoint,
+        float Weight, int VerticalBlend,
         string TopBlock, string FillerBlock, int FillerDepth,
         string StoneBlock, string WaterBlock,
+        string WaterTopBlock, int DepthWaterTop,
+        string RiverWaterBlock, string RiverbedBlock,
+        string DustBlock, string CaveLiquid,
         string TreeType, float TreeChance,
-        string[] Decorations, string DungeonBlock, string DungeonAltBlock);
+        string[] Decorations, string DungeonBlock, string DungeonAltBlock, string DungeonStairBlock);
 
     private record BiomeNoiseConfig(
         float HeatOffset, float HeatScale, float[] HeatSpread,
-        float HumidityOffset, float HumidityScale, float[] HumiditySpread);
+        float HeatBlendOffset, float HeatBlendScale, float[] HeatBlendSpread,
+        float HumidityOffset, float HumidityScale, float[] HumiditySpread,
+        float HumidityBlendOffset, float HumidityBlendScale, float[] HumidityBlendSpread);
 
     private record TreeSchematic(
         string Name, string TrunkBlock, string LeavesBlock,
@@ -95,16 +101,25 @@ public class NoiseWorldGenerator : IWorldGenerator
                         biome.TryGetProperty("yMax", out var yMaxEl) ? yMaxEl.GetInt32() : 31000,
                         (float)biome.GetProperty("heatPoint").GetDouble(),
                         (float)biome.GetProperty("humidityPoint").GetDouble(),
+                        biome.TryGetProperty("weight", out var wEl) ? (float)wEl.GetDouble() : 1.0f,
+                        biome.TryGetProperty("verticalBlend", out var vbEl) ? vbEl.GetInt32() : 0,
                         biome.GetProperty("topBlock").GetString() ?? "grass",
                         biome.GetProperty("fillerBlock").GetString() ?? "dirt",
                         biome.GetProperty("fillerDepth").GetInt32(),
                         biome.GetProperty("stoneBlock").GetString() ?? "stone",
                         biome.GetProperty("waterBlock").GetString() ?? "water",
+                        biome.TryGetProperty("waterTopBlock", out var wtEl) ? wtEl.GetString() ?? "water" : "water",
+                        biome.TryGetProperty("depthWaterTop", out var dwEl) ? dwEl.GetInt32() : 0,
+                        biome.TryGetProperty("riverWaterBlock", out var rwEl) ? rwEl.GetString() ?? "river_water" : "river_water",
+                        biome.TryGetProperty("riverbedBlock", out var rbEl) ? rbEl.GetString() ?? "sand" : "sand",
+                        biome.TryGetProperty("dustBlock", out var dustEl) ? dustEl.GetString() ?? "none" : "none",
+                        biome.TryGetProperty("caveLiquid", out var clEl) ? clEl.GetString() ?? "none" : "none",
                         biome.TryGetProperty("treeType", out var ttEl) ? ttEl.GetString() ?? "none" : "none",
                         biome.TryGetProperty("treeChance", out var tcEl) ? (float)tcEl.GetDouble() : 0f,
                         decorations.ToArray(),
                         biome.TryGetProperty("dungeonBlock", out var dbEl) ? dbEl.GetString() ?? "cobblestone" : "cobblestone",
-                        biome.TryGetProperty("dungeonAltBlock", out var daEl) ? daEl.GetString() ?? "mossy_cobblestone" : "mossy_cobblestone"
+                        biome.TryGetProperty("dungeonAltBlock", out var daEl) ? daEl.GetString() ?? "mossy_cobblestone" : "mossy_cobblestone",
+                        biome.TryGetProperty("dungeonStairBlock", out var dsEl) ? dsEl.GetString() ?? "stone_brick" : "stone_brick"
                     ));
                 }
             }
@@ -115,9 +130,19 @@ public class NoiseWorldGenerator : IWorldGenerator
                     (float)noiseEl.GetProperty("heatOffset").GetDouble(),
                     (float)noiseEl.GetProperty("heatScale").GetDouble(),
                     noiseEl.GetProperty("heatSpread").EnumerateArray().Select(e => (float)e.GetDouble()).ToArray(),
+                    noiseEl.TryGetProperty("heatBlendOffset", out var hboEl) ? (float)hboEl.GetDouble() : 0f,
+                    noiseEl.TryGetProperty("heatBlendScale", out var hbsEl) ? (float)hbsEl.GetDouble() : 3f,
+                    noiseEl.TryGetProperty("heatBlendSpread", out var hbspEl)
+                        ? hbspEl.EnumerateArray().Select(e => (float)e.GetDouble()).ToArray()
+                        : new[] { 8f, 8f, 8f },
                     (float)noiseEl.GetProperty("humidityOffset").GetDouble(),
                     (float)noiseEl.GetProperty("humidityScale").GetDouble(),
-                    noiseEl.GetProperty("humiditySpread").EnumerateArray().Select(e => (float)e.GetDouble()).ToArray()
+                    noiseEl.GetProperty("humiditySpread").EnumerateArray().Select(e => (float)e.GetDouble()).ToArray(),
+                    noiseEl.TryGetProperty("humidityBlendOffset", out var huoEl) ? (float)huoEl.GetDouble() : 0f,
+                    noiseEl.TryGetProperty("humidityBlendScale", out var husEl) ? (float)husEl.GetDouble() : 3f,
+                    noiseEl.TryGetProperty("humidityBlendSpread", out var huspEl)
+                        ? huspEl.EnumerateArray().Select(e => (float)e.GetDouble()).ToArray()
+                        : new[] { 8f, 8f, 8f }
                 );
             }
         }
@@ -212,6 +237,8 @@ public class NoiseWorldGenerator : IWorldGenerator
 
         GenerateDecorations(blocks, baseX, baseY, baseZ, heightMap);
 
+        GenerateDustNodes(blocks, baseX, baseY, baseZ, heightMap);
+
         return blocks;
     }
 
@@ -231,7 +258,15 @@ public class NoiseWorldGenerator : IWorldGenerator
 
                     if (IsCave(worldX, worldY, worldZ))
                     {
-                        blocks[x, y, z] = (ushort)BlockType.Air;
+                        var biome = GetBiomeAt(worldX, worldY, worldZ, GroundBase);
+                        if (biome.CaveLiquid != "none" && worldY <= WaterLevel && worldY > 5)
+                        {
+                            blocks[x, y, z] = GetCaveLiquidBlock(biome.CaveLiquid);
+                        }
+                        else
+                        {
+                            blocks[x, y, z] = (ushort)BlockType.Air;
+                        }
                     }
                 }
             }
@@ -414,6 +449,7 @@ public class NoiseWorldGenerator : IWorldGenerator
         GenerateOreBlob(blocks, baseX, baseY, baseZ, rng);
         GenerateOrePuff(blocks, baseX, baseY, baseZ, rng);
         GenerateOreStratum(blocks, baseX, baseY, baseZ, rng);
+        GenerateOreVein(blocks, baseX, baseY, baseZ, rng);
     }
 
     private void GenerateOreBlob(ushort[,,] blocks, int baseX, int baseY, int baseZ, Random rng)
@@ -1145,9 +1181,9 @@ public class NoiseWorldGenerator : IWorldGenerator
         if (_biomes.Count == 0)
         {
             var biomeNoise = PerlinNoise2D(x * 0.005f + 1000, z * 0.005f + 1000);
-            if (biomeNoise > 0.3f) return new BiomeDefinition("desert", 4, 31000, 90, 10, "sand", "sand", 3, "desert_stone", "water", "none", 0, Array.Empty<string>(), "cobblestone", "mossy_cobblestone");
-            if (biomeNoise < -0.4f) return new BiomeDefinition("snow", 4, 31000, 10, 40, "snow", "dirt", 1, "stone", "water", "pine", 0.006f, new[] { "tall_grass" }, "cobblestone", "mossy_cobblestone");
-            return new BiomeDefinition("grassland", 4, 31000, 50, 50, "grass", "dirt", 1, "stone", "water", "oak", 0.003f, new[] { "tall_grass", "flower_red" }, "cobblestone", "mossy_cobblestone");
+            if (biomeNoise > 0.3f) return new BiomeDefinition("desert", 4, 31000, 90, 10, 1f, 1, "sand", "sand", 3, "desert_stone", "water", "water", 0, "river_water", "sand", "none", "none", "none", 0, Array.Empty<string>(), "cobblestone", "mossy_cobblestone", "stone_brick");
+            if (biomeNoise < -0.4f) return new BiomeDefinition("snow", 4, 31000, 10, 40, 1f, 2, "snow", "dirt", 1, "stone", "water", "ice", 2, "ice", "dirt", "snow", "none", "pine", 0.006f, new[] { "tall_grass" }, "cobblestone", "mossy_cobblestone", "stone_brick");
+            return new BiomeDefinition("grassland", 4, 31000, 50, 50, 1f, 2, "grass", "dirt", 1, "stone", "water", "water", 0, "river_water", "sand", "none", "none", "oak", 0.003f, new[] { "tall_grass", "flower_red" }, "cobblestone", "mossy_cobblestone", "stone_brick");
         }
 
         float heat = 50f;
@@ -1159,10 +1195,21 @@ public class NoiseWorldGenerator : IWorldGenerator
             heat = _biomeNoiseConfig.HeatOffset + _biomeNoiseConfig.HeatScale * PerlinNoise2D(
                 x / Math.Max(hSpread[0], 1f),
                 z / Math.Max(hSpread[2], 1f));
+
+            var hbSpread = _biomeNoiseConfig.HeatBlendSpread;
+            heat += _biomeNoiseConfig.HeatBlendOffset + _biomeNoiseConfig.HeatBlendScale * PerlinNoise2D(
+                x / Math.Max(hbSpread[0], 1f) + 500,
+                z / Math.Max(hbSpread[2], 1f) + 500);
+
             var huSpread = _biomeNoiseConfig.HumiditySpread;
             humidity = _biomeNoiseConfig.HumidityOffset + _biomeNoiseConfig.HumidityScale * PerlinNoise2D(
                 x / Math.Max(huSpread[0], 1f) + 100,
                 z / Math.Max(huSpread[2], 1f) + 100);
+
+            var hubSpread = _biomeNoiseConfig.HumidityBlendSpread;
+            humidity += _biomeNoiseConfig.HumidityBlendOffset + _biomeNoiseConfig.HumidityBlendScale * PerlinNoise2D(
+                x / Math.Max(hubSpread[0], 1f) + 600,
+                z / Math.Max(hubSpread[2], 1f) + 600);
         }
 
         BiomeDefinition bestBiome = _biomes[0];
@@ -1171,9 +1218,18 @@ public class NoiseWorldGenerator : IWorldGenerator
         foreach (var biome in _biomes)
         {
             if (y < biome.YMin || y > biome.YMax) continue;
+
             var dx = heat - biome.HeatPoint;
             var dz = humidity - biome.HumidityPoint;
-            var dist = dx * dx + dz * dz;
+            var dist = (dx * dx + dz * dz) / Math.Max(biome.Weight, 0.01f);
+
+            if (biome.VerticalBlend > 0 && surfaceHeight > 0)
+            {
+                var vertDist = Math.Abs(y - surfaceHeight);
+                if (vertDist < biome.VerticalBlend)
+                    dist *= (float)vertDist / biome.VerticalBlend;
+            }
+
             if (dist < bestDist)
             {
                 bestDist = dist;
@@ -1282,5 +1338,114 @@ public class NoiseWorldGenerator : IWorldGenerator
         var mountainNoise = PerlinNoise2D(x * 0.003f + 5000, z * 0.003f + 5000);
         var mountainFactor = mountainNoise > 0.4f ? (mountainNoise - 0.4f) * 60f : 0f;
         return GroundBase + (int)((noise2D + detailNoise) * TerrainHeight + mountainFactor);
+    }
+
+    private void GenerateDustNodes(ushort[,,] blocks, int baseX, int baseY, int baseZ, int[,] heightMap)
+    {
+        for (int x = 0; x < Chunk.Size; x++)
+        {
+            for (int z = 0; z < Chunk.Size; z++)
+            {
+                var worldX = baseX + x;
+                var worldZ = baseZ + z;
+                var surfaceY = heightMap[x, z];
+                var localSurfaceY = surfaceY - baseY;
+
+                if (localSurfaceY < 0 || localSurfaceY >= Chunk.Size - 1) continue;
+
+                var biome = GetBiomeAt(worldX, surfaceY, worldZ, surfaceY);
+                if (biome.DustBlock == "none") continue;
+
+                var dustType = GetBlockTypeByName(biome.DustBlock);
+                if (dustType != (ushort)BlockType.Air && blocks[x, localSurfaceY + 1, z] == (ushort)BlockType.Air)
+                {
+                    blocks[x, localSurfaceY + 1, z] = dustType;
+                }
+            }
+        }
+    }
+
+    private static ushort GetCaveLiquidBlock(string liquid)
+    {
+        return liquid switch
+        {
+            "water" => (ushort)BlockType.Water,
+            "lava" => (ushort)BlockType.Lava,
+            _ => (ushort)BlockType.Air
+        };
+    }
+
+    private void GenerateOreVein(ushort[,,] blocks, int baseX, int baseY, int baseZ, Random rng)
+    {
+        var veinDefinitions = new (BlockType Type, int YMin, int YMax, float Chance, int MinLength, int MaxLength, float NoiseThreshold)[]
+        {
+            (BlockType.OreDiamond, 0, 16, 0.001f, 8, 30, 0.5f),
+            (BlockType.OreIron, 0, 48, 0.002f, 10, 40, 0.4f),
+            (BlockType.GoldOre, 0, 32, 0.0015f, 6, 25, 0.45f)
+        };
+
+        foreach (var (oreType, yMin, yMax, chance, minLen, maxLen, noiseThreshold) in veinDefinitions)
+        {
+            if (rng.NextDouble() > chance * Chunk.Size) continue;
+
+            var startX = rng.Next(2, Chunk.Size - 2);
+            var startY = rng.Next(2, Chunk.Size - 2);
+            var startZ = rng.Next(2, Chunk.Size - 2);
+
+            if (baseY + startY < yMin || baseY + startY > yMax) continue;
+            if (blocks[startX, startY, startZ] != (ushort)BlockType.Stone &&
+                blocks[startX, startY, startZ] != (ushort)BlockType.DesertStone) continue;
+
+            var length = rng.Next(minLen, maxLen + 1);
+            var cx = startX;
+            var cy = startY;
+            var cz = startZ;
+            var stepAngle = (float)(rng.NextDouble() * Math.PI * 2);
+
+            for (int i = 0; i < length; i++)
+            {
+                var worldX = baseX + cx;
+                var worldY = baseY + cy;
+                var worldZ = baseZ + cz;
+
+                var veinNoise = PerlinNoise3D(worldX * 0.15f + 12000, worldY * 0.15f + 12000, worldZ * 0.15f + 12000);
+                if (veinNoise > noiseThreshold)
+                {
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        for (int dy = -1; dy <= 1; dy++)
+                        {
+                            for (int dz = -1; dz <= 1; dz++)
+                            {
+                                var nx = cx + dx;
+                                var ny = cy + dy;
+                                var nz = cz + dz;
+                                if (nx < 0 || nx >= Chunk.Size || ny < 0 || ny >= Chunk.Size || nz < 0 || nz >= Chunk.Size) continue;
+
+                                var noiseAtPoint = PerlinNoise3D(
+                                    (baseX + nx) * 0.15f + 12000,
+                                    (baseY + ny) * 0.15f + 12000,
+                                    (baseZ + nz) * 0.15f + 12000);
+
+                                if (noiseAtPoint > noiseThreshold &&
+                                    (blocks[nx, ny, nz] == (ushort)BlockType.Stone ||
+                                     blocks[nx, ny, nz] == (ushort)BlockType.DesertStone))
+                                {
+                                    blocks[nx, ny, nz] = (ushort)oreType;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                stepAngle += (float)(rng.NextDouble() - 0.5) * 0.5f;
+                cx += (int)Math.Round(Math.Cos(stepAngle));
+                cy += rng.Next(-1, 2);
+                cz += (int)Math.Round(Math.Sin(stepAngle));
+
+                if (cx < 1 || cx >= Chunk.Size - 1 || cy < 1 || cy >= Chunk.Size - 1 || cz < 1 || cz >= Chunk.Size - 1)
+                    break;
+            }
+        }
     }
 }
