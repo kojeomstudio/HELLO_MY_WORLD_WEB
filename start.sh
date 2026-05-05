@@ -1,4 +1,5 @@
 #!/bin/bash
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 trap 'kill $SERVER_PID $CLIENT_PID 2>/dev/null; echo "Servers stopped."' EXIT INT TERM
 
 echo "========================================"
@@ -7,18 +8,29 @@ echo "========================================"
 echo ""
 
 echo "Starting C# server..."
-cd "$(dirname "$0")/web/server"
+cd "$SCRIPT_DIR/web/server"
 dotnet run --project WebGameServer.csproj &
 SERVER_PID=$!
-cd - > /dev/null
+cd "$SCRIPT_DIR"
 
-sleep 5
+echo "Waiting for server to be ready..."
+for i in $(seq 1 30); do
+    if curl -s http://localhost:5266/api/status > /dev/null 2>&1; then
+        echo "Server is ready."
+        break
+    fi
+    if ! kill -0 $SERVER_PID 2>/dev/null; then
+        echo "Server failed to start."
+        exit 1
+    fi
+    sleep 1
+done
 
 echo "Starting Vite client dev server..."
-cd "$(dirname "$0")/web/client"
+cd "$SCRIPT_DIR/web/client"
 npm run dev &
 CLIENT_PID=$!
-cd - > /dev/null
+cd "$SCRIPT_DIR"
 
 echo ""
 echo "========================================"

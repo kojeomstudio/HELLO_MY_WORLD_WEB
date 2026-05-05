@@ -805,6 +805,22 @@ export class FormspecRenderer {
         this.container!.appendChild(div);
     }
 
+    private isValidCssValue(value: string, type: 'color' | 'font' | 'size'): boolean {
+        if (!value || value.length > 128) return false;
+        if (type === 'color') {
+            return /^(#[0-9a-fA-F]{3,8}|rgb(a?\([^)]*\))?|[a-zA-Z]+)$/.test(value) &&
+                !value.includes('url(') && !value.includes('expression(');
+        }
+        if (type === 'font') {
+            return /^[a-zA-Z0-9_\-\s,"']+$/.test(value) &&
+                !value.includes('url(') && !value.includes('expression(');
+        }
+        if (type === 'size') {
+            return /^[0-9]+(px|em|rem|%|pt|vh|vw)?$/.test(value);
+        }
+        return false;
+    }
+
     private applyStyle(element: FormspecElement): void {
         const name = String(element.name || '');
         const propertiesStr = String(element.properties || '');
@@ -825,19 +841,19 @@ export class FormspecRenderer {
             for (const [key, value] of Object.entries(props)) {
                 switch (key) {
                     case 'bgcolor':
-                        htmlEl.style.backgroundColor = value;
+                        if (this.isValidCssValue(value, 'color')) htmlEl.style.backgroundColor = value;
                         break;
                     case 'fgcolor':
-                        htmlEl.style.color = value;
+                        if (this.isValidCssValue(value, 'color')) htmlEl.style.color = value;
                         break;
                     case 'bordercolor':
-                        htmlEl.style.borderColor = value;
+                        if (this.isValidCssValue(value, 'color')) htmlEl.style.borderColor = value;
                         break;
                     case 'font':
-                        htmlEl.style.fontFamily = value;
+                        if (this.isValidCssValue(value, 'font')) htmlEl.style.fontFamily = value;
                         break;
                     case 'fontsize':
-                        htmlEl.style.fontSize = value;
+                        if (this.isValidCssValue(value, 'size')) htmlEl.style.fontSize = value;
                         break;
                 }
             }

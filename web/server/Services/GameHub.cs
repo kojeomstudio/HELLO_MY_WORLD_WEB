@@ -2181,6 +2181,28 @@ public class GameHub : Hub<IGameClient>
             }
         }
 
+        if (_accountFailures.Count > 500)
+        {
+            foreach (var kvp in _accountFailures)
+            {
+                if (kvp.Value.LockoutEnd < now)
+                    _accountFailures.TryRemove(kvp.Key, out _);
+            }
+        }
+
+        if (_chatTimestamps.Count > 1000)
+        {
+            var chatCutoff = now.AddMinutes(-5);
+            foreach (var kvp in _chatTimestamps)
+            {
+                lock (kvp.Value)
+                {
+                    if (kvp.Value.Count == 0 || kvp.Value.Peek() < chatCutoff)
+                        _chatTimestamps.TryRemove(kvp.Key, out _);
+                }
+            }
+        }
+
         return true;
     }
 

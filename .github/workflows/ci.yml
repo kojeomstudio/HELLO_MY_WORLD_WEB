@@ -83,7 +83,7 @@ jobs:
         run: |
           ERRORS=0
           for f in web/data/*.json; do
-            if ! python3 -c "import json; json.load(open('$f'))" 2>/dev/null; then
+            if ! python3 -c "import json, sys; json.load(open(sys.argv[1]))" "$f" 2>/dev/null; then
               echo "::error::Invalid JSON: $f"
               ERRORS=1
             fi
@@ -125,7 +125,9 @@ jobs:
           cache-dependency-path: web/client/package-lock.json
 
       - name: Install dependencies for audit
-        run: npm install --prefix web/client
+        run: |
+          npm install --prefix web/client
+          npm install
 
       - name: npm audit (client)
         run: npm audit --prefix web/client --audit-level=high
@@ -174,11 +176,12 @@ jobs:
           MISSING=0
           for pattern in ".env" "*.db" "*.sqlite" "*.user" "*.suo" "node_modules" "bin/" "obj/" "dist/" "world"; do
             if ! grep -q "$pattern" .gitignore 2>/dev/null; then
-              echo "::warning::.gitignore missing pattern: $pattern"
+              echo "::error::.gitignore missing pattern: $pattern"
               MISSING=1
             fi
           done
           if [ $MISSING -ne 0 ]; then
-            echo "::warning::Some .gitignore patterns are missing"
+            echo "::error::.gitignore is missing required patterns"
+            exit 1
           fi
           echo ".gitignore verification complete"

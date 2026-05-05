@@ -173,16 +173,20 @@ public class AreaProtectionSystem
 
     public (bool Success, string? Error) RemoveArea(int areaId, string? requester = null)
     {
-        if (!_areas.TryGetValue(areaId, out var area))
-            return (false, $"Area {areaId} not found.");
+        var maxRetries = 3;
+        for (int i = 0; i < maxRetries; i++)
+        {
+            if (!_areas.TryGetValue(areaId, out var area))
+                return (false, $"Area {areaId} not found.");
 
-        if (requester != null && !string.Equals(area.OwnerName, requester, StringComparison.OrdinalIgnoreCase))
-            return (false, "You do not own this area.");
+            if (requester != null && !string.Equals(area.OwnerName, requester, StringComparison.OrdinalIgnoreCase))
+                return (false, "You do not own this area.");
 
-        if (_areas.TryRemove(areaId, out _))
-            return (true, null);
+            if (((ICollection<KeyValuePair<int, ProtectionArea>>)_areas).Remove(new KeyValuePair<int, ProtectionArea>(areaId, area)))
+                return (true, null);
+        }
 
-        return (false, $"Area {areaId} not found.");
+        return (false, "Failed to remove area due to a concurrent modification.");
     }
 
     public (bool Success, string? Error) TransferArea(int areaId, string newOwner, string? requester = null)

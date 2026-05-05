@@ -9,7 +9,7 @@ concurrency:
 
 on:
   pull_request:
-    branches: [main, develop]
+    branches: [develop]
 
 jobs:
   quick-check:

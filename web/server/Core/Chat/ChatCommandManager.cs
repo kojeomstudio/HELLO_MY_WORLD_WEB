@@ -392,6 +392,9 @@ public class ChatCommandManager
                 var hasServer = granterPrivs != null && Array.Exists(granterPrivs, p => p == "server");
                 if (!hasServer)
                 {
+                    var targetPrivs = _getPlayerPrivileges?.Invoke(args[0]);
+                    if (targetPrivs != null && Array.Exists(targetPrivs, p => p == "server"))
+                        return Task.FromResult("You cannot modify privileges of server admins.");
                     var safePrivs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
                     {
                         "interact", "shout", "fly", "fast", "teleport", "give",
