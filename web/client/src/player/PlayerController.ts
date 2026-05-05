@@ -508,6 +508,25 @@ export class PlayerController {
         if (this._input.isKeyDown('KeyA')) moveDir.sub(right);
         if (this._input.isKeyDown('KeyD')) moveDir.add(right);
 
+        const virtualMove = this._input.getVirtualMove();
+        if (virtualMove.x !== 0 || virtualMove.z !== 0) {
+            moveDir.add(forward.clone().multiplyScalar(-virtualMove.z));
+            moveDir.add(right.clone().multiplyScalar(virtualMove.x));
+        }
+
+        const virtualLook = this._input.getVirtualLook();
+        if (virtualLook.x !== 0 || virtualLook.y !== 0) {
+            this._yaw -= virtualLook.x * this.mouseSensitivity;
+            this._pitch -= virtualLook.y * this.mouseSensitivity;
+            this._pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, this._pitch));
+        }
+
+        if (this._input.isVirtualJump() && !this._input.isKeyDown('Space')) {
+            this._input.setVirtualKey('Space', true);
+        } else if (!this._input.isVirtualJump()) {
+            this._input.setVirtualKey('Space', false);
+        }
+
         const inLiquid = this.isInLiquid();
         const onSlippery = this.isOnSlipperyBlock();
         const moveResistance = this.getMoveResistance();

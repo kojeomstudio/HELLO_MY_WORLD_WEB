@@ -17,6 +17,7 @@ public class GameLoopService : BackgroundService
     private readonly ILogger<GameLoopService> _logger;
     private readonly BlockDefinitionManager _blockDefinitionManager;
     private readonly ServerConfig _config;
+    private readonly ServerProfiler _profiler;
 
     private int _tickCount;
     private int _previousEntityCount;
@@ -34,7 +35,8 @@ public class GameLoopService : BackgroundService
         IHubContext<GameHub, IGameClient> hub,
         ILogger<GameLoopService> logger,
         BlockDefinitionManager blockDefinitionManager,
-        ServerConfig config)
+        ServerConfig config,
+        ServerProfiler profiler)
     {
         _gameServer = gameServer;
         _entityManager = entityManager;
@@ -42,6 +44,7 @@ public class GameLoopService : BackgroundService
         _logger = logger;
         _blockDefinitionManager = blockDefinitionManager;
         _config = config;
+        _profiler = profiler;
         _lastBackupTime = DateTime.UtcNow;
     }
 
@@ -57,7 +60,10 @@ public class GameLoopService : BackgroundService
         {
             var now = DateTime.UtcNow;
 
-            _gameServer.Update();
+            _profiler.BeginFrame();
+            using (_profiler.Measure("tick"))
+            {
+                _gameServer.Update();
 
             await ProcessItemPickups();
 
@@ -95,6 +101,13 @@ public class GameLoopService : BackgroundService
             CheckAutoBackup();
 
             TrackTps(now);
+            }
+
+            _profiler.EndFrame();
+            _profiler.SetGauge("tps", _currentTps);
+            _profiler.SetGauge("entities", _entityManager.Count);
+            _profiler.SetGauge("players", _gameServer.OnlinePlayerCount);
+            _profiler.SetGauge("chunks", _gameServer.DefaultWorld.GetLoadedChunks().Count);
 
             await Task.Delay(interval, stoppingToken);
         }

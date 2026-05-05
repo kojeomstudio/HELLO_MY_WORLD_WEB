@@ -1,6 +1,7 @@
 import * as HubConnection from '@microsoft/signalr';
 import { SettingsPanel } from './SettingsPanel';
 import { CraftingGridUI } from './CraftingGridUI';
+import { EnrichedString } from './EnrichedString';
 import type { ItemRegistry } from '../world/ItemRegistry';
 
 interface CreativeInventoryEntry {
@@ -154,9 +155,19 @@ export class UIManager {
         const senderSpan = document.createElement('span');
         senderSpan.className = 'sender';
         senderSpan.textContent = sender + ':';
-        const textNode = document.createTextNode(' ' + message);
-        msgEl.appendChild(senderSpan);
-        msgEl.appendChild(textNode);
+
+        const hasColorCodes = message.includes('\u00A7');
+        if (hasColorCodes) {
+            const contentSpan = document.createElement('span');
+            contentSpan.innerHTML = EnrichedString.toHtml(message);
+            msgEl.appendChild(senderSpan);
+            msgEl.appendChild(document.createTextNode(' '));
+            msgEl.appendChild(contentSpan);
+        } else {
+            const textNode = document.createTextNode(' ' + message);
+            msgEl.appendChild(senderSpan);
+            msgEl.appendChild(textNode);
+        }
 
         switch (messageType) {
             case 'system':

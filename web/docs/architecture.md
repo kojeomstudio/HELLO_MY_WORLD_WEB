@@ -200,7 +200,8 @@ Creates `UIManager`, then `GameClient`, connects to server.
 - Settings panel (FOV, mouse sensitivity, render distance, AO, clouds, volume)
 
 ### Other Client Modules
-- **InputManager** (`input/InputManager.ts`) — Keyboard/mouse state tracking
+- **InputManager** (`input/InputManager.ts`) — Keyboard/mouse state tracking with virtual input support for touch/gamepad (virtual keys, analog movement/look, gamepad polling via Web Gamepad API with deadzone)
+- **TouchControls** (`input/TouchControls.ts`) — Mobile web touch controls with virtual joystick (left), action buttons (JUMP/DIG/USE/RUN), and camera look (right half drag). Auto-detected on touch-capable devices
 - **AudioManager** (`audio/AudioManager.ts`) — Procedural audio via Web Audio API (8 sound types: block break, block place, footstep, hurt, pickup, death, note block, jukebox) plus material-based block sound groups (stone, dirt, grass, wood, leaves, glass, sand, gravel, cloth, metal, snow, water, lava)
 - **Minimap** (`ui/Minimap.ts`) — 2D overhead minimap
 - **WeatherSystem** (`world/WeatherSystem.ts`) — Rain and snow particle systems with cyclable weather modes
@@ -212,6 +213,7 @@ Creates `UIManager`, then `GameClient`, connects to server.
 - **SettingsPanel** (`ui/SettingsPanel.ts`) — Settings UI with persistence
 - **ModLoader** (`modding/ModLoader.ts`) — Client-side mod loading system with lifecycle hooks (`onInit`, `onUpdate`, `onChatMessage`, `onDestroy`), custom chat command registration, and game API (player position, block get/set, chat). Wired into GameClient game loop and chat dispatch.
 - **I18n** (`i18n/I18n.ts`) — Internationalization framework with translation lookup, parameter interpolation, locale auto-detection from browser settings. Supports English and Korean with 17 translation keys. Used in chat join/leave messages and UI labels.
+- **EnrichedString** (`ui/EnrichedString.ts`) — Minetest-style color-coded chat support with § color codes (16 colors), bold/italic/underline formatting, HTML rendering, and plain text stripping
 - **AutoExposurePass** (`rendering/AutoExposurePass.ts`) — Post-processing auto-exposure pass with ACES filmic tone mapping, luminance extraction, configurable exposure range. Integrated into Renderer's post-processing pipeline, toggleable via `setLighting({ autoExposure: true })`.
 
 ## World System
@@ -466,6 +468,12 @@ All server services registered as **Singleton** in `Program.cs`:
 - **Configurable security parameters**: Auth settings (PBKDF2 iterations, lockout policy, password length, reserved names) and security settings (HSTS max-age, CSP nonce size, max connections) externalized to `server_config.json`
 - **CSP nonce size from config**: Content Security Policy nonce generation uses configurable byte size from `security.cspNonceSize`
 - **Port validation in CORS**: Origin validation now checks for valid port numbers (1-65535) to prevent malformed origin injection
+
+### Porting Improvements (Round 7)
+- **Touch Controls**: Mobile web virtual joystick and action buttons (JUMP/DIG/USE/RUN) with camera look via right-half drag. Auto-detected on touch-capable devices via `TouchControls.ts`
+- **Gamepad Support**: Web Gamepad API integration with analog stick movement/look, button mapping (A=jump, B=dig, X=place, triggers=sprint/sneak), configurable deadzone (0.15)
+- **Enriched String Chat**: Minetest-style § color codes (16 colors) with bold/italic/underline formatting, HTML rendering, and plain text stripping via `EnrichedString.ts`
+- **Server Profiler**: Runtime performance profiling with per-metric avg/max/min tracking, gauge values (TPS, entities, players, chunks), frame timing, and text report API (`/api/profiler`, `/api/profiler/report`). Integrated into `GameLoopService` tick measurement
 
 ## Security Model
 

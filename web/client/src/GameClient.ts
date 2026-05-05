@@ -16,6 +16,7 @@ import { ItemRegistry } from './world/ItemRegistry';
 import { FormspecRenderer } from './ui/FormspecRenderer';
 import { setLeavesStyle as applyLeavesStyle, setTranslucentLiquids as applyTranslucentLiquids } from './world/ChunkMesh';
 import { ModLoader } from './modding/ModLoader';
+import { TouchControls } from './input/TouchControls';
 import { t, setLocale, getAvailableLocales } from './i18n/I18n';
 
 enum ClientState {
@@ -35,6 +36,7 @@ export class GameClient {
     private inputManager: InputManager;
     private uiManager: UIManager;
     private audioManager: AudioManager;
+    private _touchControls: TouchControls | null = null;
     private minimap: Minimap;
     private particleSystem: ParticleSystem;
     private wieldItem: WieldItem;
@@ -89,6 +91,7 @@ export class GameClient {
 
         this.initI18n();
         this.initModLoader();
+        this.initTouchControls();
     }
 
     get items() { return this.itemRegistry; }
@@ -455,6 +458,14 @@ export class GameClient {
         });
     }
 
+    private initTouchControls(): void {
+        this._touchControls = new TouchControls(this.inputManager);
+    }
+
+    isTouchDevice(): boolean {
+        return this._touchControls?.isEnabled() ?? false;
+    }
+
     loadMod(mod: { name: string; version: string; description: string; onInit?: any; onUpdate?: any; onChatMessage?: any; onDestroy?: any }): void {
         ModLoader.loadMod(mod);
     }
@@ -558,6 +569,7 @@ export class GameClient {
         }
 
         if (!this.playerController.isDead) {
+            this.inputManager.updateGamepad();
             this.playerController.update(dt);
         }
 

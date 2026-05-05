@@ -192,6 +192,10 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **MapgenV7 Data-Driven Trees**: Tree schematics loaded from `tree_schematics.json` (5 types with canopy shapes: sphere, cone, cylinder, none), L-system trees from `lsystem_trees.json`, biome-matched placement
 - **Biome Blend Noises**: Smooth biome transitions using heat_blend and humidity_blend noises from `biomes.json`, weighted biome selection
 - **Biome Dust**: Biome-specific dust nodes (snow layers in cold biomes) placed on exposed surfaces
+- **Touch Controls**: Mobile web virtual joystick and action buttons (JUMP/DIG/USE/RUN) with camera look via right-half drag, auto-detected on touch-capable devices
+- **Gamepad Support**: Web Gamepad API integration with analog stick movement/look, button mapping (A=jump, B=dig, X=place, triggers=sprint/sneak), configurable deadzone
+- **Enriched String Chat**: Minetest-style § color codes (16 colors) with bold/italic/underline formatting in chat messages
+- **Server Profiler**: Runtime performance profiling with per-metric avg/max/min tracking, gauge values, text report API (`/api/profiler`, `/api/profiler/report`)
 
 ## Architecture
 
@@ -219,11 +223,13 @@ web/
 │   │   ├── player/
 │   │   │   └── PlayerController.ts  # FPS controller
 │   │   ├── input/
-│   │   │   └── InputManager.ts
+│   │   │   ├── InputManager.ts    # Keyboard/mouse/touch/gamepad input
+│   │   │   └── TouchControls.ts   # Mobile virtual joystick and buttons
 │   │   ├── ui/
 │   │   │   ├── UIManager.ts     # All UI panels
 │   │   │   ├── CraftingGridUI.ts # 3x3 crafting grid
 │   │   │   ├── FormspecRenderer.ts # Server-driven UI
+│   │   │   ├── EnrichedString.ts # Color-coded chat
 │   │   │   ├── Minimap.ts
 │   │   │   └── SettingsPanel.ts
 │   │   └── audio/

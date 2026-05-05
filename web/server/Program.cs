@@ -805,6 +805,7 @@ builder.Services.AddSingleton<GridCraftingSystem>(sp =>
     return gridCrafting;
 });
 builder.Services.AddSingleton<EntityManager>();
+builder.Services.AddSingleton<ServerProfiler>();
 builder.Services.AddHostedService<GameLoopService>();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -886,6 +887,9 @@ app.MapGet("/api/status", (GameServer server) => new
     maxPlayers = server.MaxPlayers,
     isRunning = server.IsRunning
 });
+
+app.MapGet("/api/profiler", (ServerProfiler profiler) => profiler.GetSnapshot());
+app.MapGet("/api/profiler/report", (ServerProfiler profiler) => profiler.FormatReport());
 
 if (Directory.Exists(clientDistPath))
 {
