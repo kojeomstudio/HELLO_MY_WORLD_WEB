@@ -101,10 +101,13 @@ See [server-api.md](server-api.md) for full method/event signatures.
 **EntityManager** (`Entities/EntityManager.cs`) — Tracks all entities:
 - `ItemEntity`: Dropped items with position, lifetime, magnet range
 - `MobEntity`: Hostile (Zombie, Skeleton, Spider) and passive (Cow, Pig, Chicken) mobs with AI pathfinding, attack, and mob-specific render properties (color, size)
+- `ProjectileEntity`: Arrow/snowball entities with gravity, drag, block collision, and entity hit detection. Supports piercing (multishot) with configurable hit counts
 
 **MobSpawner** (`Entities/MobSpawner.cs`) — Spawns mobs every 10s (max 50), weighted random selection with spawn height validation, despawns distant mobs (>128 blocks). Hostile mobs only spawn at night (ticks 13000–23000); passive mobs only spawn on grass during day.
 
-**Mob Combat** — AI state machine (Idle → Chase → Attack) with 1s cooldown. Passive mobs flee when hit. PvP distance check (max 4 blocks). Mob definitions loaded from `web/data/mobs.json`.
+**Mob Combat** — AI state machine (Idle → Chase → Attack) with 1s cooldown. Passive mobs flee when hit. PvP distance check (max 6 blocks). Mob definitions loaded from `web/data/mobs.json`.
+
+**ExplosionSystem** (`World/ExplosionSystem.cs`) — Block destruction within radius with per-block resistance, item drops, entity/player damage with knockback, rollback integration for undo support. Triggered via `/explode` command or TNT blocks.
 
 ### Crafting & Smelting
 
@@ -127,6 +130,10 @@ See [server-api.md](server-api.md) for full method/event signatures.
 - **KnockbackSystem** (`Physics/KnockbackSystem.cs`) — Damage knockback calculation
 - **ToolWearSystem** (`ToolWear/ToolWearSystem.cs`) — 65536-scale tool wear matching Minetest's wear system, integrated into dig and combat actions
 - **SoundSpecManager** (`Sound/SoundSpecManager.cs`) — Block sound group definitions loaded from `sounds.json`, positional sound events
+- **ExplosionSystem** (`World/ExplosionSystem.cs`) — Radius-based block destruction with resistance values, item drops, entity/player damage, rollback recording
+- **Lightning System** — Thunderstorm weather generates lightning strikes that damage nearby players (8 damage at impact, falloff over 5 blocks) and can set fires on exposed blocks
+- **PvP Combat** — Players can attack each other within 6 blocks using `AttackPlayer` hub method, requires `pvp` privilege, applies knockback and tracks damage statistics
+- **Projectile System** — `ProjectileEntity` with gravity, drag, and collision. Supports arrows and snowballs with configurable damage and piercing
 - **Security**: HTML/XML tag stripping in chat, security headers (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, CSP with nonce, Referrer-Policy, Permissions-Policy, HSTS in production), configurable CORS origins from `server_config.json`, enhanced rate limiting (join spam, punch, interact), privilege escalation protection (no self-grant/self-revoke/server privilege protection), HTTPS redirection (configurable), periodic auto-save (player data + metadata every 60s)
 
 ## Client Architecture
@@ -146,6 +153,7 @@ Creates `UIManager`, then `GameClient`, connects to server.
 - WASD movement, space jump, shift sneak, ctrl sprint
 - Client-side physics: gravity (20 m/s^2), collision detection, stepping
 - Server-authoritative position correction: server validates movement and sends corrected positions when client deviates
+- Client-side prediction/reconciliation: smooth interpolation for small corrections (<2 blocks), hard snap for large corrections
 - Block raycasting (DDA algorithm) for dig/place targeting
 - Dig timing with server-confirmed duration
 - Flying mode toggle (double-space)
@@ -161,7 +169,8 @@ Creates `UIManager`, then `GameClient`, connects to server.
 - Generates Three.js geometry per chunk
 - Separates solid and transparent meshes
 - Ambient occlusion per vertex (configurable)
-- Light interpolation from 4 neighbor light values
+- Smooth per-face lighting from 4 neighbor light samples (improves visual quality over flat lighting)
+- Param2 color palette support for wool and colorable blocks (32 wool colors + generic RGB palette)
 - Vegetation wind animation (leaves, pine needles, sugar cane)
 - Texture atlas UV mapping (89 textures from Minetest DevTest, packed into atlas)
 - Animated textures for water and lava (wave vertex displacement + frame cycling)
@@ -176,8 +185,11 @@ Creates `UIManager`, then `GameClient`, connects to server.
 - Damage flash effect
 - Selection box rendering
 - Shadow mapping (PCFSoft, 1024 map, sun directional light)
+- Cascade Shadow Maps (3-cascade CSM) — renders shadow depth for near/mid/far cascade, merges into combined shadow texture. Wired into main render pipeline.
+- Auto Exposure Pass — luminance-based exposure calculation with ACES tonemapping. Can be toggled via settings.
 - Player-following point light for local illumination
 - Animated water (wave effect, 0.45 opacity, lowered surface) and lava (wave effect, emissive vertex colors)
+- Post-processing pipeline: EffectComposer with Bloom + FXAA + OutputPass, optional auto-exposure
 
 ### UIManager (`ui/UIManager.ts`) — HUD and UI panels
 - Health bar (heart textures), breath bar (bubble textures)

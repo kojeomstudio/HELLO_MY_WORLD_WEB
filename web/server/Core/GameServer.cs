@@ -54,10 +54,12 @@ public class GameServer
     private readonly MobSpawner _mobSpawner;
     private readonly WorldPathfinder _pathfinder;
     private readonly WeatherSystem _weatherSystem;
+    private readonly ExplosionSystem _explosionSystem;
     private NodeTimerSystem _nodeTimerSystem;
     public AgricultureSystem? Agriculture { get; set; }
     public FishingSystem FishingSystem => _fishingSystem;
     public BreedingSystem Breeding => _breedingSystem;
+    public ExplosionSystem Explosions => _explosionSystem;
 
     private IHubContext<GameHub, IGameClient>? _hubContext;
     private int _tickCount;
@@ -156,6 +158,60 @@ public class GameServer
         Agriculture = new AgricultureSystem(DefaultWorld, _blockDefinitionManager);
 
         _weatherSystem = new WeatherSystem(config, DefaultWorld);
+
+        _explosionSystem = new ExplosionSystem(DefaultWorld, _rollbackSystem, _entityManager);
+        _explosionSystem.OnPlayerDamaged += (player, damage, center) =>
+        {
+            var knockDir = (player.Position - center);
+            var knockDist = knockDir.Length;
+            if (knockDist > 0)
+            {
+                knockDir = knockDir.Normalized;
+                var knockForce = damage * 0.5f;
+                var knockVel = new Vector3(knockDir.X * knockForce, knockForce * 0.5f, knockDir.Z * knockForce);
+                player.Velocity = player.Velocity + knockVel;
+                if (_hubContext != null)
+                {
+                    _ = _hubContext.Clients.Client(player.ConnectionId)
+                        .OnKnockback(knockVel.X, knockVel.Y, knockVel.Z);
+                }
+            }
+            DamagePlayer(player, damage, "explosion");
+        };
+        _explosionSystem.OnEntityDamaged += (entity, damage, center) =>
+        {
+            if (entity is MobEntity mob)
+            {
+                var knockDir = (mob.Position - center);
+                var knockDist = knockDir.Length;
+                if (knockDist > 0)
+                {
+                    knockDir = knockDir.Normalized;
+                    mob.Velocity = mob.Velocity + new Vector3(knockDir.X * damage * 0.3f, damage * 0.2f, knockDir.Z * damage * 0.3f);
+                }
+                mob.TakeDamage(damage, "explosion");
+            }
+        };
+        _explosionSystem.OnBlockDamaged += (x, y, z, oldType, newType) =>
+        {
+            if (_hubContext != null)
+            {
+                _ = _hubContext.Clients.All.OnBlockUpdate(x, y, z, newType);
+            }
+        };
+
+        _entityManager.ProjectileHitPlayer += (player, projectile) =>
+        {
+            var knockVel = _knockbackSystem.CalculateKnockback(
+                projectile.Position, player.Position, projectile.Damage,
+                Vector3.Distance(projectile.Position, player.Position));
+            DamagePlayer(player, projectile.Damage, $"{projectile.OwnerName}'s {projectile.ProjectileType}");
+            if (_hubContext != null)
+            {
+                _ = _hubContext.Clients.Client(player.ConnectionId)
+                    .OnKnockback(knockVel.X, knockVel.Y, knockVel.Z);
+            }
+        };
 
         _entityManager.OnEntityDespawned += entity =>
         {
@@ -351,6 +407,41 @@ public class GameServer
         GameTime = (GameTime + (long)(TimeSpeed * 100)) % _config.DayNight.CycleLength;
         DayNight.Update(GameTime);
         _weatherSystem.Update(GameTime);
+
+        if (_tickCount % 20 == 0 && _weatherSystem.TryGenerateLightning(out var lx, out var ly, out var lz))
+        {
+            if (_hubContext != null)
+            {
+                _ = _hubContext.Clients.All.OnSpawnParticle(
+                    "lightning", lx + 0.5f, ly + 10, lz + 0.5f,
+                    0, 0, 0, 0.5f);
+            }
+
+            foreach (var player in _players.Values)
+            {
+                if (player.State != PlayerState.Playing || player.IsDead || player.Invulnerable) continue;
+                var dist = Vector3.Distance(player.Position, new Vector3(lx + 0.5f, ly, lz + 0.5f));
+                if (dist < 5f)
+                {
+                    DamagePlayer(player, 8f * (1f - dist / 5f), "lightning");
+                }
+            }
+
+            var lightningPos = new Vector3s((short)lx, (short)ly, (short)lz);
+            var fireBlock = DefaultWorld.GetBlock(lightningPos);
+            if (fireBlock.Type == BlockType.Air)
+            {
+                var groundBelow = DefaultWorld.GetBlock(new Vector3s((short)lx, (short)(ly - 1), (short)lz));
+                if (groundBelow.Type != BlockType.Air && groundBelow.Type != BlockType.Water)
+                {
+                    DefaultWorld.SetBlock(lightningPos, new Block(BlockType.Fire));
+                    if (_hubContext != null)
+                    {
+                        _ = _hubContext.Clients.All.OnBlockUpdate(lx, ly, lz, (uint)BlockType.Fire);
+                    }
+                }
+            }
+        }
 
         foreach (var player in _players.Values)
         {

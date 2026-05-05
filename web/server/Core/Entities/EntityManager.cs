@@ -74,6 +74,8 @@ public class EntityManager
             }
         }
 
+        ProcessProjectileCollisions();
+
         var deadEntities = _entities.Values.Where(e => !e.IsAlive).ToList();
         foreach (var entity in deadEntities)
         {
@@ -81,4 +83,52 @@ public class EntityManager
             _entities.TryRemove(entity.Id, out _);
         }
     }
+
+    private void ProcessProjectileCollisions()
+    {
+        var players = GetPlayersFunc?.Invoke();
+        if (players == null) return;
+
+        var projectiles = _entities.Values
+            .OfType<ProjectileEntity>()
+            .Where(p => p.IsAlive)
+            .ToList();
+
+        foreach (var proj in projectiles)
+        {
+            var mobs = _entities.Values
+                .Where(e => e is MobEntity mob && mob.IsAlive && proj.CanHitEntity(mob))
+                .ToList();
+
+            foreach (var entity in mobs)
+            {
+                if (Vector3.Distance(proj.Position, entity.Position) < 0.8f)
+                {
+                    if (entity is MobEntity mob)
+                    {
+                        mob.TakeDamage(proj.Damage, "fleshy");
+                        var knockDir = (mob.Position - proj.Position).Normalized;
+                        mob.Velocity = mob.Velocity + new Vector3(knockDir.X * 0.5f, 0.3f, knockDir.Z * 0.5f);
+                    }
+                    proj.OnHit();
+                    break;
+                }
+            }
+
+            if (!proj.IsAlive) continue;
+
+            foreach (var player in players)
+            {
+                if (player.IsDead || player.Invulnerable) continue;
+                if (Vector3.Distance(proj.Position, player.Position) < 0.8f)
+                {
+                    ProjectileHitPlayer?.Invoke(player, proj);
+                    proj.OnHit();
+                    break;
+                }
+            }
+        }
+    }
+
+    public event Action<PlayerEnt, ProjectileEntity>? ProjectileHitPlayer;
 }

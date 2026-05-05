@@ -247,6 +247,87 @@ public enum MobState
     Attack
 }
 
+public class ProjectileEntity : Entity
+{
+    public string ProjectileType { get; set; } = "arrow";
+    public string OwnerName { get; set; } = "";
+    public Guid OwnerId { get; set; }
+    public float Damage { get; set; } = 4.0f;
+    public float LifetimeSeconds { get; set; } = 60.0f;
+    public DateTime SpawnTime { get; set; } = DateTime.UtcNow;
+    public int PierceLevel { get; set; }
+    private int _hitCount;
+
+    public ProjectileEntity(string projectileType, Vector3 position, Vector3 velocity, string ownerName, Guid ownerId, float damage)
+        : base(EntityType.Projectile)
+    {
+        ProjectileType = projectileType;
+        Position = position;
+        Velocity = velocity;
+        OwnerName = ownerName;
+        OwnerId = ownerId;
+        Damage = damage;
+        Health = 1;
+    }
+
+    public override void Update(float dt)
+    {
+        base.Update(dt);
+
+        if ((DateTime.UtcNow - SpawnTime).TotalSeconds > LifetimeSeconds || !IsAlive)
+        {
+            Health = 0;
+            OnEntityDespawn?.Invoke(this);
+            return;
+        }
+
+        Velocity = new Vector3(Velocity.X, Velocity.Y - 9.81f * dt, Velocity.Z);
+        var drag = 0.99f;
+        Velocity = new Vector3(Velocity.X * drag, Velocity.Y * drag, Velocity.Z * drag);
+
+        var newPos = Position + Velocity * dt;
+
+        if (WorldReference != null)
+        {
+            var blockX = (short)Math.Floor(newPos.X);
+            var blockY = (short)Math.Floor(newPos.Y);
+            var blockZ = (short)Math.Floor(newPos.Z);
+            var block = WorldReference.GetBlock(new Vector3s(blockX, blockY, blockZ));
+
+            if (block.Type != BlockType.Air
+                && block.Type != BlockType.Water
+                && block.Type != BlockType.WaterFlowing
+                && block.Type != BlockType.Lava
+                && block.Type != BlockType.LavaFlowing)
+            {
+                Health = 0;
+                OnEntityDespawn?.Invoke(this);
+                return;
+            }
+        }
+
+        Position = newPos;
+    }
+
+    public bool CanHitEntity(Entity entity)
+    {
+        if (!IsAlive) return false;
+        if (entity.Id == OwnerId) return false;
+        if (_hitCount > PierceLevel) return false;
+        return true;
+    }
+
+    public void OnHit()
+    {
+        _hitCount++;
+        if (_hitCount > PierceLevel)
+        {
+            Health = 0;
+            OnEntityDespawn?.Invoke(this);
+        }
+    }
+}
+
 public class MobEntity : Entity
 {
     public static Func<Vector3, float, PlayerEnt?>? FindNearestPlayer { get; set; }

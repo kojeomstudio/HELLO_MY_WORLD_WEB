@@ -44,7 +44,15 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Agriculture**: Farmable crops (wheat, carrot, potato), farmland hydration
 - **Persistence**: Player data, world chunks, block metadata, chest inventories, node timers, and player privileges saved to disk
 - **Server-Authoritative Physics**: Anti-cheat with speed validation, teleport detection, noclip prevention, position correction
-- **PvP**: Distance check, weapon damage with Minetest knockback formula
+- **Lightning Damage**: Thunderstorm lightning strikes damage nearby players (falloff over 5 blocks) and can ignite fires on exposed surfaces
+- **Explosion System**: Radius-based block destruction with per-block resistance, item drops, entity/player damage with knockback, rollback integration
+- **Projectile System**: Arrow/snowball entities with gravity, drag, block collision, entity hit detection, and piercing support
+- **PvP Combat**: Players attack each other (6-block range) via `AttackPlayer` hub method, requires `pvp` privilege, knockback and damage tracking
+- **Smooth Lighting**: Per-face smooth lighting from 4 neighbor light samples for improved visual quality
+- **Param2 Color Palette**: Wool blocks and colorable blocks support 32 colors via param2, with generic RGB palette for other blocks
+- **Client Prediction**: Smooth position interpolation for server corrections (<2 blocks lerp), hard snap for large corrections
+- **Cascade Shadow Map Rendering**: 3-cascade CSM fully wired into main render pipeline with depth rendering
+- **Auto Exposure Pipeline**: ACES tone mapping with luminance-based auto-exposure integrated into post-processing
 - **PvM**: Player vs mob combat with damage, knockback, and mob death drops
 - **Fishing System**: Cast, wait, bite, reel phases with catch probabilities; accessible via hub methods
 - **Breeding System**: Feed animals (cow/pig with wheat, chicken with seeds) to breed with baby mobs
@@ -237,7 +245,7 @@ web/
 │   │   ├── Auth/                 # Authentication, privileges, protection, ban DB
 │   │   ├── Chat/                 # Chat commands with privilege checks
 │   │   ├── Crafting/             # Crafting system
-│   │   ├── Entities/             # Entities, mobs (with AI states), spawner, fishing, breeding
+│   │   ├── Entities/             # Entities, mobs (with AI states), spawner, fishing, breeding, projectiles
 │   │   ├── Game/                 # Block definitions
 │   │   ├── Inventory/            # Detached inventory manager
 │   │   ├── Particles/            # Particle spawner specs
@@ -252,7 +260,7 @@ web/
 │   │   ├── AsyncJobSystem.cs     # Background job queue with progress tracking
 │   │   ├── UI/                   # Formspec parser and system
 │   │   ├── Weather/              # Server weather system (rain, snow, thunderstorm)
-│   │   └── World/                # World, chunks, generators, lighting, ABMs, redstone
+│   │   └── World/                # World, chunks, generators, lighting, ABMs, redstone, explosions
 │       │       ├── Generators/       # MapgenV5, V6, V7, Noise, Valleys, Carpathian, Fractal, Singlenode, Flat
     │       │   ├── NoiseSystem.cs        # Shared PerlinNoise, NoiseParams, PcgRandom, NoiseBuffer
 │   │       │   ├── LSystemTree.cs        # L-system tree generation engine

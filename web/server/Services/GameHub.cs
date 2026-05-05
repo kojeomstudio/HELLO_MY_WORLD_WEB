@@ -2797,4 +2797,78 @@ public class GameHub : Hub<IGameClient>
 
         await Clients.Caller.OnMinimapModes(modes);
     }
+
+    public async Task AttackPlayer(string targetName, float damage)
+    {
+        if (!CheckRateLimit(Context.ConnectionId, "attack", 300)) return;
+        var attacker = GetAuthenticatedPlayer();
+        if (attacker == null) return;
+        if (!_gameServer.Privileges.HasPrivilege(attacker.Name, "pvp")) return;
+        if (string.IsNullOrEmpty(targetName) || targetName.Length > 32) return;
+        if (targetName.Equals(attacker.Name, StringComparison.OrdinalIgnoreCase)) return;
+        damage = Math.Clamp(damage, 0.1f, 100f);
+
+        var target = _gameServer.GetPlayer(targetName);
+        if (target == null || target.IsDead || target.Invulnerable) return;
+
+        var dist = Vector3.Distance(attacker.Position, target.Position);
+        if (dist > 6f) return;
+
+        var knockVel = _gameServer.DamagePlayerWithKnockback(target, damage, attacker.Position, "pvp");
+        attacker.Statistics.AddDamageDealt((int)Math.Ceiling(damage));
+
+        await Clients.Client(target.ConnectionId)
+            .OnKnockback(knockVel.X, knockVel.Y, knockVel.Z);
+
+        await Clients.Caller.OnChatMessage("Server", $"Hit {targetName} for {(int)damage} damage", "system");
+    }
+
+    public async Task ShootProjectile(
+        string projectileType, float posX, float posY, float posZ,
+        float velX, float velY, float velZ, float damage)
+    {
+        if (!CheckRateLimit(Context.ConnectionId, "projectile", 200)) return;
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
+        if (!_gameServer.Privileges.HasPrivilege(player.Name, "interact")) return;
+        if (string.IsNullOrEmpty(projectileType) || projectileType.Length > 32) return;
+        projectileType = SanitizeChatMessage(projectileType, 32);
+        damage = Math.Clamp(damage, 0.1f, 50f);
+
+        var speed = MathF.Sqrt(velX * velX + velY * velY + velZ * velZ);
+        if (speed > 100f)
+        {
+            var scale = 100f / speed;
+            velX *= scale;
+            velY *= scale;
+            velZ *= scale;
+        }
+
+        var projectile = new ProjectileEntity(
+            projectileType,
+            new Vector3(posX, posY, posZ),
+            new Vector3(velX, velY, velZ),
+            player.Name,
+            player.Id,
+            damage);
+        _entityManager.Add(projectile);
+    }
+
+    public async Task TriggerExplosion(float x, float y, float z, float radius, float power)
+    {
+        if (!CheckRateLimit(Context.ConnectionId, "explosion", 100)) return;
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
+        if (!_gameServer.Privileges.HasPrivilege(player.Name, "server")) return;
+
+        radius = Math.Clamp(radius, 1f, 50f);
+        power = Math.Clamp(power, 1f, 50f);
+
+        _gameServer.Explosions.Explode(new Vector3(x, y, z), radius, power, player.Name);
+        _gameServer.Explosions.DamageEntitiesFromExplosion(
+            new Vector3(x, y, z), radius, power, _gameServer.OnlinePlayers);
+
+        await Clients.All.OnSpawnParticle(
+            "explosion", x, y, z, 0, 5, 0, 2.0f);
+    }
 }

@@ -7,6 +7,40 @@ const LIGHT_OFFSETS: [number, number][] = [[-1, -1], [-1, 0], [0, -1], [0, 0]];
 let leavesStyle: 'fancy' | 'simple' = 'fancy';
 let translucentLiquids: boolean = true;
 
+const WOOL_COLORS: string[] = [
+    '#FFFFFF', '#DB7D2E', '#B02E26', '#A4662D',
+    '#243B53', '#6E8CBB', '#B1746A', '#575C5E',
+    '#3E2912', '#3FAA73', '#8C7A42', '#9E6B38',
+    '#3B49AF', '#7533B4', '#C76018', '#696969',
+    '#C0C0C0', '#F0A030', '#E84040', '#D08850',
+    '#5080C0', '#90B0E0', '#D09898', '#A0A0A0',
+    '#6B4C2A', '#60D090', '#C0B060', '#C09060',
+    '#6070D0', '#9050C0', '#E07030', '#909090'
+];
+
+function applyParam2Color(color: THREE.Color, blockDef: any, param2: number): THREE.Color {
+    if (!blockDef.paramType2 || !blockDef.paramType2.includes('color')) return color;
+    if (blockDef.palette === 'wool' || blockDef.palette === 'dye') {
+        const idx = param2 & 0x0F;
+        if (idx < WOOL_COLORS.length) {
+            return new THREE.Color(WOOL_COLORS[idx]);
+        }
+    }
+    if (blockDef.paramType2 === 'color' || blockDef.paramType2 === 'colored') {
+        const r = ((param2 >> 5) & 0x07) / 7;
+        const g = ((param2 >> 2) & 0x07) / 7;
+        const b = (param2 & 0x03) / 3;
+        return new THREE.Color(r, g, b);
+    }
+    if (blockDef.paramType2 === 'colorwallmounted' || blockDef.paramType2 === 'colorfacedir') {
+        const paletteIdx = param2 >> 4;
+        if (paletteIdx < WOOL_COLORS.length) {
+            return new THREE.Color(WOOL_COLORS[paletteIdx]);
+        }
+    }
+    return color;
+}
+
 export function setLeavesStyle(style: 'fancy' | 'simple'): void {
     leavesStyle = style;
 }
@@ -51,6 +85,40 @@ function getBlockLight(ctx: BuildCtx, wx: number, wy: number, wz: number): numbe
     return Math.max(ctx.getNeighborLight(wx, wy, wz) / 15.0, 0.1);
 }
 
+function getSmoothLight(ctx: BuildCtx, wx: number, wy: number, wz: number, face: string): number {
+    if (ctx.isLight) return 1.0;
+
+    let offsets: [number, number, number][];
+    switch (face) {
+        case 'top':
+            offsets = [[-1, 1, -1], [0, 1, -1], [-1, 1, 0], [0, 1, 0]];
+            break;
+        case 'bottom':
+            offsets = [[-1, -1, -1], [0, -1, -1], [-1, -1, 0], [0, -1, 0]];
+            break;
+        case 'north':
+            offsets = [[-1, -1, -1], [0, -1, -1], [-1, 0, -1], [0, 0, -1]];
+            break;
+        case 'south':
+            offsets = [[-1, -1, 0], [0, -1, 0], [-1, 0, 0], [0, 0, 0]];
+            break;
+        case 'east':
+            offsets = [[0, -1, -1], [0, -1, 0], [0, 0, -1], [0, 0, 0]];
+            break;
+        case 'west':
+            offsets = [[-1, -1, -1], [-1, -1, 0], [-1, 0, -1], [-1, 0, 0]];
+            break;
+        default:
+            return getBlockLight(ctx, wx, wy, wz);
+    }
+
+    let total = 0;
+    for (const [dx, dy, dz] of offsets) {
+        total += ctx.getNeighborLight(wx + dx, wy + dy, wz + dz);
+    }
+    return Math.max(total / (offsets.length * 15.0), 0.1);
+}
+
 function pushQuad(
     ctx: BuildCtx, wx: number, wy: number, wz: number,
     c0: number[], c1: number[], c2: number[], c3: number[],
@@ -80,12 +148,19 @@ function pushBox(
     x0: number, y0: number, z0: number, x1: number, y1: number, z1: number,
     color: THREE.Color, lightMult: number
 ): void {
-    pushQuad(ctx, wx, wy, wz, [x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1], [0, 1, 0], color, lightMult, 1.1);
-    pushQuad(ctx, wx, wy, wz, [x0, y0, z1], [x1, y0, z1], [x1, y0, z0], [x0, y0, z0], [0, -1, 0], color, lightMult, 0.7);
-    pushQuad(ctx, wx, wy, wz, [x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0], [0, 0, -1], color, lightMult, 1.0);
-    pushQuad(ctx, wx, wy, wz, [x1, y0, z1], [x0, y0, z1], [x0, y1, z1], [x1, y1, z1], [0, 0, 1], color, lightMult, 1.0);
-    pushQuad(ctx, wx, wy, wz, [x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1], [1, 0, 0], color, lightMult, 1.0);
-    pushQuad(ctx, wx, wy, wz, [x0, y0, z1], [x0, y1, z1], [x0, y1, z0], [x0, y0, z0], [-1, 0, 0], color, lightMult, 1.0);
+    const topLight = Math.max(lightMult, getSmoothLight(ctx, wx, wy, wz, 'top'));
+    const bottomLight = Math.max(lightMult, getSmoothLight(ctx, wx, wy, wz, 'bottom'));
+    const northLight = Math.max(lightMult, getSmoothLight(ctx, wx, wy, wz, 'north'));
+    const southLight = Math.max(lightMult, getSmoothLight(ctx, wx, wy, wz, 'south'));
+    const eastLight = Math.max(lightMult, getSmoothLight(ctx, wx, wy, wz, 'east'));
+    const westLight = Math.max(lightMult, getSmoothLight(ctx, wx, wy, wz, 'west'));
+
+    pushQuad(ctx, wx, wy, wz, [x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1], [0, 1, 0], color, topLight, 1.1);
+    pushQuad(ctx, wx, wy, wz, [x0, y0, z1], [x1, y0, z1], [x1, y0, z0], [x0, y0, z0], [0, -1, 0], color, bottomLight, 0.7);
+    pushQuad(ctx, wx, wy, wz, [x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0], [0, 0, -1], color, northLight, 1.0);
+    pushQuad(ctx, wx, wy, wz, [x1, y0, z1], [x0, y0, z1], [x0, y1, z1], [x1, y1, z1], [0, 0, 1], color, southLight, 1.0);
+    pushQuad(ctx, wx, wy, wz, [x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1], [1, 0, 0], color, eastLight, 1.0);
+    pushQuad(ctx, wx, wy, wz, [x0, y0, z1], [x0, y1, z1], [x0, y1, z0], [x0, y0, z0], [-1, 0, 0], color, westLight, 1.0);
 }
 
 function rotateStairCoord(x: number, y: number, z: number, rot: number): number[] {
@@ -874,7 +949,8 @@ export class ChunkMesh {
                     const worldY = this.chunkY * CHUNK_SIZE + y;
                     const worldZ = this.chunkZ * CHUNK_SIZE + z;
                     const param2 = this.getParam2(x, y, z);
-                    const color = new THREE.Color(blockDef.color);
+                    const baseColor = new THREE.Color(blockDef.color);
+                    const color = applyParam2Color(baseColor, blockDef, param2);
                     const isLight = blockRegistry.isLightSource(blockId);
                     const isTransparent = blockDef.transparent === true && !(blockDef.liquid === true && !translucentLiquids);
 

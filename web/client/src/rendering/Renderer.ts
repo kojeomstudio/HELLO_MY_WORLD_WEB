@@ -745,10 +745,18 @@ export class Renderer {
         if (this.cascadeShadowMap.isEnabled()) {
             this.cascadeShadowMap.updateCascades(this.camera, this.skyLight.position);
             this.cascadeShadowMap.applyToLight(this.skyLight);
+            this.cascadeShadowMap.renderCascades(this.renderer, this.scene);
         }
 
         if (this.composer && this.postProcessingEnabled) {
             this.composer.render();
+
+            if (this.autoExposurePass && this.autoExposurePass.isEnabled()) {
+                const readBuffer = this.composer.readBuffer;
+                if (readBuffer) {
+                    this.autoExposurePass.render(this.renderer, readBuffer.texture);
+                }
+            }
         } else {
             this.renderer.render(this.scene, this.camera);
         }

@@ -79,6 +79,12 @@ export class PlayerController {
     inventory: any[] = [];
     isDead: boolean = false;
 
+    private _predictionBuffer: { sequence: number; position: THREE.Vector3; timestamp: number }[] = [];
+    private _serverReconciliation: boolean = true;
+    private _lastServerPosition: THREE.Vector3 = new THREE.Vector3();
+    private _reconciliationThreshold: number = 2.0;
+    private _positionLerpFactor: number = 0.3;
+
     constructor(camera: THREE.PerspectiveCamera, input: InputManager) {
         this._camera = camera;
         this._input = input;
@@ -792,8 +798,25 @@ export class PlayerController {
     }
 
     applyServerCorrection(x: number, y: number, z: number): void {
-        this._position.set(x, y, z);
-        this._velocity.set(0, 0, 0);
+        const serverPos = new THREE.Vector3(x, y, z);
+        this._lastServerPosition.copy(serverPos);
+
+        if (this._serverReconciliation) {
+            const diff = this._position.distanceTo(serverPos);
+            if (diff > this._reconciliationThreshold) {
+                this._position.copy(serverPos);
+                this._velocity.set(0, 0, 0);
+            } else if (diff > 0.1) {
+                this._position.lerp(serverPos, this._positionLerpFactor);
+            }
+        } else {
+            this._position.copy(serverPos);
+            this._velocity.set(0, 0, 0);
+        }
+
+        this._predictionBuffer = this._predictionBuffer.filter(
+            p => p.timestamp > performance.now() - 2000
+        );
     }
 
     setFlying(flying: boolean): void {
