@@ -398,7 +398,8 @@ export class GameClient {
             this.uiManager.clearHudElements();
         });
 
-        this.connection.on('OnModChannelMessage', (_channel: string, _sender: string, _message: string) => {
+        this.connection.on('OnModChannelMessage', (channel: string, sender: string, message: string) => {
+            ModLoader.handleModChannelMessage(channel, sender, message);
         });
 
         this.connection.on('OnAddParticleSpawner', (spawnerId: number, posX: number, posY: number, posZ: number,
@@ -419,10 +420,17 @@ export class GameClient {
             this.particleSystem.removeSpawner(spawnerId);
         });
 
-        this.connection.on('OnItemDefinitions', (_definitionsJson: string) => {
+        this.connection.on('OnItemDefinitions', (definitionsJson: string) => {
+            try {
+                const items = JSON.parse(definitionsJson);
+                if (Array.isArray(items)) {
+                    this.itemRegistry.loadFromServer(items);
+                }
+            } catch { }
         });
 
-        this.connection.on('OnMinimapModes', (_modes: string[]) => {
+        this.connection.on('OnMinimapModes', (modes: string[]) => {
+            this.minimap.setAvailableModes(modes);
         });
     }
 

@@ -1462,7 +1462,8 @@ export class UIManager {
         this.waypointOverlay.innerHTML = '';
         for (const wp of this.waypoints) {
             const div = document.createElement('div');
-            div.style.cssText = `color:${wp.color};font-size:12px;text-shadow:1px 1px 2px black;text-align:center;margin:2px 0;white-space:nowrap;`;
+            const safeColor = /^#[0-9a-fA-F]{3,8}$/.test(wp.color) ? wp.color : '#ffffff';
+            div.style.cssText = `color:${safeColor};font-size:12px;text-shadow:1px 1px 2px black;text-align:center;margin:2px 0;white-space:nowrap;`;
             if (camera) {
                 const dx = wp.x - camera.position.x;
                 const dy = wp.y - (camera.position.y + 1.6);

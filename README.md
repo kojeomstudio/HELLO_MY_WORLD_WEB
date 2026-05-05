@@ -411,7 +411,7 @@ The Vite dev server proxies `/game` to the server.
 | /privs [player] | Show privileges |
 | /grant player priv | Grant privilege (no self-grant; basic_privs limited to interact/shout) |
 | /revoke player priv | Revoke privilege |
-| /password <pw> | Set your account password |
+| /password <new_pw> <current_pw> | Set your account password (requires current password if one exists) |
 | /ban player | Ban player |
 | /unban player | Unban player |
 | /kick player | Kick player |

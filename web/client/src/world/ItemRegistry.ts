@@ -120,4 +120,10 @@ export class ItemRegistry {
     getItemColor(itemId: string): string | undefined {
         return this.itemColors.get(itemId);
     }
+
+    loadFromServer(items: Array<{ name: string; type: string; stackable?: boolean; maxStack?: number; blockId?: number }>): void {
+        for (const item of items) {
+            this.items.set(item.name, item);
+        }
+    }
 }

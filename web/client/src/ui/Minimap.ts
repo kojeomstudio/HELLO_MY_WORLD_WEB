@@ -9,6 +9,7 @@ export class Minimap {
     private ctx: CanvasRenderingContext2D;
     private worldManager: WorldManager;
     private mode: 'surface' | 'radar' | 'normal' = 'surface';
+    private availableModes: Array<'surface' | 'radar' | 'normal'> = ['surface', 'radar', 'normal'];
     private updateTimer: number = 0;
     private updateInterval: number = 0.5;
     private container: HTMLElement;
@@ -35,11 +36,26 @@ export class Minimap {
         this.container.appendChild(this.canvas);
 
         this.canvas.addEventListener('click', () => {
-            const modes: Array<'surface' | 'radar' | 'normal'> = ['surface', 'radar', 'normal'];
-            const currentIdx = modes.indexOf(this.mode);
-            this.mode = modes[(currentIdx + 1) % modes.length];
+            const currentIdx = this.availableModes.indexOf(this.mode);
+            this.mode = this.availableModes[(currentIdx + 1) % this.availableModes.length];
             this.canvas.style.borderRadius = this.mode === 'surface' ? '50%' : '4px';
         });
+    }
+
+    setAvailableModes(modes: string[]): void {
+        const valid: Array<'surface' | 'radar' | 'normal'> = [];
+        for (const m of modes) {
+            if (m === 'surface' || m === 'radar' || m === 'normal') {
+                valid.push(m);
+            }
+        }
+        if (valid.length > 0) {
+            this.availableModes = valid;
+            if (!valid.includes(this.mode)) {
+                this.mode = valid[0];
+                this.canvas.style.borderRadius = this.mode === 'surface' ? '50%' : '4px';
+            }
+        }
     }
 
     setPosition(x: number, y: number, z: number, yaw: number): void {

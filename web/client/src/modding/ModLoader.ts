@@ -5,6 +5,7 @@ export interface GameMod {
     onInit?(api: ModAPI): void;
     onUpdate?(dt: number, api: ModAPI): void;
     onChatMessage?(message: string, api: ModAPI): void;
+    onModChannelMessage?(channel: string, sender: string, message: string, api: ModAPI): void;
     onDestroy?(): void;
 }
 
@@ -92,6 +93,13 @@ class ModLoaderImpl {
 
     getLoadedMods(): string[] {
         return Array.from(this.mods.keys());
+    }
+
+    handleModChannelMessage(channel: string, sender: string, message: string): void {
+        const api = this.getAPI();
+        for (const mod of this.mods.values()) {
+            mod.onModChannelMessage?.(channel, sender, message, api);
+        }
     }
 }
 

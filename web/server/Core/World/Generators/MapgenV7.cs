@@ -365,6 +365,72 @@ public class MapgenV7 : IWorldGenerator
                 }
             }
         }
+
+        GenerateLargeCaves(blocks, baseX, baseY, baseZ);
+    }
+
+    private void GenerateLargeCaves(ushort[,,] blocks, int baseX, int baseY, int baseZ)
+    {
+        if (baseY > _largeCaveDepth + ChunkSize) return;
+
+        var rng = new Random(_seed ^ (baseX * 73856093) ^ (baseY * 19349663) ^ (baseZ * 83492791));
+        var numLargeCaves = rng.Next(0, _largeCaveNumMax + 1);
+
+        for (int i = 0; i < numLargeCaves; i++)
+        {
+            var cx = baseX + rng.Next(2, ChunkSize - 2);
+            var cy = baseY + rng.Next(2, ChunkSize - 2);
+            var cz = baseZ + rng.Next(2, ChunkSize - 2);
+
+            var flooded = rng.Next(100) < _largeCaveFlooded;
+            var length = rng.Next(10, 40);
+            var dx = (float)(rng.NextDouble() * 2 - 1) * 0.5f;
+            var dy = (float)(rng.NextDouble() * 0.4 - 0.2);
+            var dz = (float)(rng.NextDouble() * 2 - 1) * 0.5f;
+            var radius = 1.5f + (float)rng.NextDouble() * 2.5f;
+
+            for (int s = 0; s < length; s++)
+            {
+                var lx = (int)(cx + dx * s);
+                var ly = (int)(cy + dy * s);
+                var lz = (int)(cz + dz * s);
+
+                var localX = lx - baseX;
+                var localY = ly - baseY;
+                var localZ = lz - baseZ;
+
+                if (localX < 0 || localX >= ChunkSize || localY < 0 || localY >= ChunkSize
+                    || localZ < 0 || localZ >= ChunkSize) continue;
+
+                var r = (int)radius;
+                for (int ox = -r; ox <= r; ox++)
+                {
+                    for (int oy = -r; oy <= r; oy++)
+                    {
+                        for (int oz = -r; oz <= r; oz++)
+                        {
+                            if (ox * ox + oy * oy + oz * oz > radius * radius) continue;
+                            var bx = localX + ox;
+                            var by = localY + oy;
+                            var bz = localZ + oz;
+                            if (bx < 0 || bx >= ChunkSize || by < 0 || by >= ChunkSize
+                                || bz < 0 || bz >= ChunkSize) continue;
+                            var bt = blocks[bx, by, bz];
+                            if (bt == (ushort)BlockType.Bedrock) continue;
+                            if (bt == (ushort)BlockType.Air) continue;
+                            if (flooded && ly + oy <= WaterLevel)
+                                blocks[bx, by, bz] = (ushort)BlockType.Water;
+                            else
+                                blocks[bx, by, bz] = (ushort)BlockType.Air;
+                        }
+                    }
+                }
+
+                dx += (float)(rng.NextDouble() - 0.5) * 0.3f;
+                dy += (float)(rng.NextDouble() - 0.5) * 0.1f;
+                dz += (float)(rng.NextDouble() - 0.5) * 0.3f;
+            }
+        }
     }
 
     private void CarveCaverns(ushort[,,] blocks, int baseX, int baseY, int baseZ)

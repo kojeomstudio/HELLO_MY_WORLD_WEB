@@ -648,6 +648,8 @@ builder.Services.AddSingleton<ChatCommandManager>(sp =>
             }
             catch { return false; }
         },
+        (password, storedHash) => AuthenticationService.VerifyPassword(password, storedHash),
+        sp.GetRequiredService<PlayerDatabase>(),
         (itemId) => {
             var blockDefMgr = sp.GetRequiredService<BlockDefinitionManager>();
             if (blockDefMgr.GetByName(itemId) != null) return true;

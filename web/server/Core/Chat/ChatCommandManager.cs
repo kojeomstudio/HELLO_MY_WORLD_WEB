@@ -49,6 +49,8 @@ public class ChatCommandManager
     private readonly Func<string, string, string, bool>? _sendPrivateMessage;
     private readonly AreaProtectionSystem? _areaProtection;
     private readonly Func<string, string, bool>? _setPassword;
+    private readonly Func<string, string, bool>? _verifyPassword;
+    private readonly PlayerDatabase? _playerDb;
     private readonly Func<string, bool>? _isValidItemId;
     private readonly Func<string, bool>? _isValidEntityType;
     private readonly Action<string, float>? _setPlayerHp;
@@ -109,6 +111,8 @@ public class ChatCommandManager
         Func<string, string, string, bool>? sendPrivateMessage = null,
         AreaProtectionSystem? areaProtection = null,
         Func<string, string, bool>? setPassword = null,
+        Func<string, string, bool>? verifyPassword = null,
+        PlayerDatabase? playerDb = null,
         Func<string, bool>? isValidItemId = null,
         Func<string, bool>? isValidEntityType = null,
         Action<string, float>? setPlayerHp = null,
@@ -168,6 +172,8 @@ public class ChatCommandManager
         _sendPrivateMessage = sendPrivateMessage;
         _areaProtection = areaProtection;
         _setPassword = setPassword;
+        _verifyPassword = verifyPassword;
+        _playerDb = playerDb;
         _isValidItemId = isValidItemId;
         _isValidEntityType = isValidEntityType;
         _setPlayerHp = setPlayerHp;
@@ -574,10 +580,19 @@ public class ChatCommandManager
             (playerName, args) =>
             {
                 if (_setPassword == null) return Task.FromResult("Password command is not available.");
-                if (args.Length == 0) return Task.FromResult("Usage: /password <new_password>");
-                var newPassword = string.Join(' ', args);
+                if (args.Length == 0) return Task.FromResult("Usage: /password <new_password> [current_password]");
+                var newPassword = args[0];
                 if (newPassword.Length < 8) return Task.FromResult("Password must be at least 8 characters.");
                 if (newPassword.Length > 128) return Task.FromResult("Password must be at most 128 characters.");
+                if (_verifyPassword != null && _playerDb != null)
+                {
+                    var existingHash = _playerDb.GetPasswordHash(playerName);
+                    if (existingHash != null)
+                    {
+                        if (args.Length < 2) return Task.FromResult("Current password required. Usage: /password <new_password> <current_password>");
+                        if (!_verifyPassword(args[1], existingHash)) return Task.FromResult("Current password is incorrect.");
+                    }
+                }
                 var success = _setPassword(playerName, newPassword);
                 return Task.FromResult(success ? "Password updated successfully." : "Failed to update password.");
             }, ""));
