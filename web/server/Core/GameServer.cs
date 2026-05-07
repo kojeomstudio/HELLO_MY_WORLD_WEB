@@ -878,7 +878,7 @@ public class GameServer
 
         var feetBlockY = (short)Math.Floor(player.Position.Y - _physicsEngine.PlayerHeight);
         var groundBlock = DefaultWorld.GetBlock(
-            new Vector3s((short)player.Position.X, feetBlockY, (short)player.Position.Z));
+            new Vector3s((short)Math.Floor(player.Position.X), feetBlockY, (short)Math.Floor(player.Position.Z)));
         player.IsOnGround = groundBlock.Type != BlockType.Air &&
                             groundBlock.Type != BlockType.Water &&
                             groundBlock.Type != BlockType.WaterFlowing &&
@@ -888,7 +888,7 @@ public class GameServer
 
         var liquidCheckY = (short)Math.Floor(player.Position.Y - _physicsEngine.PlayerHeight * 0.5);
         var liquidBlock = DefaultWorld.GetBlock(
-            new Vector3s((short)player.Position.X, liquidCheckY, (short)player.Position.Z));
+            new Vector3s((short)Math.Floor(player.Position.X), liquidCheckY, (short)Math.Floor(player.Position.Z)));
         player.IsInLiquid = liquidBlock.Type is BlockType.Water or BlockType.WaterFlowing or BlockType.Lava or BlockType.LavaFlowing or BlockType.RiverWater or BlockType.RiverWaterFlowing;
 
         if (!player.IsFlying && player.Mode != GameMode.Creative && player.Mode != GameMode.Spectator)

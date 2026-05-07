@@ -764,9 +764,10 @@ public class ChatCommandManager
             }));
 
         Register(new ChatCommand("worldinfo", "Show world information", new[] { "world" },
-            (_playerName, _args) =>
+            (playerName, _args) =>
             {
                 var seed = _getWorldSeed?.Invoke() ?? 0;
+                var hasServerPriv = _hasPrivilege?.Invoke(playerName) ?? false;
                 var name = _getWorldName?.Invoke() ?? "unknown";
                 var chunks = _getLoadedChunkCount?.Invoke() ?? 0;
                 var entities = _getEntityCount?.Invoke() ?? 0;
@@ -779,7 +780,7 @@ public class ChatCommandManager
                 {
                     $"--- World Info ---",
                     $"World: {name}",
-                    $"Seed: {seed}",
+                    hasServerPriv ? $"Seed: {seed}" : "Seed: [requires server privilege]",
                     $"Loaded chunks: {chunks}",
                     $"Active entities: {entities}",
                     $"Online players: {playerCount}",

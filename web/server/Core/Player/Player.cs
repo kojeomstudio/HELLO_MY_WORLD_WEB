@@ -120,7 +120,7 @@ public class Player
         FoodLevel = 20f;
         FoodSaturation = 5f;
         FallDistance = 0f;
-        LastGroundY = 0f;
+        IsDead = false;
     }
 
     public ItemStack? GetSelectedHotbarItem()

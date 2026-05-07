@@ -168,7 +168,7 @@ public class PhysicsEngine
         newPos = ResolveCollisions(newPos, state, world);
 
         var feetBlockY = (short)Math.Floor(newPos.Y - PlayerHeight);
-        var groundBlock = world.GetBlock(new Vector3s((short)newPos.X, (short)feetBlockY, (short)newPos.Z));
+        var groundBlock = world.GetBlock(new Vector3s((short)Math.Floor(newPos.X), (short)feetBlockY, (short)Math.Floor(newPos.Z)));
         var wasOnGround = state.IsOnGround;
         newState.IsOnGround = groundBlock.Type != BlockType.Air &&
                               groundBlock.Type != BlockType.Water &&
@@ -229,14 +229,14 @@ public class PhysicsEngine
     private bool IsInLiquid(Vector3 position, WorldMap world)
     {
         var feetBlockY = (short)Math.Floor(position.Y - PlayerHeight * 0.5);
-        var block = world.GetBlock(new Vector3s((short)position.X, (short)feetBlockY, (short)position.Z));
+        var block = world.GetBlock(new Vector3s((short)Math.Floor(position.X), (short)feetBlockY, (short)Math.Floor(position.Z)));
         return IsLiquid(block.Type);
     }
 
     private BlockType? GetLiquidBlock(Vector3 position, WorldMap world)
     {
         var feetBlockY = (short)Math.Floor(position.Y - PlayerHeight * 0.5);
-        var block = world.GetBlock(new Vector3s((short)position.X, (short)feetBlockY, (short)position.Z));
+        var block = world.GetBlock(new Vector3s((short)Math.Floor(position.X), (short)feetBlockY, (short)Math.Floor(position.Z)));
         return IsLiquid(block.Type) ? block.Type : null;
     }
 
@@ -389,16 +389,24 @@ public class PhysicsEngine
 
     private bool IsSolid(BlockType type)
     {
+        if (BlockDefs != null)
+        {
+            var def = BlockDefs.Get((ushort)type);
+            return def != null && def.Solid;
+        }
         return type != BlockType.Air &&
-               type != BlockType.Water &&
-               type != BlockType.Lava &&
+               type != BlockType.Water && type != BlockType.WaterFlowing &&
+               type != BlockType.Lava && type != BlockType.LavaFlowing &&
+               type != BlockType.RiverWater &&
                type != BlockType.Torch &&
                type != BlockType.Ladder;
     }
 
     private static bool IsLiquid(BlockType type)
     {
-        return type is BlockType.Water or BlockType.Lava;
+        return type is BlockType.Water or BlockType.WaterFlowing
+            or BlockType.Lava or BlockType.LavaFlowing
+            or BlockType.RiverWater;
     }
 }
 

@@ -556,7 +556,7 @@ builder.Services.AddSingleton<ActiveBlockModifierSystem>(sp =>
             var below = new Vector3s(pos.X, (short)(pos.Y - 1), pos.Z);
             var belowBlock = world.GetBlock(below);
             var belowDef = blockDefinitions.Get((ushort)belowBlock.Type);
-            if (belowDef == null || !belowDef.Solid) return true;
+            if (belowDef != null && belowDef.Solid) return false;
 
             world.SetBlock(pos, Block.Air);
             var itemEnt = new ItemEntity(blockDef.Drops ?? blockDef.Name ?? "", 1,

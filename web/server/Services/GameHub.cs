@@ -179,6 +179,8 @@ public class GameHub : Hub<IGameClient>
             await SendPlayerList();
         }
         _antiCheat.RemovePlayer(Context.ConnectionId);
+        _activeDigs.TryRemove(Context.ConnectionId, out _);
+        _lastActionTimes.TryRemove(Context.ConnectionId, out _);
         await base.OnDisconnectedAsync(exception);
     }
 
@@ -396,7 +398,7 @@ public class GameHub : Hub<IGameClient>
             {
                 if (result.StartsWith("LIGHTING:", StringComparison.OrdinalIgnoreCase))
                 {
-                    var parts = result.Substring(8).Split(':');
+                    var parts = result.Substring(9).Split(':');
                     if (parts.Length == 5 &&
                         float.TryParse(parts[0], out var shadow) &&
                         float.TryParse(parts[1], out var expMin) &&
@@ -596,7 +598,7 @@ public class GameHub : Hub<IGameClient>
                     }
                     else if (result.StartsWith("GETBLOCK:", StringComparison.OrdinalIgnoreCase))
                     {
-                        var parts = result.Substring(8).Split(':');
+                        var parts = result.Substring(9).Split(':');
                         if (parts.Length == 3 &&
                             int.TryParse(parts[0], out var bx) &&
                             int.TryParse(parts[1], out var by) &&
@@ -1164,6 +1166,7 @@ public class GameHub : Hub<IGameClient>
         else if (blockName == "bed")
         {
             player.SpawnPoint = new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
+            player.HasSpawnPoint = true;
             await Clients.Caller.OnChatMessage("Server", "Spawn point set", "system");
         }
         else if (blockName == "note_block" || blockName == "jukebox")
@@ -1201,8 +1204,8 @@ public class GameHub : Hub<IGameClient>
                 _ => BlockType.DoorWood
             };
             _gameServer.DefaultWorld.SetBlock(blockPos, new Block(isOpen ? closedBlockType : openBlockType));
-            await Clients.Caller.OnBlockUpdate(x, y, z, (uint)(isOpen ? (ushort)closedBlockType : (ushort)openBlockType));
-            await Clients.Caller.OnPlaySound("door", "interactive", isOpen ? "close" : "open", x + 0.5f, y + 0.5f, z + 0.5f, 0.5f);
+            await Clients.All.OnBlockUpdate(x, y, z, (uint)(isOpen ? (ushort)closedBlockType : (ushort)openBlockType));
+            await Clients.All.OnPlaySound("door", "interactive", isOpen ? "close" : "open", x + 0.5f, y + 0.5f, z + 0.5f, 0.5f);
         }
         else if (blockName == "lever")
         {
