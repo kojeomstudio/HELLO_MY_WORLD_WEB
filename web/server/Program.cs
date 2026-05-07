@@ -910,15 +910,19 @@ app.MapGet("/api/status", (GameServer server) => new
 
 app.MapGet("/api/profiler", (ServerProfiler profiler, GameServer server, HttpContext context) =>
 {
-    var playerName = context.Request.Query["token"].ToString();
-    if (string.IsNullOrEmpty(playerName) || !server.Privileges.HasPrivilege(playerName, "server"))
+    var playerName = context.Request.Headers["X-Auth-Player"].FirstOrDefault() ?? string.Empty;
+    var queryToken = context.Request.Query["token"].FirstOrDefault() ?? string.Empty;
+    var token = !string.IsNullOrEmpty(playerName) ? playerName : queryToken;
+    if (string.IsNullOrEmpty(token) || !server.Privileges.HasPrivilege(token, "server"))
         return Results.Unauthorized();
     return Results.Ok(profiler.GetSnapshot());
 });
 app.MapGet("/api/profiler/report", (ServerProfiler profiler, GameServer server, HttpContext context) =>
 {
-    var playerName = context.Request.Query["token"].ToString();
-    if (string.IsNullOrEmpty(playerName) || !server.Privileges.HasPrivilege(playerName, "server"))
+    var playerName = context.Request.Headers["X-Auth-Player"].FirstOrDefault() ?? string.Empty;
+    var queryToken = context.Request.Query["token"].FirstOrDefault() ?? string.Empty;
+    var token = !string.IsNullOrEmpty(playerName) ? playerName : queryToken;
+    if (string.IsNullOrEmpty(token) || !server.Privileges.HasPrivilege(token, "server"))
         return Results.Unauthorized();
     return Results.Ok(profiler.FormatReport());
 });

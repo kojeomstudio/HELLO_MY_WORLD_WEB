@@ -207,7 +207,7 @@ public class BlockDefinitionManager
             [(ushort)BlockType.EndStone] = new() { Id = 95, Name = "end_stone", Solid = true, Color = "#E8E0B8", Hardness = 3.0f, Groups = new() { ["cracky"] = 3 }, SoundGroup = "stone" },
             [(ushort)BlockType.PurpurBlock] = new() { Id = 96, Name = "purpur_block", Solid = true, Color = "#A86FCF", Hardness = 1.5f, Groups = new() { ["cracky"] = 2 }, SoundGroup = "stone" },
             [(ushort)BlockType.PurpurPillar] = new() { Id = 97, Name = "purpur_pillar", Solid = true, Color = "#8B5CBF", Hardness = 1.5f, Groups = new() { ["cracky"] = 2 }, SoundGroup = "stone" },
-            [(ushort)BlockType.Mycelium2] = new() { Id = 98, Name = "mycelium2", Solid = true, Color = "#6B5A8A", Hardness = 0.6f, Drops = "dirt", Groups = new() { ["crumbly"] = 3 }, SoundGroup = "dirt" },
+            [(ushort)BlockType.Mycelium2] = new() { Id = 98, Name = "huge_mushroom_red", Solid = true, Color = "#B22222", Hardness = 0.3f, Groups = new() { ["choppy"] = 3 }, SoundGroup = "wood" },
             [(ushort)BlockType.Podzol] = new() { Id = 99, Name = "podzol", Solid = true, Color = "#5C4827", Hardness = 0.5f, Drops = "dirt", Groups = new() { ["crumbly"] = 3 }, SoundGroup = "dirt" },
             [(ushort)BlockType.CoarseDirt] = new() { Id = 100, Name = "coarse_dirt", Solid = true, Color = "#6B5C48", Hardness = 0.5f, Groups = new() { ["crumbly"] = 3 }, SoundGroup = "dirt" },
             [(ushort)BlockType.DesertSand] = new() { Id = 101, Name = "desert_sand", Solid = true, Color = "#E8D5A3", Hardness = 0.5f, Falling = true, Groups = new() { ["crumbly"] = 3 }, SoundGroup = "sand" },

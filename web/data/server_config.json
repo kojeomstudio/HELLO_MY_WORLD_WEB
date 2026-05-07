@@ -95,6 +95,6 @@
         "enableHttpsRedirection": false,
         "hstsMaxAge": 31536000,
         "cspNonceSize": 16,
-        "maxConcurrentConnections": 0
+        "maxConcurrentConnections": 100
     }
 }
