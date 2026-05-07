@@ -241,7 +241,6 @@ export class PlayerController {
                 this.isDigging = true;
             })
             .catch(() => {
-                this.instantDig(ray);
             });
     }
 

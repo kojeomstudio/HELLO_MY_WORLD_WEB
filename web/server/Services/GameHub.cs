@@ -1358,6 +1358,9 @@ public class GameHub : Hub<IGameClient>
             }
             else if (blockName == "tnt")
             {
+                if (!_areaProtection.CanInteract(player.Name, x, y, z)
+                    && !_gameServer.Privileges.HasPrivilege(player.Name, "protection_bypass")) return;
+
                 var tntPos = new Vector3s((short)x, (short)y, (short)z);
                 _gameServer.DefaultWorld.SetBlock(tntPos, Block.Air);
                 await Clients.All.OnBlockUpdate(x, y, z, 0);
@@ -2468,7 +2471,7 @@ public class GameHub : Hub<IGameClient>
         }
     }
 
-    public async Task GridCraft(string resultItemId, int resultCount)
+    public async Task CraftByResult(string resultItemId, int resultCount)
     {
         if (!CheckRateLimit(Context.ConnectionId, "gridcraft2", 500)) return;
         if (string.IsNullOrEmpty(resultItemId) || resultItemId.Length > 100 || resultCount < 1 || resultCount > 999) return;

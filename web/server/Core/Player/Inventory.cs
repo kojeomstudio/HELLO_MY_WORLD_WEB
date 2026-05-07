@@ -3,6 +3,7 @@ namespace WebGameServer.Core.Player;
 public class Inventory
 {
     private readonly ItemStack?[] _slots;
+    private readonly object _lock = new();
     public int Size { get; }
     public int HotbarSize { get; } = 8;
 
@@ -17,68 +18,77 @@ public class Inventory
         get
         {
             if (index < 0 || index >= Size) return null;
-            return _slots[index];
+            lock (_lock) { return _slots[index]; }
         }
         set
         {
             if (index < 0 || index >= Size) return;
-            _slots[index] = value;
+            lock (_lock) { _slots[index] = value; }
         }
     }
 
     public bool AddItem(ItemStack item)
     {
-        var remaining = item.Count;
-
-        for (int i = 0; i < Size && remaining > 0; i++)
+        lock (_lock)
         {
-            if (_slots[i] != null && _slots[i]!.ItemId == item.ItemId && _slots[i]!.Count < 64)
-            {
-                var canAdd = Math.Min(remaining, 64 - _slots[i]!.Count);
-                _slots[i] = _slots[i]! with { Count = _slots[i]!.Count + canAdd };
-                remaining -= canAdd;
-            }
-        }
+            var remaining = item.Count;
 
-        for (int i = 0; i < Size && remaining > 0; i++)
-        {
-            if (_slots[i] == null)
+            for (int i = 0; i < Size && remaining > 0; i++)
             {
-                var canAdd = Math.Min(remaining, 64);
-                _slots[i] = item with { Count = canAdd };
-                remaining -= canAdd;
+                if (_slots[i] != null && _slots[i]!.ItemId == item.ItemId && _slots[i]!.Count < 64)
+                {
+                    var canAdd = Math.Min(remaining, 64 - _slots[i]!.Count);
+                    _slots[i] = _slots[i]! with { Count = _slots[i]!.Count + canAdd };
+                    remaining -= canAdd;
+                }
             }
-        }
 
-        return remaining == 0;
+            for (int i = 0; i < Size && remaining > 0; i++)
+            {
+                if (_slots[i] == null)
+                {
+                    var canAdd = Math.Min(remaining, 64);
+                    _slots[i] = item with { Count = canAdd };
+                    remaining -= canAdd;
+                }
+            }
+
+            return remaining == 0;
+        }
     }
 
     public ItemStack? RemoveItem(int index, int count = 1)
     {
-        if (index < 0 || index >= Size || _slots[index] == null) return null;
-
-        var item = _slots[index]!;
-        if (count >= item.Count)
+        lock (_lock)
         {
-            _slots[index] = null;
-            return item;
-        }
+            if (index < 0 || index >= Size || _slots[index] == null) return null;
 
-        _slots[index] = item with { Count = item.Count - count };
-        return item with { Count = count };
+            var item = _slots[index]!;
+            if (count >= item.Count)
+            {
+                _slots[index] = null;
+                return item;
+            }
+
+            _slots[index] = item with { Count = item.Count - count };
+            return item with { Count = count };
+        }
     }
 
     public void Clear()
     {
-        for (int i = 0; i < Size; i++)
+        lock (_lock)
         {
-            _slots[i] = null;
+            for (int i = 0; i < Size; i++)
+            {
+                _slots[i] = null;
+            }
         }
     }
 
     public ItemStack?[] GetAll()
     {
-        return _slots.ToArray();
+        lock (_lock) { return _slots.ToArray(); }
     }
 }
 

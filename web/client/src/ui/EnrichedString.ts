@@ -87,6 +87,7 @@ export class EnrichedString {
     static toHtml(text: string): string {
         const segments = EnrichedString.parse(text);
         return segments.map(seg => {
+            if (!/^#[0-9a-fA-F]{6}$/.test(seg.color)) return '';
             let style = `color:${seg.color}`;
             if (seg.bold) style += ';font-weight:bold';
             if (seg.italic) style += ';font-style:italic';

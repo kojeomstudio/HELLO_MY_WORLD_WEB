@@ -165,4 +165,5 @@ public class SecuritySettings
     public int HstsMaxAge { get; set; } = 31536000;
     public int CspNonceSize { get; set; } = 16;
     public int MaxConcurrentConnections { get; set; } = 0;
+    public string? ProfilerSecret { get; set; }
 }

@@ -20,6 +20,11 @@ const DEFAULT_SETTINGS: GameSettings = {
 
 const STORAGE_KEY = 'helloworld_settings';
 
+function clamp(value: number, min: number, max: number, fallback: number): number {
+    if (typeof value !== 'number' || !isFinite(value)) return fallback;
+    return Math.min(max, Math.max(min, value));
+}
+
 export class SettingsPanel {
     private element: HTMLElement | null = null;
     private overlay: HTMLElement | null = null;
@@ -154,17 +159,16 @@ export class SettingsPanel {
             if (raw) {
                 const parsed = JSON.parse(raw);
                 return {
-                    mouseSensitivity: parsed.mouseSensitivity ?? DEFAULT_SETTINGS.mouseSensitivity,
-                    renderDistance: parsed.renderDistance ?? DEFAULT_SETTINGS.renderDistance,
-                    fov: parsed.fov ?? DEFAULT_SETTINGS.fov,
-                    musicVolume: parsed.musicVolume ?? DEFAULT_SETTINGS.musicVolume,
-                    soundVolume: parsed.soundVolume ?? DEFAULT_SETTINGS.soundVolume,
-                    cloudsEnabled: parsed.cloudsEnabled ?? DEFAULT_SETTINGS.cloudsEnabled,
-                    aoEnabled: parsed.aoEnabled ?? DEFAULT_SETTINGS.aoEnabled
+                    mouseSensitivity: clamp(parsed.mouseSensitivity, 0.0005, 0.01, DEFAULT_SETTINGS.mouseSensitivity),
+                    renderDistance: clamp(parsed.renderDistance, 2, 8, DEFAULT_SETTINGS.renderDistance),
+                    fov: clamp(parsed.fov, 30, 110, DEFAULT_SETTINGS.fov),
+                    musicVolume: clamp(parsed.musicVolume, 0, 1, DEFAULT_SETTINGS.musicVolume),
+                    soundVolume: clamp(parsed.soundVolume, 0, 1, DEFAULT_SETTINGS.soundVolume),
+                    cloudsEnabled: !!parsed.cloudsEnabled,
+                    aoEnabled: parsed.aoEnabled !== false
                 };
             }
         } catch {
-            // ignore
         }
         return { ...DEFAULT_SETTINGS };
     }

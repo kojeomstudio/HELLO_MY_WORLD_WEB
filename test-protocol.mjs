@@ -1,7 +1,7 @@
 import { HubConnectionBuilder, HttpTransportType } from '@microsoft/signalr';
 
 const SERVER_URL = 'http://localhost:5266';
-const TEST_PLAYER = `TestBot_${Date.now()}`;
+const TEST_PLAYER = `TBot_${Date.now().toString().slice(-8)}`;
 const TIMEOUT_MS = 10000;
 
 let passed = 0;
@@ -64,7 +64,7 @@ async function testSignalRConnection() {
             .withUrl(`${SERVER_URL}/game`, {
                 transport: HttpTransportType.WebSockets
             })
-            .withAutomaticRetry()
+            .withAutomaticReconnect()
             .build();
 
         await withTimeout(connection.start());
@@ -84,7 +84,7 @@ async function testJoinAndInitProtocol() {
         const timePromise = waitForEvent('OnTimeUpdate');
         const playerListPromise = waitForEvent('OnPlayerListUpdate');
 
-        await connection.invoke('Join', TEST_PLAYER);
+        await connection.invoke('Join', TEST_PLAYER, '');
 
         const [defs] = await withTimeout(blockDefsPromise);
         assert(typeof defs === 'string' && defs.length > 0, 'OnBlockDefinitions received with data');
@@ -111,7 +111,7 @@ async function testJoinAndInitProtocol() {
 async function testPositionUpdate() {
     console.log('\n[4/8] Testing Position Update Protocol');
     try {
-        await connection.invoke('UpdatePosition', 0, 50, 0, 0, 0, 0, 0, 70);
+        await connection.invoke('UpdatePosition', 0, 50, 0, 0, 0, 0, 0, 70, false);
         await new Promise(r => setTimeout(r, 200));
         assert(true, 'UpdatePosition accepted without error');
     } catch (e) {
@@ -152,16 +152,18 @@ async function testChunkRequestProtocol() {
 async function testCraftingProtocol() {
     console.log('\n[7/8] Testing Crafting/Smelting Protocol');
     try {
+        const craftingPromise = waitForEvent('OnCraftingRecipes');
         await connection.invoke('GetCraftingRecipes');
-        const [recipes] = await withTimeout(waitForEvent('OnCraftingRecipes'), 5000);
+        const [recipes] = await withTimeout(craftingPromise, 5000);
         assert(Array.isArray(recipes), `OnCraftingRecipes received (${recipes.length} recipes)`);
     } catch (e) {
         assert(false, `GetCraftingRecipes: ${e.message}`);
     }
 
     try {
+        const smeltingPromise = waitForEvent('OnSmeltingRecipes');
         await connection.invoke('GetSmeltingRecipes');
-        const [recipes] = await withTimeout(waitForEvent('OnSmeltingRecipes'), 5000);
+        const [recipes] = await withTimeout(smeltingPromise, 5000);
         assert(Array.isArray(recipes), `OnSmeltingRecipes received (${recipes.length} recipes)`);
     } catch (e) {
         assert(false, `GetSmeltingRecipes: ${e.message}`);
@@ -171,8 +173,9 @@ async function testCraftingProtocol() {
 async function testPrivilegeProtocol() {
     console.log('\n[8/8] Testing Privilege Protocol');
     try {
+        const privPromise = waitForEvent('OnPrivilegeList');
         await connection.invoke('GetPrivileges');
-        const [privs] = await withTimeout(waitForEvent('OnPrivilegeList'), 5000);
+        const [privs] = await withTimeout(privPromise, 5000);
         assert(Array.isArray(privs), `OnPrivilegeList received (${privs.length} privileges)`);
         assert(privs.includes('interact') || privs.includes('shout') || privs.length > 0, 'Privileges include expected entries');
     } catch (e) {

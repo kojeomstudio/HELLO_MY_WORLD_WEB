@@ -32,6 +32,15 @@ static bool IsValidOrigin(string origin)
         && uri.Port > 0 && uri.Port <= 65535;
 }
 
+static bool CryptographicOperationsEqual(string a, string b)
+{
+    if (a.Length != b.Length) return false;
+    var result = 0;
+    for (int i = 0; i < a.Length; i++)
+        result |= a[i] ^ b[i];
+    return result == 0;
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 var configPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "data", "server_config.json");
@@ -619,6 +628,7 @@ var blockMetaDbPath = Path.Combine(dataDir, "blockmeta.db");
 
 builder.Services.AddSingleton(new PlayerDatabase(playerDbPath));
 builder.Services.AddSingleton(new BlockMetadataDatabase(blockMetaDbPath));
+builder.Services.AddSingleton<PhysicsEngine>(sp => new PhysicsEngine());
 builder.Services.AddSingleton<GameServer>();
 builder.Services.AddSingleton<AuthenticationService>();
 builder.Services.AddSingleton<AsyncJobSystem>();
@@ -889,7 +899,7 @@ app.Use(async (context, next) =>
         "script-src 'self'; " +
         $"style-src 'self' 'nonce-{cspNonce}'; " +
         "img-src 'self' data: blob:; " +
-        $"connect-src 'self' ws: wss: {string.Join(' ', serverConfig.CorsOrigins.Where(o => IsValidOrigin(o)))}; " +
+        $"connect-src 'self' wss: {string.Join(' ', serverConfig.CorsOrigins.Where(o => IsValidOrigin(o)))}; " +
         "media-src 'self' blob:; " +
         "font-src 'self'; " +
         "object-src 'none'; " +
@@ -908,21 +918,25 @@ app.MapGet("/api/status", (GameServer server) => new
     isRunning = server.IsRunning
 });
 
-app.MapGet("/api/profiler", (ServerProfiler profiler, GameServer server, HttpContext context) =>
+app.MapGet("/api/profiler", (ServerProfiler profiler, ServerConfig cfg, HttpContext context) =>
 {
-    var playerName = context.Request.Headers["X-Auth-Player"].FirstOrDefault() ?? string.Empty;
-    var queryToken = context.Request.Query["token"].FirstOrDefault() ?? string.Empty;
-    var token = !string.IsNullOrEmpty(playerName) ? playerName : queryToken;
-    if (string.IsNullOrEmpty(token) || !server.Privileges.HasPrivilege(token, "server"))
+    var secret = context.Request.Headers["X-Profiler-Secret"].FirstOrDefault() ?? string.Empty;
+    var querySecret = context.Request.Query["token"].FirstOrDefault() ?? string.Empty;
+    var providedSecret = !string.IsNullOrEmpty(secret) ? secret : querySecret;
+    if (string.IsNullOrEmpty(cfg.Security.ProfilerSecret)
+        || string.IsNullOrEmpty(providedSecret)
+        || !CryptographicOperationsEqual(providedSecret, cfg.Security.ProfilerSecret))
         return Results.Unauthorized();
     return Results.Ok(profiler.GetSnapshot());
 });
-app.MapGet("/api/profiler/report", (ServerProfiler profiler, GameServer server, HttpContext context) =>
+app.MapGet("/api/profiler/report", (ServerProfiler profiler, ServerConfig cfg, HttpContext context) =>
 {
-    var playerName = context.Request.Headers["X-Auth-Player"].FirstOrDefault() ?? string.Empty;
-    var queryToken = context.Request.Query["token"].FirstOrDefault() ?? string.Empty;
-    var token = !string.IsNullOrEmpty(playerName) ? playerName : queryToken;
-    if (string.IsNullOrEmpty(token) || !server.Privileges.HasPrivilege(token, "server"))
+    var secret = context.Request.Headers["X-Profiler-Secret"].FirstOrDefault() ?? string.Empty;
+    var querySecret = context.Request.Query["token"].FirstOrDefault() ?? string.Empty;
+    var providedSecret = !string.IsNullOrEmpty(secret) ? secret : querySecret;
+    if (string.IsNullOrEmpty(cfg.Security.ProfilerSecret)
+        || string.IsNullOrEmpty(providedSecret)
+        || !CryptographicOperationsEqual(providedSecret, cfg.Security.ProfilerSecret))
         return Results.Unauthorized();
     return Results.Ok(profiler.FormatReport());
 });

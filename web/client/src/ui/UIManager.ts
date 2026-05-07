@@ -123,7 +123,7 @@ export class UIManager {
             gridContainer,
             (recipe) => {
                 if (this._connection) {
-                    this._connection.invoke('GridCraft', recipe.itemId, recipe.count);
+                    this._connection.invoke('CraftByResult', recipe.itemId, recipe.count);
                 }
             },
             (items) => {

@@ -236,6 +236,7 @@ export class FormspecRenderer {
 
     private renderBgcolor(element: FormspecElement): void {
         const color = String(element.color || '#000000');
+        if (!this.isValidCssColor(color)) return;
         const fullscreen = element.fullscreen === true;
         if (fullscreen && this.overlay) {
             this.overlay.style.background = color;
