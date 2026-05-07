@@ -2127,15 +2127,7 @@ public class GameHub : Hub<IGameClient>
             if (c == '\r') continue;
             if (c == '\n') { sb.Append(' '); continue; }
             if (char.IsControl(c)) continue;
-            switch (c)
-            {
-                case '<': sb.Append("&lt;"); break;
-                case '>': sb.Append("&gt;"); break;
-                case '&': sb.Append("&amp;"); break;
-                case '"': sb.Append("&quot;"); break;
-                case '\'': sb.Append("&#39;"); break;
-                default: sb.Append(c); break;
-            }
+            sb.Append(c);
         }
         var result = sb.ToString();
         if (result.Length > maxLength) result = result[..maxLength];
@@ -2826,7 +2818,14 @@ public class GameHub : Hub<IGameClient>
         if (!_gameServer.Privileges.HasPrivilege(attacker.Name, "pvp")) return;
         if (string.IsNullOrEmpty(targetName) || targetName.Length > 32) return;
         if (targetName.Equals(attacker.Name, StringComparison.OrdinalIgnoreCase)) return;
-        damage = Math.Clamp(damage, 0.1f, 100f);
+
+        var computedDamage = 1.0f;
+        var toolItem = attacker.GetSelectedHotbarItem();
+        if (toolItem != null)
+        {
+            computedDamage = ToolConfig.GetWeaponDamage(toolItem.ItemId.ToLowerInvariant());
+        }
+        computedDamage = Math.Clamp(computedDamage, 0.1f, 100f);
 
         var target = _gameServer.GetPlayer(targetName);
         if (target == null || target.IsDead || target.Invulnerable) return;
@@ -2834,13 +2833,13 @@ public class GameHub : Hub<IGameClient>
         var dist = Vector3.Distance(attacker.Position, target.Position);
         if (dist > 6f) return;
 
-        var knockVel = _gameServer.DamagePlayerWithKnockback(target, damage, attacker.Position, "pvp");
-        attacker.Statistics.AddDamageDealt((int)Math.Ceiling(damage));
+        var knockVel = _gameServer.DamagePlayerWithKnockback(target, computedDamage, attacker.Position, "pvp");
+        attacker.Statistics.AddDamageDealt((int)Math.Ceiling(computedDamage));
 
         await Clients.Client(target.ConnectionId)
             .OnKnockback(knockVel.X, knockVel.Y, knockVel.Z);
 
-        await Clients.Caller.OnChatMessage("Server", $"Hit {targetName} for {(int)damage} damage", "system");
+        await Clients.Caller.OnChatMessage("Server", $"Hit {targetName} for {(int)computedDamage} damage", "system");
     }
 
     public async Task ShootProjectile(
@@ -2852,6 +2851,10 @@ public class GameHub : Hub<IGameClient>
         if (player == null) return;
         if (!_gameServer.Privileges.HasPrivilege(player.Name, "interact")) return;
         if (string.IsNullOrEmpty(projectileType) || projectileType.Length > 32) return;
+        if (float.IsNaN(posX) || float.IsInfinity(posX) || float.IsNaN(posY) || float.IsInfinity(posY) || float.IsNaN(posZ) || float.IsInfinity(posZ)) return;
+        if (float.IsNaN(velX) || float.IsInfinity(velX) || float.IsNaN(velY) || float.IsInfinity(velY) || float.IsNaN(velZ) || float.IsInfinity(velZ)) return;
+        var spawnDist = Vector3.Distance(new Vector3(posX, posY, posZ), player.Position);
+        if (spawnDist > 10f) return;
         projectileType = SanitizeChatMessage(projectileType, 32);
         damage = Math.Clamp(damage, 0.1f, 50f);
 
@@ -2880,6 +2883,8 @@ public class GameHub : Hub<IGameClient>
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
         if (!_gameServer.Privileges.HasPrivilege(player.Name, "server")) return;
+        if (float.IsNaN(x) || float.IsInfinity(x) || float.IsNaN(y) || float.IsInfinity(y) || float.IsNaN(z) || float.IsInfinity(z)) return;
+        if (float.IsNaN(radius) || float.IsInfinity(radius) || float.IsNaN(power) || float.IsInfinity(power)) return;
 
         radius = Math.Clamp(radius, 1f, 50f);
         power = Math.Clamp(power, 1f, 50f);

@@ -78,7 +78,7 @@ builder.Services.AddSingleton(serverConfig);
 
 builder.Services.AddSignalR(options =>
 {
-    options.MaximumReceiveMessageSize = 128 * 1024;
+    options.MaximumReceiveMessageSize = 64 * 1024;
 });
 builder.Services.AddSingleton<BlockDefinitionManager>(sp =>
 {
@@ -834,8 +834,6 @@ builder.Services.AddCors(options =>
     });
 });
 
-var app = builder.Build();
-
 if (serverConfig.Security.MaxConcurrentConnections > 0)
 {
     builder.WebHost.ConfigureKestrel(options =>
@@ -843,6 +841,8 @@ if (serverConfig.Security.MaxConcurrentConnections > 0)
         options.Limits.MaxConcurrentConnections = (long)serverConfig.Security.MaxConcurrentConnections;
     });
 }
+
+var app = builder.Build();
 
 if (!app.Environment.IsDevelopment() && serverConfig.Security.EnableHttpsRedirection)
 {
@@ -898,7 +898,6 @@ app.Use(async (context, next) =>
     context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
     await next();
 });
-app.UseAuthorization();
 app.MapControllers();
 app.MapHub<GameHub>("/game");
 
@@ -909,8 +908,20 @@ app.MapGet("/api/status", (GameServer server) => new
     isRunning = server.IsRunning
 });
 
-app.MapGet("/api/profiler", (ServerProfiler profiler) => profiler.GetSnapshot());
-app.MapGet("/api/profiler/report", (ServerProfiler profiler) => profiler.FormatReport());
+app.MapGet("/api/profiler", (ServerProfiler profiler, GameServer server, HttpContext context) =>
+{
+    var playerName = context.Request.Query["token"].ToString();
+    if (string.IsNullOrEmpty(playerName) || !server.Privileges.HasPrivilege(playerName, "server"))
+        return Results.Unauthorized();
+    return Results.Ok(profiler.GetSnapshot());
+});
+app.MapGet("/api/profiler/report", (ServerProfiler profiler, GameServer server, HttpContext context) =>
+{
+    var playerName = context.Request.Query["token"].ToString();
+    if (string.IsNullOrEmpty(playerName) || !server.Privileges.HasPrivilege(playerName, "server"))
+        return Results.Unauthorized();
+    return Results.Ok(profiler.FormatReport());
+});
 
 if (Directory.Exists(clientDistPath))
 {

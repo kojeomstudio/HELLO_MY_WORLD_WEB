@@ -521,6 +521,17 @@ All server services registered as **Singleton** in `Program.cs`:
 - World data excluded from version control
 - CI pipeline includes automated secrets detection and npm audit
 
+### Security Fixes (Round 8)
+- **Kestrel connection limit**: Fixed `MaxConcurrentConnections` config applied after `builder.Build()` (was silently ignored). Now correctly configured before host build
+- **Profiler endpoint auth**: `/api/profiler` and `/api/profiler/report` endpoints now require `server` privilege via query token. Previously unauthenticated
+- **Removed misleading UseAuthorization**: Removed `app.UseAuthorization()` call without matching `UseAuthentication()` middleware
+- **AttackPlayer server-side damage**: `AttackPlayer` hub method now computes damage from attacker's equipped weapon instead of trusting client-supplied value
+- **Chat sanitization**: Removed server-side HTML entity encoding from `SanitizeChatMessage` — client already handles XSS protection via `textContent`/`EnrichedString.toHtml()`. Server now only strips control characters
+- **Projectile validation**: `ShootProjectile` now validates NaN/Infinity on position/velocity and enforces 10-block spawn distance from player
+- **Explosion validation**: `TriggerExplosion` now validates NaN/Infinity on coordinates, radius, and power
+- **SignalR message size**: Reduced `MaximumReceiveMessageSize` from 128KB to 64KB to limit memory pressure from malicious clients
+- **.gitignore**: Added `.npmrc`, `*.bak`, `*.backup`, `*.old` patterns
+
 ### Anti-Cheat
 - Server-authoritative physics validation
 - Teleport detection (position delta exceeds max speed)
