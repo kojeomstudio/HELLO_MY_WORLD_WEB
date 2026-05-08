@@ -943,22 +943,18 @@ app.MapGet("/api/status", (GameServer server) => new
 app.MapGet("/api/profiler", (ServerProfiler profiler, ServerConfig cfg, HttpContext context) =>
 {
     var secret = context.Request.Headers["X-Profiler-Secret"].FirstOrDefault() ?? string.Empty;
-    var querySecret = context.Request.Query["token"].FirstOrDefault() ?? string.Empty;
-    var providedSecret = !string.IsNullOrEmpty(secret) ? secret : querySecret;
     if (string.IsNullOrEmpty(cfg.Security.ProfilerSecret)
-        || string.IsNullOrEmpty(providedSecret)
-        || !CryptographicOperationsEqual(providedSecret, cfg.Security.ProfilerSecret))
+        || string.IsNullOrEmpty(secret)
+        || !CryptographicOperationsEqual(secret, cfg.Security.ProfilerSecret))
         return Results.Unauthorized();
     return Results.Ok(profiler.GetSnapshot());
 });
 app.MapGet("/api/profiler/report", (ServerProfiler profiler, ServerConfig cfg, HttpContext context) =>
 {
     var secret = context.Request.Headers["X-Profiler-Secret"].FirstOrDefault() ?? string.Empty;
-    var querySecret = context.Request.Query["token"].FirstOrDefault() ?? string.Empty;
-    var providedSecret = !string.IsNullOrEmpty(secret) ? secret : querySecret;
     if (string.IsNullOrEmpty(cfg.Security.ProfilerSecret)
-        || string.IsNullOrEmpty(providedSecret)
-        || !CryptographicOperationsEqual(providedSecret, cfg.Security.ProfilerSecret))
+        || string.IsNullOrEmpty(secret)
+        || !CryptographicOperationsEqual(secret, cfg.Security.ProfilerSecret))
         return Results.Unauthorized();
     return Results.Ok(profiler.FormatReport());
 });
@@ -1018,8 +1014,10 @@ app.Lifetime.ApplicationStopping.Register(() =>
     var protectionSavePath = Path.Combine(dataDir, "protection");
     try
     {
-        areaProtection.SaveProtection(protectionSavePath).Wait(TimeSpan.FromSeconds(10));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        areaProtection.SaveProtection(protectionSavePath).Wait(cts.Token);
     }
+    catch (OperationCanceledException) { }
     catch (AggregateException) { }
     gameServer.Stop();
 });

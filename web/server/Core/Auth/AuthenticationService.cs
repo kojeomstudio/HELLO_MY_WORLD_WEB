@@ -127,25 +127,53 @@ public class AuthenticationService
     public void BanName(string name)
     {
         _bannedNames.Add(name);
-        _ = _banDatabase?.BanNameAsync(name);
+        if (_banDatabase != null)
+        {
+            _ = Task.Run(async () =>
+            {
+                try { await _banDatabase.BanNameAsync(name); }
+                catch { }
+            });
+        }
     }
 
     public void BanIp(string ip)
     {
         _bannedIps.Add(ip);
-        _ = _banDatabase?.BanIpAsync(ip);
+        if (_banDatabase != null)
+        {
+            _ = Task.Run(async () =>
+            {
+                try { await _banDatabase.BanIpAsync(ip); }
+                catch { }
+            });
+        }
     }
 
     public void UnbanName(string name)
     {
         _bannedNames.Remove(name);
-        _ = _banDatabase?.UnbanNameAsync(name);
+        if (_banDatabase != null)
+        {
+            _ = Task.Run(async () =>
+            {
+                try { await _banDatabase.UnbanNameAsync(name); }
+                catch { }
+            });
+        }
     }
 
     public void UnbanIp(string ip)
     {
         _bannedIps.Remove(ip);
-        _ = _banDatabase?.UnbanIpAsync(ip);
+        if (_banDatabase != null)
+        {
+            _ = Task.Run(async () =>
+            {
+                try { await _banDatabase.UnbanIpAsync(ip); }
+                catch { }
+            });
+        }
     }
 
     public bool IsBanned(string name) => _bannedNames.Contains(name) || (_banDatabase?.IsNameBanned(name) ?? false);

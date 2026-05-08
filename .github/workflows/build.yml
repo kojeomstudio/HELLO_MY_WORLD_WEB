@@ -9,7 +9,7 @@ concurrency:
 
 on:
   pull_request:
-    branches: [develop]
+    branches: [main, develop]
 
 jobs:
   quick-check:
@@ -17,13 +17,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@3951f0dfe99a8eb0f6946b3bb0c4b1f2fac077af # v4.3.0
         with:
           dotnet-version: '8.0.x'
       - name: Cache NuGet packages
-        uses: actions/cache@v4
+        uses: actions/cache@d4323d4df104b026a6aa633fdb11d772146be0bf # v4.2.2
         with:
           path: ~/.nuget/packages
           key: ${{ runner.os }}-nuget-${{ hashFiles('web/server/*.csproj') }}
@@ -34,7 +34,7 @@ jobs:
           dotnet restore web/server/WebGameServer.csproj
           dotnet build web/server/WebGameServer.csproj --configuration Release --no-restore -warnaserror
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601876af8c594af # v4.3.0
         with:
           node-version: '20'
           cache: 'npm'

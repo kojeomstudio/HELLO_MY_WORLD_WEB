@@ -2,10 +2,12 @@ namespace WebGameServer.Core.World.Generators;
 
 public enum AdvancedOreType
 {
+    Scatter,
     Sheet,
     Blob,
     Puff,
-    Stratum
+    Stratum,
+    Vein
 }
 
 public record AdvancedOreParams(
@@ -46,6 +48,9 @@ public class AdvancedOrePlacer
         {
             switch (ore.OreType)
             {
+                case AdvancedOreType.Scatter:
+                    PlaceScatterOre(blocks, baseX, baseY, baseZ, ore, getBiomeAt);
+                    break;
                 case AdvancedOreType.Sheet:
                     PlaceSheetOre(blocks, baseX, baseY, baseZ, ore, getBiomeAt);
                     break;
@@ -58,6 +63,127 @@ public class AdvancedOrePlacer
                 case AdvancedOreType.Stratum:
                     PlaceStratumOre(blocks, baseX, baseY, baseZ, ore, getBiomeAt);
                     break;
+                case AdvancedOreType.Vein:
+                    PlaceVeinOre(blocks, baseX, baseY, baseZ, ore, getBiomeAt);
+                    break;
+            }
+        }
+    }
+
+    private void PlaceScatterOre(ushort[,,] blocks, int baseX, int baseY, int baseZ,
+        AdvancedOreParams ore, Func<int, int, int, string?>? getBiomeAt)
+    {
+        var rng = new Random(ore.Noise.Seed ^ (baseX * 73856093) ^ (baseZ * 19349663) ^ (baseY * 83492791));
+        var clustSize = Math.Max(1, ore.ClustSize);
+
+        for (int i = 0; i < clustSize; i++)
+        {
+            var cx = rng.Next(0, ChunkSize);
+            var cy = rng.Next(0, ChunkSize);
+            var cz = rng.Next(0, ChunkSize);
+            var worldY = baseY + cy;
+
+            if (worldY < ore.YMin || worldY > ore.YMax) continue;
+
+            if (ore.Biomes.Length > 0 && getBiomeAt != null)
+            {
+                var biome = getBiomeAt(baseX + cx, worldY, baseZ + cz);
+                if (biome == null || !ore.Biomes.Contains(biome)) continue;
+            }
+
+            var scatterRadius = Math.Max(1, (int)MathF.Ceiling(ore.ClustRadius));
+            for (int dx = -scatterRadius; dx <= scatterRadius; dx++)
+            {
+                for (int dy = -scatterRadius; dy <= scatterRadius; dy++)
+                {
+                    for (int dz = -scatterRadius; dz <= scatterRadius; dz++)
+                    {
+                        var distSq = dx * dx + dy * dy + dz * dz;
+                        if (distSq > scatterRadius * scatterRadius) continue;
+
+                        var bx = cx + dx;
+                        var by = cy + dy;
+                        var bz = cz + dz;
+
+                        if (bx < 0 || bx >= ChunkSize || by < 0 || by >= ChunkSize
+                            || bz < 0 || bz >= ChunkSize) continue;
+
+                        if (rng.NextDouble() > ore.Threshold) continue;
+
+                        if (IsReplaceable(blocks[bx, by, bz]))
+                            blocks[bx, by, bz] = ore.OreBlockId;
+                    }
+                }
+            }
+        }
+    }
+
+    private void PlaceVeinOre(ushort[,,] blocks, int baseX, int baseY, int baseZ,
+        AdvancedOreParams ore, Func<int, int, int, string?>? getBiomeAt)
+    {
+        var noise = _noiseInstances[ore.Name];
+        var rng = new Random(ore.Noise.Seed ^ (baseX * 73856093) ^ (baseZ * 19349663));
+
+        var numVeins = Math.Max(1, ore.ClustSize);
+        var veinLength = Math.Max(3, (int)ore.ClustRadius);
+
+        for (int v = 0; v < numVeins; v++)
+        {
+            var cx = rng.Next(2, ChunkSize - 2);
+            var cy = rng.Next(2, ChunkSize - 2);
+            var cz = rng.Next(2, ChunkSize - 2);
+
+            if (baseY + cy < ore.YMin || baseY + cy > ore.YMax) continue;
+
+            if (ore.Biomes.Length > 0 && getBiomeAt != null)
+            {
+                var biome = getBiomeAt(baseX + cx, baseY + cy, baseZ + cz);
+                if (biome == null || !ore.Biomes.Contains(biome)) continue;
+            }
+
+            var dx = (float)(rng.NextDouble() * 2 - 1);
+            var dy = (float)(rng.NextDouble() * 0.6 - 0.3);
+            var dz = (float)(rng.NextDouble() * 2 - 1);
+            var len = MathF.Sqrt(dx * dx + dy * dy + dz * dz);
+            if (len > 0.001f) { dx /= len; dy /= len; dz /= len; }
+
+            for (int step = 0; step < veinLength; step++)
+            {
+                var px = (int)MathF.Round(cx + dx * step);
+                var py = (int)MathF.Round(cy + dy * step);
+                var pz = (int)MathF.Round(cz + dz * step);
+
+                dx += (float)(rng.NextDouble() - 0.5) * 0.4f;
+                dy += (float)(rng.NextDouble() - 0.5) * 0.2f;
+                dz += (float)(rng.NextDouble() - 0.5) * 0.4f;
+                len = MathF.Sqrt(dx * dx + dy * dy + dz * dz);
+                if (len > 0.001f) { dx /= len; dy /= len; dz /= len; }
+
+                var worldY = baseY + py;
+                if (worldY < ore.YMin || worldY > ore.YMax) continue;
+
+                for (var ox = -1; ox <= 1; ox++)
+                {
+                    for (var oy = -1; oy <= 1; oy++)
+                    {
+                        for (var oz = -1; oz <= 1; oz++)
+                        {
+                            var bx = px + ox;
+                            var by = py + oy;
+                            var bz = pz + oz;
+
+                            if (bx < 0 || bx >= ChunkSize || by < 0 || by >= ChunkSize
+                                || bz < 0 || bz >= ChunkSize) continue;
+
+                            var nVal = noise.Noise3DEx(ore.Noise,
+                                baseX + bx, baseY + by, baseZ + bz);
+                            if (nVal < ore.Threshold) continue;
+
+                            if (IsReplaceable(blocks[bx, by, bz]))
+                                blocks[bx, by, bz] = ore.OreBlockId;
+                        }
+                    }
+                }
             }
         }
     }

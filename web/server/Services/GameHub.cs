@@ -89,6 +89,9 @@ public class GameHub : Hub<IGameClient>
     private static readonly ConcurrentDictionary<string, int> _joinAttempts = new();
     private static readonly ConcurrentDictionary<string, (int FailCount, DateTime LockoutEnd)> _accountFailures = new();
     private static readonly ConcurrentDictionary<string, Queue<DateTime>> _chatTimestamps = new();
+    private static DateTime _lastCleanup = DateTime.UtcNow;
+    private static readonly TimeSpan _cleanupInterval = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan _staleThreshold = TimeSpan.FromMinutes(10);
 
     private readonly GameServer _gameServer;
     private readonly ILogger<GameHub> _logger;
@@ -163,8 +166,36 @@ public class GameHub : Hub<IGameClient>
     public override async Task OnConnectedAsync()
     {
         _antiCheat.TrackPlayer(Context.ConnectionId);
+        CleanupStaleEntries();
         _logger.LogInformation("Client connected: {ConnectionId}", Context.ConnectionId);
         await base.OnConnectedAsync();
+    }
+
+    private static void CleanupStaleEntries()
+    {
+        if (DateTime.UtcNow - _lastCleanup < _cleanupInterval) return;
+        _lastCleanup = DateTime.UtcNow;
+
+        var cutoff = DateTime.UtcNow - _staleThreshold;
+        foreach (var kvp in _accountFailures)
+        {
+            if (kvp.Value.LockoutEnd < cutoff)
+                _accountFailures.TryRemove(kvp.Key, out _);
+        }
+
+        foreach (var kvp in _joinAttempts)
+        {
+            if (kvp.Key.EndsWith("_time"))
+            {
+                var timestamp = DateTimeOffset.FromUnixTimeSeconds(kvp.Value).UtcDateTime;
+                if (timestamp < cutoff)
+                {
+                    var baseKey = kvp.Key[..^5];
+                    _joinAttempts.TryRemove(baseKey, out _);
+                    _joinAttempts.TryRemove(kvp.Key, out _);
+                }
+            }
+        }
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)

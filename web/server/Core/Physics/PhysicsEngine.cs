@@ -375,6 +375,16 @@ public class PhysicsEngine
                             canStep = false;
                         }
                     }
+
+                    var currentHeadBY = (short)Math.Floor(desiredY - 0.01f);
+                    var stepTopBY = (short)Math.Floor(stepY + 0.01f);
+                    for (int by = currentHeadBY; by <= stepTopBY && canStep; by++)
+                    {
+                        if (IsSolid(world.GetBlock(new Vector3s((short)bx, (short)by, (short)bz)).Type))
+                        {
+                            canStep = false;
+                        }
+                    }
                 }
             }
 
