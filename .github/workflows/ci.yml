@@ -187,7 +187,7 @@ jobs:
         run: npm audit --prefix web/client --audit-level=high
 
       - name: Check .NET packages for vulnerabilities
-        run: dotnet list web/server/WebGameServer.csproj package --vulnerable --include-transitive || true
+        run: dotnet list web/server/WebGameServer.csproj package --vulnerable --include-transitive
 
       - name: Check for hardcoded secrets in source
         run: |

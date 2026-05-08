@@ -34,11 +34,10 @@ static bool IsValidOrigin(string origin)
 
 static bool CryptographicOperationsEqual(string a, string b)
 {
-    if (a.Length != b.Length) return false;
-    var result = 0;
-    for (int i = 0; i < a.Length; i++)
-        result |= a[i] ^ b[i];
-    return result == 0;
+    var bytesA = System.Text.Encoding.UTF8.GetBytes(a);
+    var bytesB = System.Text.Encoding.UTF8.GetBytes(b);
+    if (bytesA.Length != bytesB.Length) return false;
+    return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(bytesA, bytesB);
 }
 
 var builder = WebApplication.CreateBuilder(args);
@@ -1015,10 +1014,11 @@ app.Lifetime.ApplicationStopping.Register(() =>
     try
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        areaProtection.SaveProtection(protectionSavePath).Wait(cts.Token);
+        areaProtection.SaveProtection(protectionSavePath).GetAwaiter().GetResult();
     }
     catch (OperationCanceledException) { }
     catch (AggregateException) { }
+    catch (Exception) { }
     gameServer.Stop();
 });
 
