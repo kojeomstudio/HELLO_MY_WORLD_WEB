@@ -152,8 +152,9 @@ jobs:
           items = json.load(open('web/data/items.json'))
           if 'items' not in items:
               print('::error::items.json missing \"items\" key')
-          if 'recipes' in items:
-              for i, recipe in enumerate(items['recipes']):
+          recipe_key = 'craftingRecipes' if 'craftingRecipes' in items else 'recipes'
+          if recipe_key in items:
+              for i, recipe in enumerate(items[recipe_key]):
                   if 'result' not in recipe or 'ingredients' not in recipe:
                       print(f'::warning::Recipe {i} missing result or ingredients')
 
