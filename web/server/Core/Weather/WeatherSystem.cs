@@ -24,10 +24,15 @@ public class WeatherSystem
     public float Intensity { get; private set; }
     public long NextChangeTime { get; private set; }
 
+    private readonly int _minIntervalSeconds;
+    private readonly int _maxIntervalSeconds;
+
     public WeatherSystem(ServerConfig config, WorldMap world)
     {
         _config = config;
         _world = world;
+        _minIntervalSeconds = config.Weather.MinIntervalSeconds;
+        _maxIntervalSeconds = config.Weather.MaxIntervalSeconds;
         CurrentWeather = WeatherType.None;
         Intensity = 0f;
         NextChangeTime = CalculateInterval();
@@ -35,7 +40,7 @@ public class WeatherSystem
 
     private long CalculateInterval()
     {
-        var seconds = 300 + _random.Next(0, 301);
+        var seconds = _minIntervalSeconds + _random.Next(0, _maxIntervalSeconds - _minIntervalSeconds + 1);
         return (long)(seconds * 2000.0);
     }
 

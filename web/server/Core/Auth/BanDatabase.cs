@@ -7,6 +7,7 @@ public class BanDatabase
     private readonly string _filePath;
     private readonly HashSet<string> _bannedNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _bannedIps = new(StringComparer.OrdinalIgnoreCase);
+    private readonly SemaphoreSlim _saveLock = new(1, 1);
 
     public BanDatabase(string filePath)
     {
@@ -42,8 +43,9 @@ public class BanDatabase
         }
     }
 
-    private void Save()
+    private async Task SaveAsync()
     {
+        await _saveLock.WaitAsync();
         try
         {
             var dir = Path.GetDirectoryName(_filePath);
@@ -53,36 +55,42 @@ public class BanDatabase
                 bannedNames = _bannedNames.ToArray(),
                 bannedIps = _bannedIps.ToArray()
             });
-            File.WriteAllText(_filePath, json);
+            var tmpPath = _filePath + ".tmp";
+            await File.WriteAllTextAsync(tmpPath, json);
+            File.Move(tmpPath, _filePath, overwrite: true);
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[BanDatabase] Failed to save: {ex.Message}");
         }
+        finally
+        {
+            _saveLock.Release();
+        }
     }
 
-    public void BanName(string name)
+    public async Task BanNameAsync(string name)
     {
         _bannedNames.Add(name);
-        Save();
+        await SaveAsync();
     }
 
-    public void BanIp(string ip)
+    public async Task BanIpAsync(string ip)
     {
         _bannedIps.Add(ip);
-        Save();
+        await SaveAsync();
     }
 
-    public void UnbanName(string name)
+    public async Task UnbanNameAsync(string name)
     {
         _bannedNames.Remove(name);
-        Save();
+        await SaveAsync();
     }
 
-    public void UnbanIp(string ip)
+    public async Task UnbanIpAsync(string ip)
     {
         _bannedIps.Remove(ip);
-        Save();
+        await SaveAsync();
     }
 
     public bool IsNameBanned(string name) => _bannedNames.Contains(name);

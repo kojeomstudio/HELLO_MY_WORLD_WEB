@@ -577,7 +577,16 @@ builder.Services.AddSingleton<ActiveBlockModifierSystem>(sp =>
 
     return system;
 });
-builder.Services.AddSingleton<AntiCheatValidator>();
+builder.Services.AddSingleton<AntiCheatValidator>(sp =>
+{
+    var config = sp.GetRequiredService<ServerConfig>();
+    return new AntiCheatValidator(
+        config.AntiCheat.MaxSpeedBuffer,
+        config.AntiCheat.MaxFlySpeedBuffer,
+        config.AntiCheat.PositionCorrectionThreshold,
+        config.AntiCheat.MaxViolationsBeforeCorrection,
+        config.AntiCheat.TeleportDistanceThreshold);
+});
 builder.Services.AddSingleton<KnockbackSystem>();
 
 var dataDir = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "data", "worlds", "default");
@@ -590,9 +599,18 @@ builder.Services.AddSingleton<BanDatabase>(sp =>
     var banDbPath = Path.Combine(dataDir, "bans.json");
     return new BanDatabase(banDbPath);
 });
-builder.Services.AddSingleton<RollbackSystem>();
+builder.Services.AddSingleton<RollbackSystem>(sp =>
+{
+    var config = sp.GetRequiredService<ServerConfig>();
+    return new RollbackSystem(config.Rollback.MaxRecords);
+});
 builder.Services.AddSingleton<ProtectionSystem>();
-builder.Services.AddSingleton<AreaProtectionSystem>();
+builder.Services.AddSingleton<AreaProtectionSystem>(sp =>
+{
+    var gameServer = sp.GetRequiredService<GameServer>();
+    var config = sp.GetRequiredService<ServerConfig>();
+    return new AreaProtectionSystem(gameServer, config.AreaProtection.MaxAreasPerPlayer, config.AreaProtection.MaxClaimSize);
+});
 builder.Services.AddSingleton<ParticleSpawnerManager>();
 builder.Services.AddSingleton<RedstoneSystem>();
 builder.Services.AddSingleton<FishingSystem>();
@@ -827,7 +845,11 @@ builder.Services.AddSingleton<GridCraftingSystem>(sp =>
     gridCrafting.LoadRecipes(gridDataPath);
     return gridCrafting;
 });
-builder.Services.AddSingleton<EntityManager>();
+builder.Services.AddSingleton<EntityManager>(sp =>
+{
+    var config = sp.GetRequiredService<ServerConfig>();
+    return new EntityManager(config.Entities.MaxEntities);
+});
 builder.Services.AddSingleton<ServerProfiler>();
 builder.Services.AddHostedService<GameLoopService>();
 builder.Services.AddControllers();

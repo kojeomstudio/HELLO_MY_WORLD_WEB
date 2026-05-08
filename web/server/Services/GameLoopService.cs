@@ -25,9 +25,9 @@ public class GameLoopService : BackgroundService
     private int _tpsFrameCount;
     private float _currentTps;
     private DateTime _lastBackupTime;
-    private const int AutoSaveIntervalSeconds = 300;
-    private const int AutoBackupIntervalSeconds = 1800;
-    private const int FallingBlockInterval = 10;
+    private readonly int _autoSaveIntervalSeconds;
+    private readonly int _autoBackupIntervalSeconds;
+    private readonly int _fallingBlockInterval;
 
     public GameLoopService(
         GameServer gameServer,
@@ -46,6 +46,9 @@ public class GameLoopService : BackgroundService
         _config = config;
         _profiler = profiler;
         _lastBackupTime = DateTime.UtcNow;
+        _autoSaveIntervalSeconds = config.GameLoop.AutoSaveIntervalSeconds;
+        _autoBackupIntervalSeconds = config.GameLoop.AutoBackupIntervalSeconds;
+        _fallingBlockInterval = config.GameLoop.FallingBlockInterval;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -91,7 +94,7 @@ public class GameLoopService : BackgroundService
 
             await BroadcastEntityEvents();
 
-            if (_tickCount % FallingBlockInterval == 0)
+            if (_tickCount % _fallingBlockInterval == 0)
             {
                 await ProcessFallingBlocks();
             }
@@ -279,7 +282,7 @@ public class GameLoopService : BackgroundService
     private void CheckAutoSave()
     {
         var world = _gameServer.DefaultWorld;
-        if (world.NeedsSave && DateTime.UtcNow - world.LastSaveTime > TimeSpan.FromSeconds(AutoSaveIntervalSeconds))
+        if (world.NeedsSave && DateTime.UtcNow - world.LastSaveTime > TimeSpan.FromSeconds(_autoSaveIntervalSeconds))
         {
             try
             {
@@ -298,7 +301,7 @@ public class GameLoopService : BackgroundService
 
     private void CheckAutoBackup()
     {
-        if (DateTime.UtcNow - _lastBackupTime < TimeSpan.FromSeconds(AutoBackupIntervalSeconds)) return;
+        if (DateTime.UtcNow - _lastBackupTime < TimeSpan.FromSeconds(_autoBackupIntervalSeconds)) return;
 
         try
         {

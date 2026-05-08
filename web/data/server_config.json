@@ -97,5 +97,39 @@
         "cspNonceSize": 16,
         "maxConcurrentConnections": 100,
         "profilerSecret": null
+    },
+    "gameLoop": {
+        "autoSaveIntervalSeconds": 300,
+        "autoBackupIntervalSeconds": 1800,
+        "fallingBlockInterval": 10
+    },
+    "entities": {
+        "maxEntities": 10000
+    },
+    "mobs": {
+        "maxMobs": 50,
+        "spawnInterval": 10.0,
+        "despawnDistance": 128.0,
+        "nightStart": 13000,
+        "nightEnd": 23000,
+        "darkLightThreshold": 7
+    },
+    "weather": {
+        "minIntervalSeconds": 300,
+        "maxIntervalSeconds": 600
+    },
+    "rollback": {
+        "maxRecords": 10000
+    },
+    "areaProtection": {
+        "maxAreasPerPlayer": 16,
+        "maxClaimSize": 256
+    },
+    "antiCheat": {
+        "maxSpeedBuffer": 1.5,
+        "maxFlySpeedBuffer": 2.0,
+        "positionCorrectionThreshold": 2.0,
+        "maxViolationsBeforeCorrection": 3,
+        "teleportDistanceThreshold": 50.0
     }
 }

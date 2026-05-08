@@ -26,13 +26,27 @@ public readonly struct PhysicsOverride
 
 public class AntiCheatValidator
 {
-    private const float MaxSpeedBuffer = 1.5f;
-    private const float MaxFlySpeedBuffer = 2.0f;
-    private const float PositionCorrectionThreshold = 2.0f;
-    private const int MaxViolationsBeforeCorrection = 3;
-    private const float TeleportDistanceThreshold = 50.0f;
+    private readonly float _maxSpeedBuffer;
+    private readonly float _maxFlySpeedBuffer;
+    private readonly float _positionCorrectionThreshold;
+    private readonly int _maxViolationsBeforeCorrection;
+    private readonly float _teleportDistanceThreshold;
 
     private readonly Dictionary<string, PlayerAntiCheatState> _playerStates = new();
+
+    public AntiCheatValidator(
+        float maxSpeedBuffer = 1.5f,
+        float maxFlySpeedBuffer = 2.0f,
+        float positionCorrectionThreshold = 2.0f,
+        int maxViolationsBeforeCorrection = 3,
+        float teleportDistanceThreshold = 50.0f)
+    {
+        _maxSpeedBuffer = maxSpeedBuffer;
+        _maxFlySpeedBuffer = maxFlySpeedBuffer;
+        _positionCorrectionThreshold = positionCorrectionThreshold;
+        _maxViolationsBeforeCorrection = maxViolationsBeforeCorrection;
+        _teleportDistanceThreshold = teleportDistanceThreshold;
+    }
 
     public void TrackPlayer(string connectionId)
     {
@@ -89,7 +103,7 @@ public class AntiCheatValidator
         var horizontalDist = Math.Sqrt(dx * dx + dz * dz);
         var totalDist = Math.Sqrt(dx * dx + dy * dy + dz * dz);
 
-        if (totalDist > TeleportDistanceThreshold)
+        if (totalDist > _teleportDistanceThreshold)
         {
             state.LastValidPosition = newPosition;
             state.ViolationCount = 0;
@@ -99,27 +113,27 @@ public class AntiCheatValidator
         float maxAllowedSpeed;
         if (isFlying)
         {
-            maxAllowedSpeed = physics.FlySpeed * MaxFlySpeedBuffer;
+            maxAllowedSpeed = physics.FlySpeed * _maxFlySpeedBuffer;
         }
         else if (isInLiquid)
         {
-            maxAllowedSpeed = physics.WalkSpeed * 0.5f * MaxSpeedBuffer;
+            maxAllowedSpeed = physics.WalkSpeed * 0.5f * _maxSpeedBuffer;
         }
         else if (isClimbing)
         {
-            maxAllowedSpeed = physics.ClimbSpeed * MaxSpeedBuffer;
+            maxAllowedSpeed = physics.ClimbSpeed * _maxSpeedBuffer;
         }
         else if (isSprinting)
         {
-            maxAllowedSpeed = physics.SprintSpeed * MaxSpeedBuffer;
+            maxAllowedSpeed = physics.SprintSpeed * _maxSpeedBuffer;
         }
         else if (isSneaking)
         {
-            maxAllowedSpeed = physics.WalkSpeed * 0.3f * MaxSpeedBuffer;
+            maxAllowedSpeed = physics.WalkSpeed * 0.3f * _maxSpeedBuffer;
         }
         else
         {
-            maxAllowedSpeed = physics.WalkSpeed * MaxSpeedBuffer;
+            maxAllowedSpeed = physics.WalkSpeed * _maxSpeedBuffer;
         }
 
         if (moveResistance > 0)
@@ -132,7 +146,7 @@ public class AntiCheatValidator
         if (horizontalDist > maxAllowedDistance)
         {
             state.ViolationCount++;
-            if (state.ViolationCount >= MaxViolationsBeforeCorrection)
+            if (state.ViolationCount >= _maxViolationsBeforeCorrection)
             {
                 state.ViolationCount = 0;
                 return false;
@@ -149,7 +163,7 @@ public class AntiCheatValidator
                 if (heightAboveLast > maxJumpHeight * 2.0f)
                 {
                     state.ViolationCount++;
-                    if (state.ViolationCount >= MaxViolationsBeforeCorrection)
+                    if (state.ViolationCount >= _maxViolationsBeforeCorrection)
                     {
                         state.ViolationCount = 0;
                         return false;

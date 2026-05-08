@@ -41,9 +41,11 @@ public class AreaProtectionSystem
     private int _maxAreasPerPlayer = 16;
     private int _maxClaimSize = 256;
 
-    public AreaProtectionSystem(GameServer gameServer)
+    public AreaProtectionSystem(GameServer gameServer, int maxAreasPerPlayer = 16, int maxClaimSize = 256)
     {
         _gameServer = gameServer;
+        _maxAreasPerPlayer = maxAreasPerPlayer > 0 ? maxAreasPerPlayer : 16;
+        _maxClaimSize = maxClaimSize > 0 ? maxClaimSize : 256;
     }
 
     public int MaxAreasPerPlayer

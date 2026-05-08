@@ -21,6 +21,9 @@ echo "[1/3] Building server..."
 dotnet build web/server/WebGameServer.csproj -c Release -v q
 
 echo "[2/3] Building client..."
+if [ ! -d "web/client/node_modules" ]; then
+    npm install --prefix web/client
+fi
 npm run build --prefix web/client
 
 echo "[3/3] Starting server and running protocol tests..."

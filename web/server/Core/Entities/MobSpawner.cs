@@ -16,6 +16,10 @@ public class MobSpawner
     private readonly Random _random = new();
     private Func<long>? _getGameTime;
 
+    private readonly int _nightStart;
+    private readonly int _nightEnd;
+    private readonly int _darkLightThreshold;
+
     private record struct MobSpawnEntry(
         string Type,
         string Name,
@@ -40,16 +44,16 @@ public class MobSpawner
         new("Mob", "Chicken", 30, 60, 2.0f, false, new[] { BiomeType.Grassland, BiomeType.Forest, BiomeType.Jungle }, 0f, 1f)
     };
 
-    private const int NightStart = 13000;
-    private const int NightEnd = 23000;
-    private const int DarkLightThreshold = 7;
-
-    public MobSpawner(EntityManager entityManager, int maxMobs = 50, float spawnInterval = 10.0f, float despawnDistance = 128.0f)
+    public MobSpawner(EntityManager entityManager, int maxMobs = 50, float spawnInterval = 10.0f, float despawnDistance = 128.0f,
+        int nightStart = 13000, int nightEnd = 23000, int darkLightThreshold = 7)
     {
         _entityManager = entityManager;
         _maxMobs = maxMobs;
         _spawnInterval = spawnInterval;
         _despawnDistance = despawnDistance;
+        _nightStart = nightStart;
+        _nightEnd = nightEnd;
+        _darkLightThreshold = darkLightThreshold;
     }
 
     public void SetGameTimeProvider(Func<long> getGameTime)
@@ -72,14 +76,14 @@ public class MobSpawner
     private bool IsNight()
     {
         var gameTime = _getGameTime?.Invoke() ?? 0;
-        return gameTime >= NightStart && gameTime < NightEnd;
+        return gameTime >= _nightStart && gameTime < _nightEnd;
     }
 
     private bool IsSpawnPositionDark(WorldMap world, int x, int y, int z)
     {
         var pos = new Vector3s((short)x, (short)(y + 1), (short)z);
         var light = LightingEngine.CalculateLight(world, pos);
-        return light < DarkLightThreshold;
+        return light < _darkLightThreshold;
     }
 
     private void TrySpawnMob(WorldMap world, Func<Vector3, bool> isSolid, Func<int, int, int> getGroundHeight)

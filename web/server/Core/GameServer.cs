@@ -124,7 +124,14 @@ public class GameServer
         _soundSpecManager = soundSpecManager;
         _fishingSystem = fishingSystem;
         _breedingSystem = breedingSystem;
-        _mobSpawner = new MobSpawner(entityManager);
+        _mobSpawner = new MobSpawner(
+            entityManager,
+            config.Mobs.MaxMobs,
+            config.Mobs.SpawnInterval,
+            config.Mobs.DespawnDistance,
+            config.Mobs.NightStart,
+            config.Mobs.NightEnd,
+            config.Mobs.DarkLightThreshold);
         _mobSpawner.SetGameTimeProvider(() => GameTime);
 
         _breedingSystem.SpawnMob = baby =>

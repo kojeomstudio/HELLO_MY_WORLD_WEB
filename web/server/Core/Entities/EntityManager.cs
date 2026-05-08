@@ -6,15 +6,20 @@ namespace WebGameServer.Core.Entities;
 public class EntityManager
 {
     private readonly ConcurrentDictionary<Guid, Entity> _entities = new();
-    private readonly int _maxEntities = 10000;
- 
+    private readonly int _maxEntities;
+
     public Func<IEnumerable<PlayerEnt>>? GetPlayersFunc { get; set; }
- 
+
     public event Action<Entity>? OnEntitySpawned;
     public event Action<Entity>? OnEntityDespawned;
     public event Action<Entity>? OnEntityUpdated;
 
     public int Count => _entities.Count;
+
+    public EntityManager(int maxEntities = 10000)
+    {
+        _maxEntities = maxEntities > 0 ? maxEntities : 10000;
+    }
 
     public T? Add<T>(T entity) where T : Entity
     {

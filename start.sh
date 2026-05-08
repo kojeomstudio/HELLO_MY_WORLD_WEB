@@ -7,6 +7,16 @@ echo " HelloMyWorld Web Game - Starting"
 echo "========================================"
 echo ""
 
+if ! command -v dotnet &>/dev/null; then
+    echo "ERROR: .NET SDK not found. Install .NET 8.0 SDK."
+    exit 1
+fi
+
+if ! command -v node &>/dev/null; then
+    echo "ERROR: Node.js not found. Install Node.js 18+."
+    exit 1
+fi
+
 echo "Starting C# server..."
 cd "$SCRIPT_DIR/web/server"
 dotnet run --project WebGameServer.csproj &

@@ -19,6 +19,13 @@ public class ServerConfig
     public int AutoSaveIntervalTicks { get; set; } = 1200;
     public AuthSettings Auth { get; set; } = new();
     public SecuritySettings Security { get; set; } = new();
+    public GameLoopSettings GameLoop { get; set; } = new();
+    public EntitySettings Entities { get; set; } = new();
+    public MobSettings Mobs { get; set; } = new();
+    public WeatherSettings Weather { get; set; } = new();
+    public RollbackSettings Rollback { get; set; } = new();
+    public AreaProtectionSettings AreaProtection { get; set; } = new();
+    public AntiCheatSettings AntiCheat { get; set; } = new();
 }
 
 public class LiquidSettings
@@ -166,4 +173,52 @@ public class SecuritySettings
     public int CspNonceSize { get; set; } = 16;
     public int MaxConcurrentConnections { get; set; } = 0;
     public string? ProfilerSecret { get; set; }
+}
+
+public class GameLoopSettings
+{
+    public int AutoSaveIntervalSeconds { get; set; } = 300;
+    public int AutoBackupIntervalSeconds { get; set; } = 1800;
+    public int FallingBlockInterval { get; set; } = 10;
+}
+
+public class EntitySettings
+{
+    public int MaxEntities { get; set; } = 10000;
+}
+
+public class MobSettings
+{
+    public int MaxMobs { get; set; } = 50;
+    public float SpawnInterval { get; set; } = 10.0f;
+    public float DespawnDistance { get; set; } = 128.0f;
+    public int NightStart { get; set; } = 13000;
+    public int NightEnd { get; set; } = 23000;
+    public int DarkLightThreshold { get; set; } = 7;
+}
+
+public class WeatherSettings
+{
+    public int MinIntervalSeconds { get; set; } = 300;
+    public int MaxIntervalSeconds { get; set; } = 600;
+}
+
+public class RollbackSettings
+{
+    public int MaxRecords { get; set; } = 10000;
+}
+
+public class AreaProtectionSettings
+{
+    public int MaxAreasPerPlayer { get; set; } = 16;
+    public int MaxClaimSize { get; set; } = 256;
+}
+
+public class AntiCheatSettings
+{
+    public float MaxSpeedBuffer { get; set; } = 1.5f;
+    public float MaxFlySpeedBuffer { get; set; } = 2.0f;
+    public float PositionCorrectionThreshold { get; set; } = 2.0f;
+    public int MaxViolationsBeforeCorrection { get; set; } = 3;
+    public float TeleportDistanceThreshold { get; set; } = 50.0f;
 }

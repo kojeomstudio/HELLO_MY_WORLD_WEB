@@ -41,7 +41,7 @@ jobs:
           cache-dependency-path: web/client/package-lock.json
       - name: Install and build client
         run: |
-          npm install --prefix web/client
+          npm ci --prefix web/client
           npm run build --prefix web/client
       - name: Type check client
         run: npx tsc --noEmit --project web/client/tsconfig.json

@@ -58,12 +58,10 @@ if ! curl -s http://localhost:5266/api/status &>/dev/null; then
 fi
 
 echo ""
-
-TEST_ARGS="${@:-all}"
-echo "Running: node cli-test.mjs $TEST_ARGS"
+echo "Running: node cli-test.mjs ${@:-all}"
 echo ""
 
-SERVER_URL="http://localhost:5266" node cli-test.mjs $TEST_ARGS
+SERVER_URL="http://localhost:5266" node cli-test.mjs "$@"
 TEST_RESULT=$?
 
 echo ""

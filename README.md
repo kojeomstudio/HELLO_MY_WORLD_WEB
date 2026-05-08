@@ -186,6 +186,14 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **HTTPS Redirection**: Optional HTTPS enforcement for production deployments
 - **Expanded Reserved Names**: Administrator, owner, staff, operator names blocked from registration to prevent impersonation
 - **Config-Driven Game Systems**: All game balance values (auto-save interval, day/night cycle length, chat max length, password policy, account lockout) read from `server_config.json` instead of hardcoded
+- **Config-Driven Game Loop**: Auto-save interval, auto-backup interval, falling block interval configurable via `gameLoop` section in `server_config.json`
+- **Config-Driven Entity Limits**: Max entities configurable via `entities.maxEntities` in `server_config.json`
+- **Config-Driven Mob Settings**: Max mobs, spawn interval, despawn distance, night/dark thresholds configurable via `mobs` section in `server_config.json`
+- **Config-Driven Weather**: Weather change interval range configurable via `weather` section in `server_config.json`
+- **Config-Driven Rollback**: Max rollback records configurable via `rollback.maxRecords` in `server_config.json`
+- **Config-Driven Area Protection**: Max areas per player and max claim size configurable via `areaProtection` section in `server_config.json`
+- **Config-Driven Anti-Cheat**: Speed buffer, fly speed buffer, violation thresholds configurable via `antiCheat` section in `server_config.json`
+- **Async Ban Database**: Atomic file writes with semaphore locking, temp-file-and-rename for crash safety
 - **MapgenV7 External Config**: All noise parameters and feature toggles configurable via `mapgen_v7.json` (caves, dungeons, mountains, rivers, caverns, ores, dust)
 - **MapgenV7 Data-Driven Ores**: Ore definitions loaded from `ores.json` (11 ores with biome filtering, cluster size/scarcity, Y range) with fallback to hardcoded defaults
 - **MapgenV7 Data-Driven Decorations**: Decoration definitions loaded from `decorations.json` (12 decorations with biome filtering, place-on validation, schematic height variation)
@@ -349,6 +357,10 @@ chmod +x start-prod.sh
 ```bash
 # Windows - Production build
 build.bat
+
+# Linux/macOS - Production build
+chmod +x build.sh
+./build.sh
 
 # Manual build
 dotnet build web/server/WebGameServer.csproj --configuration Release

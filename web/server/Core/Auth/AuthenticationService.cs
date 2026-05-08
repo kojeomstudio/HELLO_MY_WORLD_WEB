@@ -100,28 +100,52 @@ public class AuthenticationService
         return AuthResult.Success;
     }
 
+    public async Task BanNameAsync(string name)
+    {
+        _bannedNames.Add(name);
+        if (_banDatabase != null) await _banDatabase.BanNameAsync(name);
+    }
+
+    public async Task BanIpAsync(string ip)
+    {
+        _bannedIps.Add(ip);
+        if (_banDatabase != null) await _banDatabase.BanIpAsync(ip);
+    }
+
+    public async Task UnbanNameAsync(string name)
+    {
+        _bannedNames.Remove(name);
+        if (_banDatabase != null) await _banDatabase.UnbanNameAsync(name);
+    }
+
+    public async Task UnbanIpAsync(string ip)
+    {
+        _bannedIps.Remove(ip);
+        if (_banDatabase != null) await _banDatabase.UnbanIpAsync(ip);
+    }
+
     public void BanName(string name)
     {
         _bannedNames.Add(name);
-        _banDatabase?.BanName(name);
+        _ = _banDatabase?.BanNameAsync(name);
     }
 
     public void BanIp(string ip)
     {
         _bannedIps.Add(ip);
-        _banDatabase?.BanIp(ip);
+        _ = _banDatabase?.BanIpAsync(ip);
     }
 
     public void UnbanName(string name)
     {
         _bannedNames.Remove(name);
-        _banDatabase?.UnbanName(name);
+        _ = _banDatabase?.UnbanNameAsync(name);
     }
 
     public void UnbanIp(string ip)
     {
         _bannedIps.Remove(ip);
-        _banDatabase?.UnbanIp(ip);
+        _ = _banDatabase?.UnbanIpAsync(ip);
     }
 
     public bool IsBanned(string name) => _bannedNames.Contains(name) || (_banDatabase?.IsNameBanned(name) ?? false);

@@ -1,6 +1,6 @@
 import { HubConnectionBuilder, HttpTransportType } from '@microsoft/signalr';
 
-const SERVER_URL = 'http://localhost:5266';
+const SERVER_URL = process.env.SERVER_URL || 'http://localhost:5266';
 const TEST_PLAYER = `TBot_${Date.now().toString().slice(-8)}`;
 const TIMEOUT_MS = 10000;
 

@@ -22,11 +22,16 @@ public readonly record struct BlockChangeRecord(
 
 public class RollbackSystem
 {
-    private const int MaxRecords = 10000;
+    private readonly int _maxRecords;
 
     private readonly ConcurrentQueue<BlockChangeRecord> _changes = new();
     private readonly object _rollbackLock = new();
     private int _count;
+
+    public RollbackSystem(int maxRecords = 10000)
+    {
+        _maxRecords = maxRecords > 0 ? maxRecords : 10000;
+    }
 
     public void RecordChange(int x, int y, int z, uint oldData, uint newData, string playerName, string changeType)
     {
@@ -42,7 +47,7 @@ public class RollbackSystem
         _changes.Enqueue(record);
         Interlocked.Increment(ref _count);
 
-        while (_count > MaxRecords && _changes.TryDequeue(out _))
+        while (_count > _maxRecords && _changes.TryDequeue(out _))
         {
             Interlocked.Decrement(ref _count);
         }
