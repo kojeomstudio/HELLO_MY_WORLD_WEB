@@ -2171,6 +2171,7 @@ public class GameHub : Hub<IGameClient>
         }
         var result = sb.ToString();
         if (result.Length > maxLength) result = result[..maxLength];
+        result = result.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;");
         return result;
     }
 

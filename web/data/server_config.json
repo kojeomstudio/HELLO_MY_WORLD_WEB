@@ -131,5 +131,111 @@
         "positionCorrectionThreshold": 2.0,
         "maxViolationsBeforeCorrection": 3,
         "teleportDistanceThreshold": 50.0
+    },
+    "inventory": {
+        "stackMaxSize": 64,
+        "chestSize": 27
+    },
+    "knockback": {
+        "baseValue": 8.0,
+        "resistance": 0.17328,
+        "horizontalMultiplier": 10.0,
+        "verticalMultiplier": 8.0
+    },
+    "weatherProbabilities": {
+        "night": { "none": 0.45, "rain": 0.30, "snow": 0.15, "thunderstorm": 0.10 },
+        "duskDawn": { "none": 0.50, "rain": 0.25, "snow": 0.15, "thunderstorm": 0.10 },
+        "day": { "none": 0.75, "rain": 0.15, "snow": 0.05, "thunderstorm": 0.05 }
+    },
+    "lighting": {
+        "maxLight": 15,
+        "emissionLevels": {
+            "Torch": 14,
+            "Lava": 14,
+            "Glowstone": 15,
+            "Fire": 15,
+            "JackOLantern": 15,
+            "RedstoneLamp": 12,
+            "RedstoneTorch": 7,
+            "Furnace": 13,
+            "SeaLantern": 15,
+            "Beacon": 15,
+            "EndRod": 14
+        }
+    },
+    "crops": {
+        "wheatGrowTimeSeconds": 60,
+        "carrotGrowTimeSeconds": 45,
+        "potatoGrowTimeSeconds": 45,
+        "waterProximityRadius": 4,
+        "waterGrowthMultiplier": 4,
+        "maxGrowthStage": 7
+    },
+    "weatherDetail": {
+        "lightningStrikeRange": 100,
+        "lightningDamageRange": 5.0,
+        "lightningBaseDamage": 8.0
+    },
+    "explosions": {
+        "defaultBlockResistance": 3.0,
+        "waterLavaResistance": 100.0,
+        "dropChance": 0.3,
+        "playerKnockbackMultiplier": 0.5,
+        "mobKnockbackMultiplier": 0.3
+    },
+    "dungeon": {
+        "enabled": true,
+        "minY": -32,
+        "maxY": 8,
+        "roomMinSize": 5,
+        "roomMaxSize": 11,
+        "roomHeight": 4,
+        "corridorWidth": 2,
+        "corridorHeight": 3,
+        "roomsPerDungeon": 5,
+        "chestChance": 0.5,
+        "cobbleWallChance": 0.3,
+        "mossWallChance": 0.2,
+        "spawnInterval": 48,
+        "maxDungeonsPerChunk": 1
+    },
+    "playerDamage": {
+        "lavaDamageIntervalMs": 500,
+        "blockDamageIntervalMs": 500,
+        "saturationDrainPerTick": 0.01,
+        "foodDrainPerTick": 0.05,
+        "healthRegenThreshold": 18,
+        "healthRegenPerTick": 0.2,
+        "starvationDamagePerTick": 0.5,
+        "drowningBreathDrain": 0.05,
+        "drowningDamage": 1.0,
+        "voidDeathY": -64,
+        "respawnY": 80
+    },
+    "gameplay": {
+        "startItems": {
+            "torch": 16,
+            "bread": 5,
+            "coal": 8,
+            "oak_planks": 16,
+            "planks": 16,
+            "stick": 8,
+            "apple": 5
+        },
+        "experienceFormulaBase": 10,
+        "experienceFormulaPerLevel": 5,
+        "raycastMaxDistance": 8.0,
+        "blockInteractDistance": 6.0,
+        "positionBroadcastRange": 64,
+        "chunkRequestDistanceLimit": 256
+    },
+    "tools": {
+        "maxWear": 65536
+    },
+    "worldPersistence": {
+        "maxBackups": 5,
+        "maxForceloadedChunks": 256,
+        "emergeMaxConcurrentPerTick": 4,
+        "pregenerationRadius": 4
     }
 }
