@@ -46,7 +46,7 @@ async function connect(playerNameParam) {
     playerName = playerNameParam || `CLI_${Date.now()}`;
     connection = new HubConnectionBuilder()
         .withUrl(`${SERVER_URL}/game`, { transport: HttpTransportType.WebSockets })
-        .withAutomaticRetry()
+        .withAutomaticReconnect()
         .build();
     await withTimeout(connection.start());
     return connection;
@@ -539,11 +539,11 @@ const testSuites = {
 
             const conn1 = new HubConnectionBuilder()
                 .withUrl(`${SERVER_URL}/game`, { transport: HttpTransportType.WebSockets })
-                .withAutomaticRetry()
+                .withAutomaticReconnect()
                 .build();
             const conn2 = new HubConnectionBuilder()
                 .withUrl(`${SERVER_URL}/game`, { transport: HttpTransportType.WebSockets })
-                .withAutomaticRetry()
+                .withAutomaticReconnect()
                 .build();
 
             await withTimeout(conn1.start());

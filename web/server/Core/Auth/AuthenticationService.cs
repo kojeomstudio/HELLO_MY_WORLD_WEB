@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using WebGameServer.Core.Player;
+using Microsoft.Extensions.Logging;
 
 namespace WebGameServer.Core.Auth;
 
@@ -204,7 +205,7 @@ public class AuthenticationService
             Task.Run(async () =>
             {
                 try { await _banDatabase.BanNameAsync(name); }
-                catch (Exception) { }
+                catch (Exception ex) { Console.Error.WriteLine($"[Auth] Failed to persist ban for name '{name}': {ex.Message}"); }
             });
         }
     }
@@ -217,7 +218,7 @@ public class AuthenticationService
             Task.Run(async () =>
             {
                 try { await _banDatabase.BanIpAsync(ip); }
-                catch (Exception) { }
+                catch (Exception ex) { Console.Error.WriteLine($"[Auth] Failed to persist ban for IP '{ip}': {ex.Message}"); }
             });
         }
     }
@@ -230,7 +231,7 @@ public class AuthenticationService
             Task.Run(async () =>
             {
                 try { await _banDatabase.UnbanNameAsync(name); }
-                catch (Exception) { }
+                catch (Exception ex) { Console.Error.WriteLine($"[Auth] Failed to persist unban for name '{name}': {ex.Message}"); }
             });
         }
     }
@@ -243,7 +244,7 @@ public class AuthenticationService
             Task.Run(async () =>
             {
                 try { await _banDatabase.UnbanIpAsync(ip); }
-                catch (Exception) { }
+                catch (Exception ex) { Console.Error.WriteLine($"[Auth] Failed to persist unban for IP '{ip}': {ex.Message}"); }
             });
         }
     }

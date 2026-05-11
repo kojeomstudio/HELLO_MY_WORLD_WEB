@@ -38,6 +38,10 @@ done
 
 echo "Starting Vite client dev server..."
 cd "$SCRIPT_DIR/web/client"
+if [ ! -d "node_modules" ]; then
+    echo "Installing client dependencies..."
+    npm install
+fi
 npm run dev &
 CLIENT_PID=$!
 cd "$SCRIPT_DIR"

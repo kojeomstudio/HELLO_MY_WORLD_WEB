@@ -34,20 +34,19 @@ echo Starting server in background...
 start /B dotnet run --project web\server\WebGameServer.csproj --no-build -c Release > nul 2>&1
 
 echo Waiting for server to be ready...
-timeout /t 8 /nobreak > nul
-
+set WAIT_COUNT=0
 :CHECK_SERVER
 curl -s http://localhost:5266/api/status > nul 2>&1
-if %ERRORLEVEL% neq 0 (
-    echo Server not ready, waiting...
-    timeout /t 3 /nobreak > nul
-    curl -s http://localhost:5266/api/status > nul 2>&1
-    if %ERRORLEVEL% neq 0 (
-        echo FAIL: Server did not start
-        taskkill /F /IM WebGameServer.dll 2> nul
-        exit /b 1
-    )
+if %ERRORLEVEL% equ 0 goto SERVER_READY
+set /a WAIT_COUNT+=1
+if %WAIT_COUNT% geq 30 (
+    echo FAIL: Server did not start within 30 seconds
+    taskkill /F /IM WebGameServer.dll 2> nul
+    exit /b 1
 )
+timeout /t 1 /nobreak > nul
+goto CHECK_SERVER
+:SERVER_READY
 
 echo Server is ready.
 echo.

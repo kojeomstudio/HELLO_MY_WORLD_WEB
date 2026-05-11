@@ -285,6 +285,15 @@ public class GameHub : Hub<IGameClient>
 
         _accountFailures.TryRemove($"{ipAddress}:{playerName.ToLowerInvariant()}", out _);
 
+        if (!_playerDb.PlayerExists(playerName) && !string.IsNullOrEmpty(password))
+        {
+            if (password.Length < _config.Auth.MinPasswordLength || password.Length > _config.Auth.MaxPasswordLength)
+            {
+                await Clients.Caller.OnChatMessage("Server", $"Password must be {_config.Auth.MinPasswordLength}-{_config.Auth.MaxPasswordLength} characters.", "system");
+                return;
+            }
+        }
+
         var (joinSuccess, isNewPlayer) = _gameServer.PlayerJoin(Context.ConnectionId, playerName);
 
         if (!joinSuccess)
@@ -313,12 +322,6 @@ public class GameHub : Hub<IGameClient>
 
         if (isNewPlayer && !string.IsNullOrEmpty(password))
         {
-            if (password.Length < _config.Auth.MinPasswordLength || password.Length > _config.Auth.MaxPasswordLength)
-            {
-                await Clients.Caller.OnChatMessage("Server", $"Password must be {_config.Auth.MinPasswordLength}-{_config.Auth.MaxPasswordLength} characters.", "system");
-                _gameServer.PlayerLeave(Context.ConnectionId);
-                return;
-            }
             _playerDb.SetPasswordHash(playerName, AuthenticationService.HashPassword(password));
         }
 

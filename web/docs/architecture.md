@@ -548,3 +548,10 @@ All server services registered as **Singleton** in `Program.cs`:
 - **Smelting fuel system**: `SmeltingSystem` now loads fuel items with burn times from `smelting.json` fuels array, provides `GetFuel()`/`IsFuel()`/`GetFuelBurnTime()` APIs
 - **WorldManager enhancement**: Added `CreateDefaultWorld()`, `GetDefaultWorld()`, `SaveAll()`, `LoadWorld()`, `WorldCount` for multi-world management support
 - **Protocol integration test**: CI now includes `protocol-test` job that builds server, starts it in background, and runs `test-protocol.mjs` to verify SignalR communication
+
+### Security Improvements (Round 10)
+- **Pre-join password validation**: New player passwords now validated (length, complexity) BEFORE `PlayerJoin()` enters the game world, preventing brief unauthorized player entries
+- **Ban persistence error logging**: `AuthenticationService` ban/unban operations now log persistence failures to `stderr` instead of silently swallowing exceptions
+- **CI security-scan .NET setup**: Added missing `setup-dotnet` step to `security-scan` CI job, ensuring `dotnet list --vulnerable` runs reliably
+- **CLI test bug fix**: Fixed `cli-test.mjs` using non-existent `withAutomaticRetry()` — corrected to `withAutomaticReconnect()` (SignalR API)
+- **Script reliability**: `start.sh` now auto-installs client dependencies when `node_modules` is missing; `.bat` scripts use proper server readiness polling loops instead of fixed delays
