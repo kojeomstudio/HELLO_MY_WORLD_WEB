@@ -243,3 +243,59 @@ jobs:
             exit 1
           fi
           echo ".gitignore verification complete"
+
+  protocol-test:
+    name: Protocol Integration Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [server-build, client-build]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup .NET 8.0
+        uses: actions/setup-dotnet@3951f0dfe99a8eb0f6946b3bb0c4b1f2fac077af # v4.3.0
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601876af8c594af # v4.3.0
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web/client/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci --prefix web/client
+          npm install --no-save @microsoft/signalr
+
+      - name: Build server
+        run: dotnet build web/server/WebGameServer.csproj --configuration Release
+
+      - name: Run protocol tests
+        run: |
+          dotnet run --project web/server/WebGameServer.csproj --no-build -c Release &
+          SERVER_PID=$!
+
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:5266/api/status &>/dev/null; then
+              break
+            fi
+            if ! kill -0 $SERVER_PID 2>/dev/null; then
+              echo "Server failed to start."
+              exit 1
+            fi
+            sleep 1
+          done
+
+          if ! curl -s http://localhost:5266/api/status &>/dev/null; then
+            echo "Server did not start within timeout."
+            kill $SERVER_PID 2>/dev/null || true
+            exit 1
+          fi
+
+          SERVER_URL="http://localhost:5266" node test-protocol.mjs
+          TEST_RESULT=$?
+
+          kill $SERVER_PID 2>/dev/null || true
+          exit $TEST_RESULT

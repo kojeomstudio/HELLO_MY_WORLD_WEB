@@ -603,7 +603,13 @@ builder.Services.AddSingleton<RollbackSystem>(sp =>
     var config = sp.GetRequiredService<ServerConfig>();
     return new RollbackSystem(config.Rollback.MaxRecords);
 });
-builder.Services.AddSingleton<ProtectionSystem>();
+builder.Services.AddSingleton<ProtectionSystem>(sp =>
+{
+    var privilegeSystem = sp.GetRequiredService<PrivilegeSystem>();
+    var system = new ProtectionSystem();
+    system.SetPrivilegeBypass("protection_bypass", (player, priv) => privilegeSystem.HasPrivilege(player, priv));
+    return system;
+});
 builder.Services.AddSingleton<AreaProtectionSystem>(sp =>
 {
     var gameServer = sp.GetRequiredService<GameServer>();
@@ -647,7 +653,14 @@ builder.Services.AddSingleton(new PlayerDatabase(playerDbPath));
 builder.Services.AddSingleton(new BlockMetadataDatabase(blockMetaDbPath));
 builder.Services.AddSingleton<PhysicsEngine>(sp => new PhysicsEngine());
 builder.Services.AddSingleton<GameServer>();
-builder.Services.AddSingleton<AuthenticationService>();
+builder.Services.AddSingleton<AuthenticationService>(sp =>
+{
+    var config = sp.GetRequiredService<ServerConfig>();
+    return new AuthenticationService(
+        config.Auth.AccountLockoutAttempts,
+        config.Auth.AccountLockoutMinutes,
+        10);
+});
 builder.Services.AddSingleton<AsyncJobSystem>();
 builder.Services.AddSingleton<ChatCommandManager>(sp =>
 {
@@ -887,6 +900,18 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors();
+
+app.Use(async (context, next) =>
+{
+    var authService = context.RequestServices.GetRequiredService<AuthenticationService>();
+    var ip = context.Connection.RemoteIpAddress?.ToString();
+    if (ip != null && authService.IsConnectionRateLimited(ip))
+    {
+        context.Response.StatusCode = 429;
+        return;
+    }
+    await next();
+});
 
 var clientDistPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "client", "dist");
 if (!Directory.Exists(clientDistPath))

@@ -13,6 +13,14 @@ public class ProtectionSystem
 {
     private readonly List<ProtectionZone> _zones = new();
     private readonly object _lock = new();
+    private string _privilegeBypass = "protection_bypass";
+    private Func<string, string, bool>? _hasPrivilege;
+
+    public void SetPrivilegeBypass(string privilege, Func<string, string, bool> hasPrivilege)
+    {
+        _privilegeBypass = privilege;
+        _hasPrivilege = hasPrivilege;
+    }
 
     public bool IsProtected(Vector3 position, string playerName, string action)
     {
@@ -26,6 +34,9 @@ public class ProtectionSystem
 
                 if (zone.Owner == playerName) return false;
                 if (zone.AllowedPlayers.Contains(playerName)) return false;
+
+                if (_hasPrivilege != null && _hasPrivilege(playerName, _privilegeBypass))
+                    return false;
 
                 if (action == "interact") return true;
                 if (action == "build") return true;

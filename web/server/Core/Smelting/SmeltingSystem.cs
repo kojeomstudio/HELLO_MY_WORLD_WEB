@@ -5,6 +5,7 @@ namespace WebGameServer.Core.Smelting;
 public class SmeltingSystem
 {
     private List<SmeltingRecipe> _recipes = new();
+    private Dictionary<string, FuelEntry> _fuels = new(StringComparer.OrdinalIgnoreCase);
 
     public void LoadRecipes(string filePath)
     {
@@ -23,6 +24,17 @@ public class SmeltingSystem
 
             _recipes.Add(new SmeltingRecipe(input, result, cookTime, xp));
         }
+
+        if (doc.RootElement.TryGetProperty("fuels", out var fuelsEl))
+        {
+            _fuels.Clear();
+            foreach (var fuelEl in fuelsEl.EnumerateArray())
+            {
+                var item = fuelEl.GetProperty("item").GetString() ?? "";
+                var burnTime = fuelEl.TryGetProperty("burnTime", out var bt) ? bt.GetSingle() : 10.0f;
+                _fuels[item] = new FuelEntry(item, burnTime);
+            }
+        }
     }
 
     public SmeltingRecipe? GetRecipe(string inputId)
@@ -31,6 +43,20 @@ public class SmeltingSystem
     }
 
     public IReadOnlyList<SmeltingRecipe> GetAllRecipes() => _recipes.AsReadOnly();
+
+    public FuelEntry? GetFuel(string itemId)
+    {
+        return _fuels.TryGetValue(itemId, out var fuel) ? fuel : null;
+    }
+
+    public bool IsFuel(string itemId) => _fuels.ContainsKey(itemId);
+
+    public IReadOnlyDictionary<string, FuelEntry> GetAllFuels() => _fuels;
+
+    public float GetFuelBurnTime(string itemId)
+    {
+        return _fuels.TryGetValue(itemId, out var fuel) ? fuel.BurnTime : 0f;
+    }
 }
 
 public record SmeltingRecipe(
@@ -38,3 +64,7 @@ public record SmeltingRecipe(
     string ResultItemId,
     float CookTime,
     float Experience);
+
+public record FuelEntry(
+    string ItemId,
+    float BurnTime);

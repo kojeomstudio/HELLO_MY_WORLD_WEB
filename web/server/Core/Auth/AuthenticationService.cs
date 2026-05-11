@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using WebGameServer.Core.Player;
@@ -12,7 +13,8 @@ public enum AuthResult
     Banned,
     ServerFull,
     PasswordRequired,
-    PasswordIncorrect
+    PasswordIncorrect,
+    AccountLocked
 }
 
 public class AuthenticationService
@@ -25,12 +27,27 @@ public class AuthenticationService
     private static readonly HashSet<string> ReservedNames = new(StringComparer.OrdinalIgnoreCase)
     {
         "server", "admin", "system", "console", "root", "moderator",
-        "administrator", "owner", "staff", "system", "operator"
+        "administrator", "owner", "staff", "operator"
     };
 
     private readonly HashSet<string> _bannedNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _bannedIps = new(StringComparer.OrdinalIgnoreCase);
     private BanDatabase? _banDatabase;
+
+    private readonly ConcurrentDictionary<string, LockoutEntry> _lockouts = new(StringComparer.OrdinalIgnoreCase);
+    private readonly int _maxLockoutAttempts;
+    private readonly TimeSpan _lockoutDuration;
+
+    private readonly ConcurrentDictionary<string, ConnectionRateEntry> _connectionRates = new(StringComparer.OrdinalIgnoreCase);
+    private readonly int _maxConnectionsPerMinute;
+    private readonly TimeSpan _rateWindow = TimeSpan.FromMinutes(1);
+
+    public AuthenticationService(int maxLockoutAttempts = 5, int lockoutMinutes = 5, int maxConnectionsPerMinute = 10)
+    {
+        _maxLockoutAttempts = maxLockoutAttempts;
+        _lockoutDuration = TimeSpan.FromMinutes(lockoutMinutes);
+        _maxConnectionsPerMinute = maxConnectionsPerMinute;
+    }
 
     public static string HashPassword(string password)
     {
@@ -62,17 +79,72 @@ public class AuthenticationService
         var baseResult = AuthenticatePlayer(name, connectionId, onlineCount, maxPlayers, ipAddress);
         if (baseResult != AuthResult.Success) return baseResult;
 
+        if (IsAccountLocked(name))
+            return AuthResult.AccountLocked;
+
         if (playerDb.PlayerExists(name))
         {
             var existingHash = playerDb.GetPasswordHash(name);
             if (existingHash != null)
             {
                 if (string.IsNullOrEmpty(password)) return AuthResult.PasswordRequired;
-                if (!VerifyPassword(password, existingHash)) return AuthResult.PasswordIncorrect;
+                if (!VerifyPassword(password, existingHash))
+                {
+                    RecordFailedAttempt(name);
+                    return AuthResult.PasswordIncorrect;
+                }
             }
         }
 
+        ClearLockout(name);
         return AuthResult.Success;
+    }
+
+    public bool IsAccountLocked(string name)
+    {
+        if (_lockouts.TryGetValue(name, out var entry))
+        {
+            if (entry.Attempts >= _maxLockoutAttempts && DateTimeOffset.UtcNow - entry.LockoutStart < _lockoutDuration)
+                return true;
+            if (DateTimeOffset.UtcNow - entry.LockoutStart >= _lockoutDuration)
+                _lockouts.TryRemove(name, out _);
+        }
+        return false;
+    }
+
+    private void RecordFailedAttempt(string name)
+    {
+        _lockouts.AddOrUpdate(name,
+            _ => new LockoutEntry { Attempts = 1, LockoutStart = DateTimeOffset.UtcNow },
+            (_, existing) => new LockoutEntry
+            {
+                Attempts = existing.Attempts + 1,
+                LockoutStart = existing.Attempts + 1 >= _maxLockoutAttempts
+                    ? DateTimeOffset.UtcNow
+                    : existing.LockoutStart
+            });
+    }
+
+    private void ClearLockout(string name)
+    {
+        _lockouts.TryRemove(name, out _);
+    }
+
+    public bool IsConnectionRateLimited(string ipAddress)
+    {
+        if (string.IsNullOrEmpty(ipAddress)) return false;
+
+        var now = DateTimeOffset.UtcNow;
+        _connectionRates.AddOrUpdate(ipAddress,
+            _ => new ConnectionRateEntry { Count = 1, WindowStart = now },
+            (_, existing) =>
+            {
+                if (now - existing.WindowStart > _rateWindow)
+                    return new ConnectionRateEntry { Count = 1, WindowStart = now };
+                return new ConnectionRateEntry { Count = existing.Count + 1, WindowStart = existing.WindowStart };
+            });
+
+        return _connectionRates.TryGetValue(ipAddress, out var entry) && entry.Count > _maxConnectionsPerMinute;
     }
 
     public void SetBanDatabase(BanDatabase banDatabase)
@@ -129,10 +201,10 @@ public class AuthenticationService
         _bannedNames.Add(name);
         if (_banDatabase != null)
         {
-            _ = Task.Run(async () =>
+            Task.Run(async () =>
             {
                 try { await _banDatabase.BanNameAsync(name); }
-                catch { }
+                catch (Exception) { }
             });
         }
     }
@@ -142,10 +214,10 @@ public class AuthenticationService
         _bannedIps.Add(ip);
         if (_banDatabase != null)
         {
-            _ = Task.Run(async () =>
+            Task.Run(async () =>
             {
                 try { await _banDatabase.BanIpAsync(ip); }
-                catch { }
+                catch (Exception) { }
             });
         }
     }
@@ -155,10 +227,10 @@ public class AuthenticationService
         _bannedNames.Remove(name);
         if (_banDatabase != null)
         {
-            _ = Task.Run(async () =>
+            Task.Run(async () =>
             {
                 try { await _banDatabase.UnbanNameAsync(name); }
-                catch { }
+                catch (Exception) { }
             });
         }
     }
@@ -168,10 +240,10 @@ public class AuthenticationService
         _bannedIps.Remove(ip);
         if (_banDatabase != null)
         {
-            _ = Task.Run(async () =>
+            Task.Run(async () =>
             {
                 try { await _banDatabase.UnbanIpAsync(ip); }
-                catch { }
+                catch (Exception) { }
             });
         }
     }
@@ -182,5 +254,17 @@ public class AuthenticationService
     public void ReloadAuth()
     {
         _banDatabase?.Load();
+    }
+
+    private class LockoutEntry
+    {
+        public int Attempts { get; set; }
+        public DateTimeOffset LockoutStart { get; set; }
+    }
+
+    private class ConnectionRateEntry
+    {
+        public int Count { get; set; }
+        public DateTimeOffset WindowStart { get; set; }
     }
 }

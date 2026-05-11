@@ -20,5 +20,30 @@
         { "input": "sand_item", "result": "glass_block", "cookTime": 10.0, "experience": 0.1 },
         { "input": "cobblestone_slab", "result": "stone_slab", "cookTime": 10.0, "experience": 0.1 },
         { "input": "diamond_block_item", "result": "diamond", "cookTime": 10.0, "experience": 0.1 }
+    ],
+    "fuels": [
+        { "item": "planks", "burnTime": 15.0 },
+        { "item": "wood", "burnTime": 15.0 },
+        { "item": "stick", "burnTime": 5.0 },
+        { "item": "coal", "burnTime": 80.0 },
+        { "item": "charcoal", "burnTime": 80.0 },
+        { "item": "coal_block", "burnTime": 800.0 },
+        { "item": "wooden_pickaxe", "burnTime": 10.0 },
+        { "item": "wooden_sword", "burnTime": 10.0 },
+        { "item": "wooden_axe", "burnTime": 10.0 },
+        { "item": "wooden_shovel", "burnTime": 10.0 },
+        { "item": "wooden_hoe", "burnTime": 10.0 },
+        { "item": "oak_log", "burnTime": 15.0 },
+        { "item": "birch_log", "burnTime": 15.0 },
+        { "item": "spruce_log", "burnTime": 15.0 },
+        { "item": "jungle_log", "burnTime": 15.0 },
+        { "item": "lava_bucket", "burnTime": 1000.0 },
+        { "item": "scaffolding", "burnTime": 5.0 },
+        { "item": "bamboo", "burnTime": 2.5 },
+        { "item": "dried_kelp_block", "burnTime": 200.0 },
+        { "item": "carpet", "burnTime": 3.3 },
+        { "item": "banner", "burnTime": 15.0 },
+        { "item": "leaves", "burnTime": 5.0 },
+        { "item": "cobweb", "burnTime": 5.0 }
     ]
 }

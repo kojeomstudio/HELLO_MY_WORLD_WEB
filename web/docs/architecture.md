@@ -540,3 +540,11 @@ All server services registered as **Singleton** in `Program.cs`:
 - Hover detection (gravity enforcement when not flying)
 - Position correction sent to clients on violation
 - Fly mode requires privilege check
+
+### Security Improvements (Round 9)
+- **Account lockout**: `AuthenticationService` now implements `ConcurrentDictionary`-based lockout tracking — 5 failed password attempts triggers 5-minute account lockout, auto-expires after configured duration
+- **IP connection rate limiting**: Middleware in `Program.cs` enforces 10 connections/minute per IP via `IsConnectionRateLimited()` check before all requests
+- **Protection bypass privilege**: `ProtectionSystem` now accepts configurable bypass privilege (default: `protection_bypass`) via `SetPrivilegeBypass()`, integrated with `PrivilegeSystem`
+- **Smelting fuel system**: `SmeltingSystem` now loads fuel items with burn times from `smelting.json` fuels array, provides `GetFuel()`/`IsFuel()`/`GetFuelBurnTime()` APIs
+- **WorldManager enhancement**: Added `CreateDefaultWorld()`, `GetDefaultWorld()`, `SaveAll()`, `LoadWorld()`, `WorldCount` for multi-world management support
+- **Protocol integration test**: CI now includes `protocol-test` job that builds server, starts it in background, and runs `test-protocol.mjs` to verify SignalR communication
