@@ -1,6 +1,6 @@
 # HelloMyWorld - Architecture Documentation
 
-Web-based voxel game ported from Luanti/Minetest with 226 block types, 220+ items, 166+ crafting recipes, 10 biomes, 6 mob types, and full multiplayer support.
+Web-based voxel game ported from Luanti/Minetest with 251 block definitions, 247 items, 183 crafting recipes, 14 biomes, 6 mob types, and full multiplayer support.
 
 ## Tech Stack
 

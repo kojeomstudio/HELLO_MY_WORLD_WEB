@@ -67,7 +67,7 @@ See [server-api.md](server-api.md) for full method/event signatures.
 - Each block stored as `Block(Type, Param1, Param2, Light)` — 4 bytes per block
 - Serialized as 16,384-byte array (16^3 * 4 bytes)
 
-- **WorldGenerator** (`World/Generators/`) — Eight generators:
+- **WorldGenerator** (`World/Generators/`) — Nine generators:
 - `NoiseWorldGenerator`: Perlin noise terrain with caves, ores, trees (default)
 - `FlatWorldGenerator`: Flat grass world
 - `MapgenV5`: 3D noise based terrain
@@ -76,6 +76,7 @@ See [server-api.md](server-api.md) for full method/event signatures.
 - `MapgenCarpathian`: Stepped mountain terrain
 - `MapgenFractal`: Fractal-based terrain (Mandelbrot/Julia)
 - `MapgenSinglenode`: Single block type world
+- `MapgenV6`: Legacy terrain with 5 biome types, mud flow, desert temples
 
 **LightingEngine** (`World/LightingEngine.cs`) — Static class:
 - Sun light propagation from sky (flood fill downward)
@@ -111,7 +112,7 @@ See [server-api.md](server-api.md) for full method/event signatures.
 
 ### Crafting & Smelting
 
-**CraftingSystem** (`Crafting/CraftingSystem.cs`) — Recipe matching from inventory contents. 166+ recipes loaded from `items.json`.
+**CraftingSystem** (`Crafting/CraftingSystem.cs`) — Recipe matching from inventory contents. 183 recipes loaded from `items.json`.
 
 **GridCraftingSystem** (`Crafting/GridCraftingSystem.cs`) — Grid-based crafting with pattern offset matching and group support. Loaded from `gridRecipes` section in `items.json`. Integrated into `GetCraftingRecipes` hub method alongside `CraftingSystem`.
 
@@ -225,13 +226,13 @@ Creates `UIManager`, then `GameClient`, connects to server.
 
 ### Block Data
 Each block has:
-- `Type` (1 byte): BlockType enum value (0-100)
+- `Type` (1 byte): BlockType enum value (0-250)
 - `Param1`: Metadata (unused in most blocks)
 - `Param2`: Liquid level (1-8 for flowing) or door state
 - `Light`: Packed lighting (4-bit sun + 4-bit artificial)
 
 ### Block Types
-226 block types defined in `BlockType.cs` enum and `blocks.json` (IDs 0-226). Full defaults in `BlockDefinition.cs` with JSON override via `blocks.json`. See [game-systems.md](game-systems.md) for full list.
+251 block definitions in `BlockType.cs` enum and `blocks.json` (IDs 0-250). Full defaults in `BlockDefinition.cs` with JSON override via `blocks.json`. See [game-systems.md](game-systems.md) for full list.
 
 ### Chunk Meshing
 - Only renders exposed faces (face culling against solid neighbors)
@@ -314,7 +315,7 @@ Client                          Server
 - Noise-based terrain generation (Perlin noise)
 - Ground base: Y=32, terrain variation: ±20 blocks
 - Water level: Y=28
-- Biomes: grassland, forest, desert, snow, taiga, jungle, savanna, mountains, swamp, ocean (from `biomes.json`)
+- Biomes: grassland, forest, desert, snow, taiga, jungle, savanna, mountains, swamp, ocean, plus ocean/underground variants (14 total from `biomes.json`)
 - Trees generated with trunk + canopy (oak, jungle, pine variants)
 
 ### Caves & Ores
