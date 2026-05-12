@@ -1,0 +1,14 @@
+{
+  "FishProbability": 0.85,
+  "JunkProbability": 0.10,
+  "TreasureProbability": 0.05,
+  "FishItems": ["fish_raw"],
+  "JunkItems": ["leather_boots", "stick", "bone"],
+  "TreasureItems": ["name_tag", "saddle", "enchanted_book"],
+  "MinBiteDelay": 5,
+  "MaxBiteDelay": 30,
+  "MinReelWindow": 3,
+  "MaxReelWindow": 5,
+  "WaterCheckRadius": 5.0,
+  "MaxFishingDistance": 10
+}

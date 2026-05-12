@@ -1,0 +1,16 @@
+{
+  "armorDefense": {
+    "leather_helmet": 1.0,
+    "leather_chestplate": 1.0,
+    "leather_leggings": 1.0,
+    "leather_boots": 1.0,
+    "iron_helmet": 2.0,
+    "iron_chestplate": 6.0,
+    "iron_leggings": 5.0,
+    "iron_boots": 2.0,
+    "diamond_helmet": 3.0,
+    "diamond_chestplate": 8.0,
+    "diamond_leggings": 6.0,
+    "diamond_boots": 3.0
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "lightEmissions": {
+    "Torch": 14,
+    "Lava": 14,
+    "LavaFlowing": 14,
+    "GlowingObsidian": 14,
+    "JackOLantern": 15,
+    "SeaLantern": 15,
+    "Glowstone": 15,
+    "RedstoneLampOn": 12,
+    "Fire": 15,
+    "SoulTorch": 10,
+    "Lantern": 15,
+    "Campfire": 15,
+    "SoulCampfire": 10
+  }
+}

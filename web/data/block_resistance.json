@@ -1,0 +1,14 @@
+{
+  "defaultResistance": 3.0,
+  "blockResistance": {
+    "Stone": 6.0,
+    "Cobblestone": 6.0,
+    "Deepslate": 9.0,
+    "CoalOre": 5.0,
+    "GoldOre": 8.0,
+    "Water": 100.0,
+    "WaterFlowing": 100.0,
+    "Lava": 100.0,
+    "LavaFlowing": 100.0
+  }
+}

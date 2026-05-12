@@ -1,0 +1,65 @@
+{
+  "spawnParameters": {
+    "spawnDistanceMin": 24,
+    "spawnDistanceMax": 48,
+    "nightStart": 13000,
+    "nightEnd": 23000,
+    "darkLightThreshold": 7
+  },
+  "mobs": {
+    "Zombie": {
+      "MinY": -20,
+      "MaxY": 40,
+      "Weight": 3.0,
+      "Hostile": true,
+      "PreferredBiomes": [],
+      "UniversalWeight": 1.5,
+      "DarkWeightMultiplier": 2.0
+    },
+    "Skeleton": {
+      "MinY": -20,
+      "MaxY": 40,
+      "Weight": 2.0,
+      "Hostile": true,
+      "PreferredBiomes": [],
+      "UniversalWeight": 1.0,
+      "DarkWeightMultiplier": 2.5
+    },
+    "Spider": {
+      "MinY": -10,
+      "MaxY": 50,
+      "Weight": 2.0,
+      "Hostile": true,
+      "PreferredBiomes": [],
+      "UniversalWeight": 1.5,
+      "DarkWeightMultiplier": 2.0
+    },
+    "Cow": {
+      "MinY": 30,
+      "MaxY": 60,
+      "Weight": 3.0,
+      "Hostile": false,
+      "PreferredBiomes": ["Grassland", "Forest", "Savanna"],
+      "UniversalWeight": 0,
+      "DarkWeightMultiplier": 1.0
+    },
+    "Pig": {
+      "MinY": 30,
+      "MaxY": 60,
+      "Weight": 3.0,
+      "Hostile": false,
+      "PreferredBiomes": ["Grassland", "Forest", "Taiga"],
+      "UniversalWeight": 0,
+      "DarkWeightMultiplier": 1.0
+    },
+    "Chicken": {
+      "MinY": 30,
+      "MaxY": 60,
+      "Weight": 2.0,
+      "Hostile": false,
+      "PreferredBiomes": ["Grassland", "Forest", "Jungle"],
+      "UniversalWeight": 0,
+      "DarkWeightMultiplier": 1.0
+    }
+  }
+}

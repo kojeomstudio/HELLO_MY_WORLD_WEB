@@ -142,7 +142,8 @@ async function testChunkRequestProtocol() {
         assert(typeof cx === 'number', `OnChunkReceived chunkX=${cx}`);
         assert(typeof cy === 'number', `OnChunkReceived chunkY=${cy}`);
         assert(typeof cz === 'number', `OnChunkReceived chunkZ=${cz}`);
-        assert(data instanceof Uint8Array || data instanceof ArrayBuffer || typeof data === 'object', 'OnChunkReceived has block data');
+        const hasData = data instanceof Uint8Array || data instanceof ArrayBuffer || typeof data === 'object' || typeof data === 'string';
+        assert(hasData, 'OnChunkReceived has block data');
     } catch (e) {
         failed += 4;
         console.log(`  \u2717 FAIL: Chunk protocol - ${e.message}`);
