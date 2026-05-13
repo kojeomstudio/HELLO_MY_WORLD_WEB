@@ -289,10 +289,12 @@ export class CascadeShadowMap {
     }
 
     applyToLight(light: THREE.DirectionalLight): void {
-        if (!this.enabled || this.cascadeCameras.length === 0) return;
-        const cam = this.cascadeCameras[0];
+        if (!this.enabled || this.cascadeLightSpaceMatrices.length === 0) return;
+        const cam = this.cascadeCameras[this.cascadeCameras.length - 1];
         light.shadow.camera.copy(cam);
         light.shadow.camera.updateProjectionMatrix();
+        light.shadow.camera.position.copy(cam.position);
+        light.shadow.camera.quaternion.copy(cam.quaternion);
         light.shadow.mapSize.width = this.shadowMapSize;
         light.shadow.mapSize.height = this.shadowMapSize;
         light.shadow.bias = this.shadowBias;

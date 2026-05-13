@@ -1,3 +1,5 @@
+using WebGameServer.Core.Game;
+
 namespace WebGameServer.Core.World;
 
 public static class LightingEngine
@@ -21,61 +23,84 @@ public static class LightingEngine
     public static byte CalculateFinalLight(byte packed)
         => Math.Max(GetSunLight(packed), GetArtificialLight(packed));
 
-    public static int GetEmissionLevel(BlockType type) => type switch
-    {
-        BlockType.Torch => 14,
-        BlockType.Lava => 14,
-        BlockType.LavaFlowing => 14,
-        BlockType.GlowingObsidian => 14,
-        BlockType.JackOLantern => 15,
-        BlockType.SeaLantern => 15,
-        BlockType.Glowstone => 15,
-        BlockType.RedstoneLampOn => 12,
-        BlockType.Fire => 15,
-        BlockType.SoulTorch => 10,
-        BlockType.Lantern => 15,
-        BlockType.Campfire => 15,
-        BlockType.SoulCampfire => 10,
-        _ => 0
-    };
+    private static BlockDefinitionManager? _blockDefs;
 
-    private static bool IsTransparentType(BlockType type) => type switch
+    public static void Initialize(BlockDefinitionManager? blockDefs)
     {
-        BlockType.Air => true,
-        BlockType.Leaves => true,
-        BlockType.JungleLeaves => true,
-        BlockType.PineNeedles => true,
-        BlockType.Glass => true,
-        BlockType.Water => true,
-        BlockType.WaterFlowing => true,
-        BlockType.RiverWater => true,
-        BlockType.RiverWaterFlowing => true,
-        BlockType.Lava => true,
-        BlockType.LavaFlowing => true,
-        BlockType.Torch => true,
-        BlockType.SoulTorch => true,
-        BlockType.Ladder => true,
-        BlockType.Fence => true,
-        BlockType.DoorWood => true,
-        BlockType.SugarCane => true,
-        BlockType.SugarCaneBlock => true,
-        BlockType.Ice => true,
-        BlockType.TallGrass => true,
-        BlockType.FlowerRed => true,
-        BlockType.FlowerYellow => true,
-        BlockType.FlowerRose => true,
-        BlockType.FlowerTulip => true,
-        BlockType.DeadBush => true,
-        BlockType.JungleGrass => true,
-        BlockType.MushroomRedBlock => true,
-        BlockType.MushroomBrownBlock => true,
-        BlockType.Fire => true,
-        BlockType.IronBars => true,
-        BlockType.Chain => true,
-        BlockType.Cobweb => true,
-        BlockType.SnowLayer => true,
-        _ => false
-    };
+        _blockDefs = blockDefs;
+    }
+
+    public static int GetEmissionLevel(BlockType type)
+    {
+        if (_blockDefs != null)
+        {
+            var def = _blockDefs.Get((ushort)type);
+            if (def != null) return def.Light;
+        }
+        return type switch
+        {
+            BlockType.Torch => 14,
+            BlockType.Lava => 14,
+            BlockType.LavaFlowing => 14,
+            BlockType.GlowingObsidian => 14,
+            BlockType.JackOLantern => 15,
+            BlockType.SeaLantern => 15,
+            BlockType.Glowstone => 15,
+            BlockType.RedstoneLampOn => 12,
+            BlockType.Fire => 15,
+            BlockType.SoulTorch => 10,
+            BlockType.Lantern => 15,
+            BlockType.Campfire => 15,
+            BlockType.SoulCampfire => 10,
+            _ => 0
+        };
+    }
+
+    private static bool IsTransparentType(BlockType type)
+    {
+        if (_blockDefs != null)
+        {
+            var def = _blockDefs.Get((ushort)type);
+            if (def != null) return def.Transparent;
+        }
+        return type switch
+        {
+            BlockType.Air => true,
+            BlockType.Leaves => true,
+            BlockType.JungleLeaves => true,
+            BlockType.PineNeedles => true,
+            BlockType.Glass => true,
+            BlockType.Water => true,
+            BlockType.WaterFlowing => true,
+            BlockType.RiverWater => true,
+            BlockType.RiverWaterFlowing => true,
+            BlockType.Lava => true,
+            BlockType.LavaFlowing => true,
+            BlockType.Torch => true,
+            BlockType.SoulTorch => true,
+            BlockType.Ladder => true,
+            BlockType.Fence => true,
+            BlockType.DoorWood => true,
+            BlockType.SugarCane => true,
+            BlockType.SugarCaneBlock => true,
+            BlockType.Ice => true,
+            BlockType.TallGrass => true,
+            BlockType.FlowerRed => true,
+            BlockType.FlowerYellow => true,
+            BlockType.FlowerRose => true,
+            BlockType.FlowerTulip => true,
+            BlockType.DeadBush => true,
+            BlockType.JungleGrass => true,
+            BlockType.MushroomRedBlock => true,
+            BlockType.MushroomBrownBlock => true,
+            BlockType.Fire => true,
+            BlockType.IronBars => true,
+            BlockType.Chain => true,
+            BlockType.Cobweb => true,
+            BlockType.SnowLayer => true,
+            _ => false
+        };
+    }
 
     private static bool IsTransparent(Block block) => IsTransparentType(block.Type);
 

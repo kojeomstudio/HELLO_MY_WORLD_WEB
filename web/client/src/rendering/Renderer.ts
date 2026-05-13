@@ -745,7 +745,6 @@ export class Renderer {
         if (this.cascadeShadowMap.isEnabled()) {
             this.cascadeShadowMap.updateCascades(this.camera, this.skyLight.position);
             this.cascadeShadowMap.applyToLight(this.skyLight);
-            this.cascadeShadowMap.renderCascades(this.renderer, this.scene);
         }
 
         if (this.composer && this.postProcessingEnabled) {

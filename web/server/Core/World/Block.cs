@@ -31,7 +31,7 @@ public class Block
 
     public ushort ToUInt16()
     {
-        return (ushort)((byte)Type | (ushort)(Param1 << 8));
+        return (ushort)((byte)Type | ((ushort)(Param1 & 0x0F) << 8) | ((ushort)(Param2 & 0x0F) << 12));
     }
 
     public uint ToPacked()

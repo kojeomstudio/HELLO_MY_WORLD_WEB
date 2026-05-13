@@ -231,7 +231,7 @@ public class World
                         var currentPos = new Vector3s(worldX, worldY, worldZ);
                         var currentDist = _flowDistances.TryGetValue(currentPos, out var cd) ? cd : (byte)0;
 
-                        if (currentDist >= 8) continue;
+                        if (currentDist >= flowRange) continue;
 
                         var shuffled = HorizontalDirections
                             .OrderBy(_ => Random.Shared.Next()).ToArray();

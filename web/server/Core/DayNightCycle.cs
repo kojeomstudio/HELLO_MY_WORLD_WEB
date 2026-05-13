@@ -31,13 +31,13 @@ public class DayNightCycle
         }
         else if (gameTime >= DawnStart && gameTime < DayStart)
         {
-            IsDay = false;
+            IsDay = true;
             var t = (gameTime - DawnStart) / (DayStart - DawnStart);
             SunlightIntensity = 0.2f + 0.8f * t;
         }
         else
         {
-            IsDay = false;
+            IsDay = true;
             var t = (gameTime - DuskStart) / (NightStart - DuskStart);
             SunlightIntensity = 1.0f - 0.8f * t;
         }

@@ -95,6 +95,7 @@ builder.Services.AddSingleton<BlockDefinitionManager>(sp =>
     if (!File.Exists(dataPath))
         dataPath = Path.Combine(Directory.GetCurrentDirectory(), "data", "blocks.json");
     manager.LoadFromFile(dataPath);
+    LightingEngine.Initialize(manager);
     return manager;
 });
 builder.Services.AddSingleton<WorldGeneratorFactory>();
@@ -651,7 +652,24 @@ var blockMetaDbPath = Path.Combine(dataDir, "blockmeta.db");
 
 builder.Services.AddSingleton(new PlayerDatabase(playerDbPath));
 builder.Services.AddSingleton(new BlockMetadataDatabase(blockMetaDbPath));
-builder.Services.AddSingleton<PhysicsEngine>(sp => new PhysicsEngine());
+builder.Services.AddSingleton<PhysicsEngine>(sp =>
+{
+    var config = sp.GetRequiredService<ServerConfig>();
+    var blockDefs = sp.GetRequiredService<BlockDefinitionManager>();
+    var engine = new PhysicsEngine();
+    engine.Gravity = config.Physics.Gravity;
+    engine.JumpForce = config.Physics.JumpForce;
+    engine.WalkSpeed = config.Physics.WalkSpeed;
+    engine.SprintSpeed = config.Physics.SprintSpeed;
+    engine.FlySpeed = config.Physics.FlySpeed;
+    engine.ClimbSpeed = config.Physics.ClimbSpeed;
+    engine.Drag = config.Physics.Drag;
+    engine.LiquidDrag = config.Physics.LiquidDrag;
+    engine.TerminalVelocity = config.Physics.TerminalVelocity;
+    engine.PlayerHeight = config.Physics.PlayerHeight;
+    engine.BlockDefs = blockDefs;
+    return engine;
+});
 builder.Services.AddSingleton<GameServer>();
 builder.Services.AddSingleton<AuthenticationService>(sp =>
 {

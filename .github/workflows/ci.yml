@@ -104,7 +104,7 @@ jobs:
 
       - name: Check required data files exist
         run: |
-          REQUIRED_FILES="blocks.json items.json mobs.json server_config.json tools.json smelting.json physics_constants.json privileges.json abm_config.json biomes.json ores.json decorations.json sounds.json game_constants.json mapgen_v7.json mapgen_valleys.json mapgen_carpathian.json sky_params.json day_night_ratio.json protection.json tree_schematics.json lsystem_trees.json schematics.json formspecs.json"
+          REQUIRED_FILES="blocks.json items.json mobs.json server_config.json tools.json smelting.json physics_constants.json privileges.json abm_config.json biomes.json ores.json decorations.json sounds.json game_constants.json mapgen_v7.json mapgen_valleys.json mapgen_carpathian.json sky_params.json day_night_ratio.json protection.json tree_schematics.json lsystem_trees.json schematics.json formspecs.json fishing_loot.json armor_values.json light_emissions.json block_resistance.json mob_spawns.json"
           MISSING=0
           for f in $REQUIRED_FILES; do
             if [ ! -f "web/data/$f" ]; then
@@ -196,7 +196,12 @@ jobs:
         run: npm audit --prefix web/client --audit-level=high
 
       - name: Check .NET packages for vulnerabilities
-        run: dotnet list web/server/WebGameServer.csproj package --vulnerable --include-transitive
+        run: |
+          dotnet list web/server/WebGameServer.csproj package --vulnerable --include-transitive
+          if dotnet list web/server/WebGameServer.csproj package --vulnerable --include-transitive 2>&1 | grep -q 'has the following vulnerable packages'; then
+            echo "::error::Vulnerable .NET packages detected"
+            exit 1
+          fi
 
       - name: Check for hardcoded secrets in source
         run: |

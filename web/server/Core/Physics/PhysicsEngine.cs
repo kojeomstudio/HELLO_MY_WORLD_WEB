@@ -416,7 +416,7 @@ public class PhysicsEngine
     {
         return type is BlockType.Water or BlockType.WaterFlowing
             or BlockType.Lava or BlockType.LavaFlowing
-            or BlockType.RiverWater;
+            or BlockType.RiverWater or BlockType.RiverWaterFlowing;
     }
 }
 

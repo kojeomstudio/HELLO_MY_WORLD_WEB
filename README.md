@@ -133,7 +133,7 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Creative Search**: Real-time search by name or block ID with result highlighting
 - **Frustum Culling**: Camera frustum-based chunk visibility culling for performance
 - **Occlusion Culling**: 9-point raycast occlusion culling with progressive step increase (1.05x factor), configurable solid-block threshold, and early exit optimization
-- **Cascade Shadow Maps**: Multi-cascade (1-4) shadow system with dynamic frustum fitting, block-boundary snapping, configurable split distances, bias, and map resolution
+- **Cascade Shadow Maps**: Multi-cascade (1-4) shadow system with dynamic frustum fitting, block-boundary snapping, configurable split distances, bias, and map resolution; optimized to apply cascade camera bounds directly to directional light for zero-overhead shadow rendering
 - **Auto-Exposure / Tone Mapping**: ACES filmic tone mapping shader with luminance-based auto-exposure, configurable min/max exposure range
 - **Formspec System**: Server-driven UI system with formspec string parser (12 element types: size, label, button, field, textarea, list, image, box, dropdown, checkbox, bgcolor, container), predefined templates (chest, furnace, crafting, death screen), SignalR bidirectional communication
 - **Mod Storage**: Persistent key-value storage per mod with JSON persistence, CRUD operations via SignalR hub methods
@@ -317,7 +317,7 @@ web/
 │   ├── smelting.json     # 20 smelting recipes
 │   ├── decorations.json
 │   ├── ores.json
-│   └── sky_params.json, day_night_ratio.json, sounds.json (15 groups), protection.json, game_constants.json, formspecs.json
+│   └── sky_params.json, day_night_ratio.json, sounds.json (15 groups), protection.json, game_constants.json, formspecs.json, fishing_loot.json, armor_values.json, light_emissions.json, block_resistance.json, mob_spawns.json
 └── docs/                # Architecture documentation
 ```
 
