@@ -215,6 +215,11 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Gamepad Support**: Web Gamepad API integration with analog stick movement/look, button mapping (A=jump, B=dig, X=place, triggers=sprint/sneak), configurable deadzone
 - **Enriched String Chat**: Minetest-style § color codes (16 colors) with bold/italic/underline formatting in chat messages
 - **Server Profiler**: Runtime performance profiling with per-metric avg/max/min tracking, gauge values, text report API (`/api/profiler`, `/api/profiler/report`)
+- **Mob AABB Collision**: Full per-axis wall collision resolution for all mob entities (X/Z horizontal walls + Y ground/ceiling), matching player physics engine collision behavior
+- **Vehicle Entity System**: Boat and minecart vehicles with mount/dismount, steering input, forward thrust, water buoyancy, and per-axis AABB collision physics
+- **Entity Riding**: Player-to-vehicle attachment system with offset positioning; players attached to vehicles follow vehicle position
+- **Chunk Compression**: Server-side GZip compression for chunk data transfer (flagged 0x01 header), client-side DecompressionStream decompression — reduces network bandwidth for chunk loading
+- **Inventory Drag-and-Drop**: Mouse drag-and-drop support for inventory slot items with visual floating indicator, slot highlighting, and double-click auto-transfer
 
 ## Architecture
 
@@ -232,10 +237,11 @@ web/
 │   │   │   ├── OcclusionCuller.ts # 9-point raycast occlusion
 │   │   │   ├── CascadeShadowMap.ts # Multi-cascade shadows
 │   │   │   └── AutoExposurePass.ts # ACES tone mapping
-│   │   ├── world/               # World management
-│   │   │   ├── WorldManager.ts  # Chunk load/unload
-│   │   │   ├── ChunkMesh.ts     # Greedy mesh with AO
-│   │   │   ├── BlockRegistry.ts # Block definitions
+    │   │   ├── world/               # World management
+    │   │   │   ├── WorldManager.ts  # Chunk load/unload
+    │   │   │   ├── ChunkMesh.ts     # Greedy mesh with AO
+    │   │   │   ├── ChunkDecompressor.ts # GZip chunk decompression
+    │   │   │   ├── BlockRegistry.ts # Block definitions
 │   │   │   ├── ParticleSystem.ts
 │   │   │   ├── ItemRegistry.ts
 │   │   │   └── WeatherSystem.ts # Rain, snow, thunderstorm
@@ -247,9 +253,10 @@ web/
 │   │   ├── ui/
 │   │   │   ├── UIManager.ts     # All UI panels
 │   │   │   ├── CraftingGridUI.ts # 3x3 crafting grid
-│   │   │   ├── FormspecRenderer.ts # Server-driven UI
-│   │   │   ├── EnrichedString.ts # Color-coded chat
-│   │   │   ├── Minimap.ts
+    │   │   │   ├── FormspecRenderer.ts # Server-driven UI
+    │   │   │   ├── EnrichedString.ts # Color-coded chat
+    │   │   │   ├── InventoryDragDrop.ts # Drag-and-drop inventory
+    │   │   │   ├── Minimap.ts
 │   │   │   └── SettingsPanel.ts
 │   │   └── audio/
 │   │       └── AudioManager.ts  # Procedural audio
@@ -273,7 +280,10 @@ web/
 │   │   ├── Auth/                 # Authentication, privileges, protection, ban DB
 │   │   ├── Chat/                 # Chat commands with privilege checks
 │   │   ├── Crafting/             # Crafting system
-│   │   ├── Entities/             # Entities, mobs (with AI states), spawner, fishing, breeding, projectiles
+    │   │   ├── Entities/             # Entities, mobs (with AI states), spawner, fishing, breeding, projectiles, vehicles
+    │   │   │   ├── Entity.cs          # Base entity, ItemEntity, ProjectileEntity, MobEntity (with AABB collision)
+    │   │   │   ├── VehicleEntity.cs   # Boat/minecart vehicles with mount/dismount
+    │   │   │   └── ...
 │   │   ├── Game/                 # Block definitions
 │   │   ├── Inventory/            # Detached inventory manager
 │   │   ├── Particles/            # Particle spawner specs

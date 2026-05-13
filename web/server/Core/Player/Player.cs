@@ -58,6 +58,9 @@ public class Player
 
     public Dictionary<string, string> ItemColors { get; } = new(StringComparer.OrdinalIgnoreCase);
 
+    public Guid? AttachedToEntityId { get; set; }
+    public Vector3 AttachmentOffset { get; set; } = Vector3.Zero;
+
     public void ClearPhysicsOverride()
     {
         OverrideGravity = null;

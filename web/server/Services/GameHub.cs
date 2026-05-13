@@ -1155,7 +1155,19 @@ public class GameHub : Hub<IGameClient>
 
         var chunk = _gameServer.DefaultWorld.GetChunk(new ChunkCoord(chunkX, chunkY, chunkZ));
         var data = chunk.Serialize();
-        await Clients.Caller.OnChunkReceived(chunkX, chunkY, chunkZ, data);
+        var compressed = CompressChunkData(data);
+        await Clients.Caller.OnChunkReceived(chunkX, chunkY, chunkZ, compressed);
+    }
+
+    private static byte[] CompressChunkData(byte[] data)
+    {
+        using var outputStream = new System.IO.MemoryStream();
+        outputStream.WriteByte(0x01);
+        using (var gzip = new System.IO.Compression.GZipStream(outputStream, System.IO.Compression.CompressionLevel.Fastest))
+        {
+            gzip.Write(data, 0, data.Length);
+        }
+        return outputStream.ToArray();
     }
 
     public async Task SelectSlot(int slot)
@@ -2948,5 +2960,73 @@ public class GameHub : Hub<IGameClient>
 
         await Clients.All.OnSpawnParticle(
             "explosion", x, y, z, 0, 5, 0, 2.0f);
+    }
+
+    public async Task SpawnVehicle(string vehicleType, float x, float y, float z)
+    {
+        if (!CheckRateLimit(Context.ConnectionId, "vehicle", 500)) return;
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
+        if (!_gameServer.Privileges.HasPrivilege(player.Name, "interact")) return;
+        if (string.IsNullOrEmpty(vehicleType) || vehicleType.Length > 32) return;
+
+        var spawnDist = Vector3.Distance(new Vector3(x, y, z), player.Position);
+        if (spawnDist > 10f) return;
+
+        var vehicle = new VehicleEntity(vehicleType, new Vector3(x, y, z));
+        _entityManager.Add(vehicle);
+
+        await Clients.All.OnEntitySpawned(
+            vehicle.Id, "Vehicle", vehicleType, x, y, z,
+            false, 1.0f, vehicle.VehicleType, 0);
+    }
+
+    public async Task MountVehicle(Guid vehicleId)
+    {
+        if (!CheckRateLimit(Context.ConnectionId, "mount", 200)) return;
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
+
+        var entity = _entityManager.Get(vehicleId);
+        if (entity is not VehicleEntity vehicle) return;
+
+        var dist = Vector3.Distance(player.Position, vehicle.Position);
+        if (dist > 3f) return;
+
+        if (vehicle.Mount(player))
+        {
+            await Clients.Caller.OnChatMessage("Server", $"Mounted {vehicle.VehicleType}.", "system");
+        }
+    }
+
+    public async Task DismountVehicle()
+    {
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
+        if (player.AttachedToEntityId == null) return;
+
+        var entity = _entityManager.Get(player.AttachedToEntityId.Value);
+        if (entity is not VehicleEntity vehicle) return;
+
+        if (vehicle.Dismount(player))
+        {
+            await Clients.Caller.OnChatMessage("Server", $"Dismounted {vehicle.VehicleType}.", "system");
+        }
+    }
+
+    public async Task ControlVehicle(float steering, float forward)
+    {
+        var player = GetAuthenticatedPlayer();
+        if (player == null) return;
+        if (player.AttachedToEntityId == null) return;
+
+        var entity = _entityManager.Get(player.AttachedToEntityId.Value);
+        if (entity is not VehicleEntity vehicle) return;
+        if (vehicle.DriverId != player.Id) return;
+
+        if (float.IsNaN(steering) || float.IsInfinity(steering)) return;
+        if (float.IsNaN(forward) || float.IsInfinity(forward)) return;
+
+        vehicle.SetInput(steering, forward);
     }
 }

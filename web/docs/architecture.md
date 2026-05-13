@@ -26,6 +26,8 @@ All client-server communication uses **SignalR** over WebSocket at the `/game` e
 - **Hub methods**: Client invokes server (`connection.invoke('Method', args)`)
 - **Client events**: Server pushes to client (`Clients.Caller.OnEvent(args)`)
 - Rate limiting: Dig/place actions throttled to 250ms, chat to 500ms
+- **Chunk compression**: Chunk data compressed with GZip on server (0x01 flag byte prefix), decompressed on client using DecompressionStream API
+- **Vehicle protocol**: `SpawnVehicle`, `MountVehicle`, `DismountVehicle`, `ControlVehicle` hub methods for entity riding
 
 See [server-api.md](server-api.md) for full method/event signatures.
 
@@ -66,6 +68,8 @@ See [server-api.md](server-api.md) for full method/event signatures.
 **Chunk** (`World/Chunk.cs`) — 16x16x16 block volume:
 - Each block stored as `Block(Type, Param1, Param2, Light)` — 4 bytes per block
 - Serialized as 16,384-byte array (16^3 * 4 bytes)
+- Monoblock optimization: all-identical chunks serialize to 5 bytes (0xFF marker)
+- **GZip compression**: Server compresses chunk data before sending; client decompresses via DecompressionStream
 
 - **WorldGenerator** (`World/Generators/`) — Nine generators:
 - `NoiseWorldGenerator`: Perlin noise terrain with caves, ores, trees (default)
@@ -101,8 +105,9 @@ See [server-api.md](server-api.md) for full method/event signatures.
 
 **EntityManager** (`Entities/EntityManager.cs`) — Tracks all entities:
 - `ItemEntity`: Dropped items with position, lifetime, magnet range
-- `MobEntity`: Hostile (Zombie, Skeleton, Spider) and passive (Cow, Pig, Chicken) mobs with AI pathfinding, attack, and mob-specific render properties (color, size)
-- `ProjectileEntity`: Arrow/snowball entities with gravity, drag, block collision, and entity hit detection. Supports piercing (multishot) with configurable hit counts
+- `MobEntity`: Hostile (Zombie, Skeleton, Spider) and passive (Cow, Pig, Chicken) mobs with AI pathfinding, attack, mob-specific render properties, and **full AABB wall collision** (per-axis X/Z/Y collision resolution matching player physics)
+- `ProjectileEntity`: Arrow/snowball entities with gravity, drag, block collision, and entity hit detection. Supports piercing (multichot) with configurable hit counts
+- `VehicleEntity`: Boat and minecart vehicles with mount/dismount via SignalR, steering input, forward thrust, water buoyancy, and per-axis AABB collision physics
 
 **MobSpawner** (`Entities/MobSpawner.cs`) — Spawns mobs every 10s (max 50), weighted random selection with spawn height validation, despawns distant mobs (>128 blocks). Hostile mobs only spawn at night (ticks 13000–23000); passive mobs only spawn on grass during day.
 
@@ -162,6 +167,7 @@ Creates `UIManager`, then `GameClient`, connects to server.
 ### WorldManager (`world/WorldManager.ts`) — Chunk management
 - Stores loaded chunk meshes
 - Requests chunks from server, rebuilds meshes on load
+- **ChunkDecompressor** (`world/ChunkDecompressor.ts`): Handles GZip decompression of chunk data using browser DecompressionStream
 - Block/neighbor lookups across chunk boundaries
 - Player entity tracking (remote players)
 - Render distance culling
@@ -197,6 +203,7 @@ Creates `UIManager`, then `GameClient`, connects to server.
 - Hotbar with item display
 - Chat overlay
 - Debug info (FPS, position, chunk count)
+- **InventoryDragDrop** (`ui/InventoryDragDrop.ts`): Reusable drag-and-drop for inventory slots with visual floating indicator, slot highlighting, double-click auto-transfer
 - Death screen, creative inventory, crafting panel, chest UI, furnace UI, settings
 - Settings panel (FOV, mouse sensitivity, render distance, AO, clouds, volume)
 

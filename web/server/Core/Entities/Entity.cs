@@ -638,19 +638,14 @@ public class MobEntity : Entity
 
         var newPos = Position + Velocity * dt;
 
-        var groundBlock = WorldReference?.GetBlock(new Vector3s(
-            (short)Math.Floor(newPos.X),
-            (short)Math.Floor(newPos.Y - 0.1),
-            (short)Math.Floor(newPos.Z)));
-
-        if (groundBlock != null
-            && groundBlock.Type != BlockType.Air
-            && groundBlock.Type != BlockType.Water
-            && groundBlock.Type != BlockType.Lava)
+        if (WorldReference != null)
         {
-            var groundY = (float)Math.Floor(newPos.Y - 0.1) + 1.0f;
-            newPos = new Vector3(newPos.X, groundY, newPos.Z);
-            Velocity = new Vector3(Velocity.X, 0, Velocity.Z);
+            var halfW = 0.3f;
+            var mobHeight = IsBaby ? 0.9f : 1.8f;
+
+            newPos = ResolveMobCollisionX(newPos, Position, halfW, mobHeight);
+            newPos = ResolveMobCollisionZ(newPos, Position, halfW, mobHeight);
+            newPos = ResolveMobCollisionY(newPos, halfW, mobHeight);
         }
 
         Position = newPos;
@@ -660,5 +655,125 @@ public class MobEntity : Entity
             Position = new Vector3(Position.X, 1, Position.Z);
             Velocity = new Vector3(Velocity.X, 0, Velocity.Z);
         }
+    }
+
+    private Vector3 ResolveMobCollisionX(Vector3 newPos, Vector3 origPos, float halfW, float height)
+    {
+        if (WorldReference == null) return newPos;
+
+        var startBX = (short)Math.Floor(newPos.X - halfW);
+        var endBX = (short)Math.Floor(newPos.X + halfW - 0.001f);
+        var startBZ = (short)Math.Floor(origPos.Z - halfW);
+        var endBZ = (short)Math.Floor(origPos.Z + halfW - 0.001f);
+        var startBY = (short)Math.Floor(origPos.Y - height);
+        var endBY = (short)Math.Floor(origPos.Y - 0.01f);
+
+        for (int bx = startBX; bx <= endBX; bx++)
+        {
+            for (int bz = startBZ; bz <= endBZ; bz++)
+            {
+                for (int by = startBY; by <= endBY; by++)
+                {
+                    var block = WorldReference.GetBlock(new Vector3s((short)bx, (short)by, (short)bz));
+                    if (!IsMobSolidBlock(block.Type)) continue;
+                    if (newPos.X < origPos.X)
+                        newPos = new Vector3(bx + 1 + halfW, newPos.Y, newPos.Z);
+                    else
+                        newPos = new Vector3(bx - halfW, newPos.Y, newPos.Z);
+                    Velocity = new Vector3(0, Velocity.Y, Velocity.Z);
+                }
+            }
+        }
+
+        return newPos;
+    }
+
+    private Vector3 ResolveMobCollisionZ(Vector3 newPos, Vector3 origPos, float halfW, float height)
+    {
+        if (WorldReference == null) return newPos;
+
+        var startBX = (short)Math.Floor(newPos.X - halfW);
+        var endBX = (short)Math.Floor(newPos.X + halfW - 0.001f);
+        var startBZ = (short)Math.Floor(newPos.Z - halfW);
+        var endBZ = (short)Math.Floor(newPos.Z + halfW - 0.001f);
+        var startBY = (short)Math.Floor(origPos.Y - height);
+        var endBY = (short)Math.Floor(origPos.Y - 0.01f);
+
+        for (int bx = startBX; bx <= endBX; bx++)
+        {
+            for (int bz = startBZ; bz <= endBZ; bz++)
+            {
+                for (int by = startBY; by <= endBY; by++)
+                {
+                    var block = WorldReference.GetBlock(new Vector3s((short)bx, (short)by, (short)bz));
+                    if (!IsMobSolidBlock(block.Type)) continue;
+                    if (newPos.Z < origPos.Z)
+                        newPos = new Vector3(newPos.X, newPos.Y, bz + 1 + halfW);
+                    else
+                        newPos = new Vector3(newPos.X, newPos.Y, bz - halfW);
+                    Velocity = new Vector3(Velocity.X, Velocity.Y, 0);
+                }
+            }
+        }
+
+        return newPos;
+    }
+
+    private Vector3 ResolveMobCollisionY(Vector3 newPos, float halfW, float height)
+    {
+        if (WorldReference == null) return newPos;
+
+        var startBX = (short)Math.Floor(newPos.X - halfW);
+        var endBX = (short)Math.Floor(newPos.X + halfW - 0.001f);
+        var startBZ = (short)Math.Floor(newPos.Z - halfW);
+        var endBZ = (short)Math.Floor(newPos.Z + halfW - 0.001f);
+        var isFalling = Velocity.Y <= 0;
+
+        for (int bx = startBX; bx <= endBX; bx++)
+        {
+            for (int bz = startBZ; bz <= endBZ; bz++)
+            {
+                if (isFalling)
+                {
+                    var feetBY = (short)Math.Floor(newPos.Y - height);
+                    var headBY = (short)Math.Floor(newPos.Y - 0.01f);
+                    for (int by = feetBY; by <= headBY; by++)
+                    {
+                        var block = WorldReference.GetBlock(new Vector3s((short)bx, (short)by, (short)bz));
+                        if (!IsMobSolidBlock(block.Type)) continue;
+                        newPos = new Vector3(newPos.X, by + 1 + height, newPos.Z);
+                        Velocity = new Vector3(Velocity.X, 0, Velocity.Z);
+                        return newPos;
+                    }
+                }
+                else
+                {
+                    var headBY = (short)Math.Floor(newPos.Y + 0.01f);
+                    var block = WorldReference.GetBlock(new Vector3s((short)bx, headBY, (short)bz));
+                    if (IsMobSolidBlock(block.Type))
+                    {
+                        newPos = new Vector3(newPos.X, headBY, newPos.Z);
+                        Velocity = new Vector3(Velocity.X, 0, Velocity.Z);
+                        return newPos;
+                    }
+                }
+            }
+        }
+
+        return newPos;
+    }
+
+    private static bool IsMobSolidBlock(BlockType type)
+    {
+        return type != BlockType.Air
+            && type != BlockType.Water && type != BlockType.WaterFlowing
+            && type != BlockType.Lava && type != BlockType.LavaFlowing
+            && type != BlockType.RiverWater && type != BlockType.RiverWaterFlowing
+            && type != BlockType.Torch
+            && type != BlockType.Ladder
+            && type != BlockType.FlowerRed && type != BlockType.FlowerYellow
+            && type != BlockType.FlowerRose && type != BlockType.FlowerTulip
+            && type != BlockType.TallGrass
+            && type != BlockType.SugarCane;
     }
 }

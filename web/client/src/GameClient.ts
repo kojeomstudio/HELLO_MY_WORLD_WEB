@@ -15,6 +15,7 @@ import { WeatherSystem } from './world/WeatherSystem';
 import { ItemRegistry } from './world/ItemRegistry';
 import { FormspecRenderer } from './ui/FormspecRenderer';
 import { setLeavesStyle as applyLeavesStyle, setTranslucentLiquids as applyTranslucentLiquids } from './world/ChunkMesh';
+import { ChunkDecompressor } from './world/ChunkDecompressor';
 import { ModLoader } from './modding/ModLoader';
 import { TouchControls } from './input/TouchControls';
 import { t, setLocale, getAvailableLocales } from './i18n/I18n';
@@ -166,8 +167,9 @@ export class GameClient {
     private setupServerHandlers(): void {
         if (!this.connection) return;
 
-        this.connection.on('OnChunkReceived', (chunkX: number, chunkY: number, chunkZ: number, data: Uint8Array) => {
-            this.worldManager.loadChunk(chunkX, chunkY, chunkZ, data);
+        this.connection.on('OnChunkReceived', async (chunkX: number, chunkY: number, chunkZ: number, data: Uint8Array) => {
+            const decompressed = await ChunkDecompressor.decompress(data);
+            this.worldManager.loadChunk(chunkX, chunkY, chunkZ, decompressed);
         });
 
         this.connection.on('OnPlayerJoined', (name: string) => {
