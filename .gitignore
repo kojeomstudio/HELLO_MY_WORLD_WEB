@@ -59,6 +59,7 @@ logs/
 *.old
 
 # World data (generated at runtime)
+data/
 web/data/worlds/
 web/data/bans.json
 web/data/player_privileges.json
