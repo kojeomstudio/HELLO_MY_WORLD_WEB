@@ -173,6 +173,11 @@ public class SecuritySettings
     public int CspNonceSize { get; set; } = 16;
     public int MaxConcurrentConnections { get; set; } = 0;
     public string? ProfilerSecret { get; set; }
+
+    public string? GetEffectiveProfilerSecret()
+    {
+        return Environment.GetEnvironmentVariable("PROFILER_SECRET") ?? ProfilerSecret;
+    }
 }
 
 public class GameLoopSettings

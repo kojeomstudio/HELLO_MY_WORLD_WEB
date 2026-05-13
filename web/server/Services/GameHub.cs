@@ -2378,6 +2378,9 @@ public class GameHub : Hub<IGameClient>
     {
         if (!CheckRateLimit(Context.ConnectionId, "gridcraft", 500)) return;
         if (gridSize < 1 || gridSize > 9) return;
+        for (int r = 0; r < gridSize; r++)
+            for (int c = 0; c < gridSize; c++)
+                if (grid[r, c] != null && grid[r, c]!.Length > 128) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
 
@@ -2683,8 +2686,8 @@ public class GameHub : Hub<IGameClient>
             player.LastGroundY = spawnPos.Y;
             player.FallDistance = 0;
             await Clients.Caller.OnHealthUpdate(player.Health, player.MaxHealth);
-            await SendInitialChunks(player);
-        }
+        await SendInitialChunks(player);
+    }
         else if (formName == "chest" && fields.TryGetValue("close", out var _))
         {
         }
@@ -2785,14 +2788,15 @@ public class GameHub : Hub<IGameClient>
         if (player == null) return;
         if (string.IsNullOrEmpty(channelName) || channelName.Length > 64) return;
         if (string.IsNullOrEmpty(message) || message.Length > 500) return;
+        var sanitizedMessage = SanitizeChatMessage(message, 500);
 
-        var recipients = ModChannelManager.SendMessage(channelName, player.Name, message);
+        var recipients = ModChannelManager.SendMessage(channelName, player.Name, sanitizedMessage);
         foreach (var recipient in recipients)
         {
             var connId = _gameServer.GetPlayerConnectionId(recipient);
             if (connId != null && connId != Context.ConnectionId)
             {
-                await Clients.Client(connId).OnModChannelMessage(channelName, player.Name, message);
+                await Clients.Client(connId).OnModChannelMessage(channelName, player.Name, sanitizedMessage);
             }
         }
     }
@@ -2809,6 +2813,13 @@ public class GameHub : Hub<IGameClient>
         if (!CheckRateLimit(Context.ConnectionId, "particlespawner", 500)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
+        if (!_gameServer.Privileges.HasPrivilege(player.Name, "interact")) return;
+        if (string.IsNullOrEmpty(texture) || texture.Length > 256) return;
+        if (amount < 0 || amount > 1000) return;
+        if (expirationTime < 0 || expirationTime > 300) return;
+        if (sizeMin < 0 || sizeMax < 0 || sizeMin > 100 || sizeMax > 100) return;
+        if (float.IsNaN(posX) || float.IsNaN(posY) || float.IsNaN(posZ)) return;
+        if (float.IsInfinity(posX) || float.IsInfinity(posY) || float.IsInfinity(posZ)) return;
 
         await Clients.Caller.OnAddParticleSpawner(
             spawnerId, posX, posY, posZ,
@@ -2822,6 +2833,7 @@ public class GameHub : Hub<IGameClient>
         if (!CheckRateLimit(Context.ConnectionId, "particlespawner", 500)) return;
         var player = GetAuthenticatedPlayer();
         if (player == null) return;
+        if (!_gameServer.Privileges.HasPrivilege(player.Name, "interact")) return;
 
         await Clients.Caller.OnDeleteParticleSpawner(spawnerId);
     }

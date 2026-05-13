@@ -985,18 +985,20 @@ app.MapGet("/api/status", (GameServer server) => new
 app.MapGet("/api/profiler", (ServerProfiler profiler, ServerConfig cfg, HttpContext context) =>
 {
     var secret = context.Request.Headers["X-Profiler-Secret"].FirstOrDefault() ?? string.Empty;
-    if (string.IsNullOrEmpty(cfg.Security.ProfilerSecret)
+    var effectiveSecret = cfg.Security.GetEffectiveProfilerSecret();
+    if (string.IsNullOrEmpty(effectiveSecret)
         || string.IsNullOrEmpty(secret)
-        || !CryptographicOperationsEqual(secret, cfg.Security.ProfilerSecret))
+        || !CryptographicOperationsEqual(secret, effectiveSecret))
         return Results.Unauthorized();
     return Results.Ok(profiler.GetSnapshot());
 });
 app.MapGet("/api/profiler/report", (ServerProfiler profiler, ServerConfig cfg, HttpContext context) =>
 {
     var secret = context.Request.Headers["X-Profiler-Secret"].FirstOrDefault() ?? string.Empty;
-    if (string.IsNullOrEmpty(cfg.Security.ProfilerSecret)
+    var effectiveSecret = cfg.Security.GetEffectiveProfilerSecret();
+    if (string.IsNullOrEmpty(effectiveSecret)
         || string.IsNullOrEmpty(secret)
-        || !CryptographicOperationsEqual(secret, cfg.Security.ProfilerSecret))
+        || !CryptographicOperationsEqual(secret, effectiveSecret))
         return Results.Unauthorized();
     return Results.Ok(profiler.FormatReport());
 });

@@ -92,10 +92,7 @@ export class EnrichedString {
             if (seg.bold) style += ';font-weight:bold';
             if (seg.italic) style += ';font-style:italic';
             if (seg.underline) style += ';text-decoration:underline';
-            const escaped = seg.text
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;');
+            const escaped = seg.text;
             return `<span style="${style}">${escaped}</span>`;
         }).join('');
     }

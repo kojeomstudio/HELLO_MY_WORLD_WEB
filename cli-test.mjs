@@ -59,7 +59,7 @@ async function join() {
     const timePromise = waitForEvent('OnTimeUpdate');
     const playerListPromise = waitForEvent('OnPlayerListUpdate');
 
-    await connection.invoke('Join', playerName);
+    await connection.invoke('Join', playerName, '');
 
     await withTimeout(blockDefsPromise);
     await withTimeout(healthPromise);
@@ -108,7 +108,7 @@ const testSuites = {
         async run() {
             await connect();
             await join();
-            await connection.invoke('UpdatePosition', 10, 50, 20, 0, 0, 0, 45, 30);
+            await connection.invoke('UpdatePosition', 10, 50, 20, 0, 0, 0, 45, 30, false);
             await new Promise(r => setTimeout(r, 300));
             assert(true, 'UpdatePosition accepted');
             await disconnect();
@@ -163,7 +163,7 @@ const testSuites = {
             await connect();
             await join();
 
-            await connection.invoke('UpdatePosition', 0, 80, 0, 0, 0, 0, 0, 70);
+            await connection.invoke('UpdatePosition', 0, 80, 0, 0, 0, 0, 0, 70, false);
             await new Promise(r => setTimeout(r, 200));
 
             const chunkPromise = waitForEvent('OnChunkReceived', null, 20000);
@@ -184,7 +184,7 @@ const testSuites = {
             await connect();
             await join();
 
-            await connection.invoke('UpdatePosition', 0, 80, 0, 0, 0, 0, 0, 70);
+            await connection.invoke('UpdatePosition', 0, 80, 0, 0, 0, 0, 0, 70, false);
             await new Promise(r => setTimeout(r, 200));
 
             // Request chunk first
@@ -329,7 +329,7 @@ const testSuites = {
             await connect();
             await join();
 
-            await connection.invoke('UpdatePosition', 0, 65, 0, 0, 0, 0, 0, 70);
+            await connection.invoke('UpdatePosition', 0, 65, 0, 0, 0, 0, 0, 70, false);
             await new Promise(r => setTimeout(r, 200));
 
             try {
@@ -490,7 +490,7 @@ const testSuites = {
             await connect();
             await join();
 
-            await connection.invoke('UpdatePosition', 0, 80, 0, 0, 0, 0, 0, 70);
+            await connection.invoke('UpdatePosition', 0, 80, 0, 0, 0, 0, 0, 70, false);
             await new Promise(r => setTimeout(r, 200));
 
             // Request chunk
@@ -512,7 +512,7 @@ const testSuites = {
             await connect();
             await join();
 
-            await connection.invoke('UpdatePosition', 0, 80, 0, 0, 0, 0, 0, 70);
+            await connection.invoke('UpdatePosition', 0, 80, 0, 0, 0, 0, 0, 70, false);
             await new Promise(r => setTimeout(r, 200));
 
             const chunkPromise3 = waitForEvent('OnChunkReceived', null, 20000);
@@ -555,7 +555,7 @@ const testSuites = {
             const p1ListPromise = new Promise((resolve) => {
                 conn1.on('OnPlayerListUpdate', (players) => { resolve(players); });
             });
-            await conn1.invoke('Join', player1);
+            await conn1.invoke('Join', player1, '');
             const p1List = await withTimeout(p1ListPromise);
             assert(Array.isArray(p1List) && p1List.includes(player1), 'P1 sees self in list');
 
@@ -563,7 +563,7 @@ const testSuites = {
             const p1JoinPromise = new Promise((resolve) => {
                 conn1.on('OnPlayerJoined', (name) => { resolve(name); });
             });
-            await conn2.invoke('Join', player2);
+            await conn2.invoke('Join', player2, '');
             const joinedName = await withTimeout(p1JoinPromise);
             assert(joinedName === player2, `P1 sees P2 join: ${joinedName}`);
 
@@ -596,7 +596,7 @@ const testSuites = {
             const init = await join();
             assert(true, '2. Join + init data received');
 
-            await connection.invoke('UpdatePosition', 0, 80, 0, 0, 0, 0, 0, 70);
+            await connection.invoke('UpdatePosition', 0, 80, 0, 0, 0, 0, 0, 70, false);
             assert(true, '3. Position update sent');
 
             const chunkP = waitForEvent('OnChunkReceived', null, 20000);
@@ -682,7 +682,7 @@ const testSuites = {
             await connect();
             await join();
 
-            await connection.invoke('UpdatePosition', 0, 80, 0, 0, 0, 0, 0, 70);
+            await connection.invoke('UpdatePosition', 0, 80, 0, 0, 0, 0, 0, 70, false);
             await new Promise(r => setTimeout(r, 200));
 
             const chunkP2 = waitForEvent('OnChunkReceived', null, 20000);
