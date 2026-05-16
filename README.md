@@ -57,7 +57,14 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Fishing System**: Cast, wait, bite, reel phases with catch probabilities; accessible via hub methods
 - **Breeding System**: Feed animals (cow/pig with wheat, chicken with seeds) to breed with baby mobs
 - **Shared Noise System**: Reusable `PerlinNoise` class with fractal octave noise (configurable octaves/persistence/lacunarity), `NoiseParams` record for structured noise configuration, `PcgRandom` deterministic PRNG, `NoiseBuffer2D`/`NoiseBuffer3D` for pre-computed noise grids, eased/abs-value noise flags
-- **Block Geometry System**: Custom mesh generation for stairs, slabs, fences, walls, glass panes, doors, ladders, torches, plants, fire, glasslike (internal face removal)
+- **Block Geometry System**: Custom mesh generation for stairs, slabs, fences, walls, glass panes, doors, ladders, torches, plants, fire, glasslike (internal face removal), nodebox (custom box collections), flowingliquid (param2-based liquid height)
+- **Nodebox Draw Type**: Custom-shaped blocks via nodebox definitions (array of {x1,y1,z1,x2,y2,z2} boxes), matching Minetest's nodebox system
+- **Flowing Liquid Geometry**: Liquid blocks render with param2-based height levels (0-7), side faces only visible when block above is not liquid
+- **Projectile Rendering**: Arrow and fireball entities rendered as cone meshes with material-appropriate coloring
+- **Entity Hurt Flash**: Entities flash red briefly when taking damage for visual feedback
+- **Mob Walking Animation**: Movement-detected leg/arm swing animation for all mob types
+- **Thunderstorm Lightning**: Visual flash overlay and procedural thunder audio during thunderstorms with random intervals
+- **Camera Shake**: Screen shake effect on damage/explosion knockback for impact feedback
 - **Particle Spawner**: Configurable particle spawner system with server-side spec management
 - **Settings**: Mouse sensitivity, render distance, FOV, volume controls, cloud/AO toggles
 - **Mouse Wheel Hotbar**: Scroll to cycle through hotbar slots

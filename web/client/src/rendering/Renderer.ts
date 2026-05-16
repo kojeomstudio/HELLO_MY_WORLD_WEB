@@ -149,6 +149,9 @@ export class Renderer {
     private occlusionGetBlock: ((x: number, y: number, z: number) => number) | null = null;
     private cascadeShadowMap: CascadeShadowMap;
     private autoExposurePass: AutoExposurePass | null = null;
+    private shakeIntensity: number = 0;
+    private shakeDuration: number = 0;
+    private shakeElapsed: number = 0;
 
     constructor(container: HTMLElement) {
         this.canvas = document.createElement('canvas');
@@ -631,6 +634,25 @@ export class Renderer {
 
     updateEffects(dt: number): void {
         this.updateDamageFlash(dt);
+        this.updateCameraShake(dt);
+    }
+
+    shakeCamera(intensity: number, duration: number): void {
+        this.shakeIntensity = intensity;
+        this.shakeDuration = duration;
+        this.shakeElapsed = 0;
+    }
+
+    private updateCameraShake(dt: number): void {
+        if (this.shakeElapsed < this.shakeDuration) {
+            this.shakeElapsed += dt;
+            const progress = this.shakeElapsed / this.shakeDuration;
+            const currentIntensity = this.shakeIntensity * (1 - progress);
+            const offsetX = (Math.random() - 0.5) * 2 * currentIntensity;
+            const offsetY = (Math.random() - 0.5) * 2 * currentIntensity;
+            this.camera.position.x += offsetX;
+            this.camera.position.y += offsetY;
+        }
     }
 
     updatePlayerLight(x: number, y: number, z: number): void {

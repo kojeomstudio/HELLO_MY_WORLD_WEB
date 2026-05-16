@@ -230,6 +230,10 @@ export class GameClient {
             }
         });
 
+        this.connection.on('OnEntityHurt', (entityId: string) => {
+            this.worldManager.flashEntityHurt(entityId);
+        });
+
         this.connection.on('OnCraftResult', (itemId: string, count: number) => {
             this.uiManager.addChatMessage('Server', `Crafted ${count}x ${itemId}`);
         });
@@ -255,6 +259,7 @@ export class GameClient {
             this.playerController.applyKnockback(vx, vy, vz);
             this.audioManager.play('hurt');
             this.renderer.flashDamage(0.6);
+            this.renderer.shakeCamera(0.1, 0.3);
         });
 
         this.connection.on('OnPrivilegeList', (_privileges: string[]) => {

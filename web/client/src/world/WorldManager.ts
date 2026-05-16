@@ -114,6 +114,7 @@ export class WorldManager {
     private textureAtlas: TextureAtlas | null = null;
     private fallingBlocks: FallingBlockAnimation[] = [];
     private animatedChunks: Set<string> = new Set();
+    private entityAnimTimers: Map<string, { walkTime: number; prevX: number; prevZ: number; isMoving: boolean }> = new Map();
     private renderDistance: number = 4;
     private aoEnabled: boolean = true;
 
@@ -493,6 +494,22 @@ export class WorldManager {
     }
 
     spawnEntity(entityId: string, entityType: string, x: number, y: number, z: number, isBaby: boolean = false, entityName: string = '', visualScale: number = 1, infotext: string = '', autoRotateSpeed: number = 0): void {
+        if (entityType === 'Projectile') {
+            const geometry = new THREE.ConeGeometry(0.05, 0.5, 6);
+            geometry.rotateX(Math.PI / 2);
+            const isFireball = entityName === 'fireball' || entityName === 'Fireball';
+            const material = new THREE.MeshLambertMaterial({
+                color: isFireball ? 0xFF4400 : 0x8B4513,
+                emissive: isFireball ? 0xFF2200 : 0x000000
+            });
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.position.set(x, y + 0.15, z);
+            mesh.userData.entityId = entityId;
+            this.renderer.addToScene(mesh);
+            this.entityMeshes.set(entityId, mesh);
+            return;
+        }
+
         if (entityType === 'Item') {
             const geometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
             const material = new THREE.MeshLambertMaterial({ color: 0xFFAA00 });
@@ -796,6 +813,28 @@ export class WorldManager {
         bone.scale.set(scale.x, scale.y, scale.z);
     }
 
+    flashEntityHurt(entityId: string): void {
+        const obj = this.entityMeshes.get(entityId);
+        if (!obj) return;
+        const originalMaterials: THREE.Material[] = [];
+        const redMaterial = new THREE.MeshLambertMaterial({ color: 0xFF0000, emissive: 0x440000 });
+        obj.traverse((child) => {
+            if (child instanceof THREE.Mesh && child.material instanceof THREE.Material) {
+                originalMaterials.push(child.material);
+                child.material = redMaterial;
+            }
+        });
+        setTimeout(() => {
+            let idx = 0;
+            obj.traverse((child) => {
+                if (child instanceof THREE.Mesh && idx < originalMaterials.length) {
+                    child.material = originalMaterials[idx++];
+                }
+            });
+            redMaterial.dispose();
+        }, 150);
+    }
+
     removeEntity(entityId: string): void {
         const mesh = this.entityMeshes.get(entityId);
         if (mesh) {
@@ -818,6 +857,7 @@ export class WorldManager {
             this.entityMeshes.delete(entityId);
             this.entityAutoRotateSpeeds.delete(entityId);
             this.entityInterpolation.delete(entityId);
+            this.entityAnimTimers.delete(entityId);
         }
     }
 
@@ -924,8 +964,29 @@ export class WorldManager {
                 mesh.position.y += Math.sin(this.entityAnimTime * 3.0) * 0.002;
                 mesh.rotation.y += dt * 2.0;
             } else if (entityId.startsWith('mob_')) {
-                const bob = Math.sin(this.entityAnimTime * 2.0) * 0.002;
-                mesh.position.y += bob;
+                let timer = this.entityAnimTimers.get(entityId);
+                if (!timer) {
+                    timer = { walkTime: 0, prevX: mesh.position.x, prevZ: mesh.position.z, isMoving: false };
+                    this.entityAnimTimers.set(entityId, timer);
+                }
+                const dx = mesh.position.x - timer.prevX;
+                const dz = mesh.position.z - timer.prevZ;
+                timer.isMoving = (dx * dx + dz * dz) > 0.0001;
+                timer.prevX = mesh.position.x;
+                timer.prevZ = mesh.position.z;
+                if (timer.isMoving) {
+                    timer.walkTime += dt * 8;
+                    const swing = Math.sin(timer.walkTime) * 0.3;
+                    if (mesh instanceof THREE.Group) {
+                        const children = mesh.children;
+                        for (let ci = 0; ci < children.length; ci++) {
+                            const child = children[ci];
+                            if (child instanceof THREE.Mesh && child.position.y < 0.3 && child.position.y > -0.1) {
+                                child.rotation.x = swing * 0.5;
+                            }
+                        }
+                    }
+                }
                 const rotateSpeed = this.entityAutoRotateSpeeds.get(entityId);
                 if (rotateSpeed) {
                     mesh.rotation.y += dt * rotateSpeed;

@@ -22,11 +22,15 @@ export class WeatherSystem {
     private weatherType: WeatherType = 'none';
     private scene: THREE.Scene;
     private groundLevel: number = 0;
+    private lightningTimer: number = 0;
+    private lightningFlashEl: HTMLElement | null = null;
+    private nextLightningTime: number = 5;
 
     constructor(scene: THREE.Scene) {
         this.scene = scene;
         this.initRain();
         this.initSnow();
+        this.lightningFlashEl = document.getElementById('lightning-flash');
     }
 
     private initRain(): void {
@@ -124,8 +128,47 @@ export class WeatherSystem {
         }
     }
 
+    private triggerLightning(): void {
+        if (!this.lightningFlashEl) return;
+        this.lightningFlashEl.style.display = 'block';
+        this.lightningFlashEl.style.opacity = '0.8';
+        setTimeout(() => {
+            if (this.lightningFlashEl) {
+                this.lightningFlashEl.style.opacity = '0.3';
+            }
+        }, 100);
+        setTimeout(() => {
+            if (this.lightningFlashEl) {
+                this.lightningFlashEl.style.opacity = '0.5';
+            }
+        }, 200);
+        setTimeout(() => {
+            if (this.lightningFlashEl) {
+                this.lightningFlashEl.style.display = 'none';
+            }
+        }, 300);
+        try {
+            const audioCtx = new AudioContext();
+            const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.5, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < data.length; i++) {
+                data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (audioCtx.sampleRate * 0.15));
+            }
+            const source = audioCtx.createBufferSource();
+            source.buffer = buffer;
+            const gain = audioCtx.createGain();
+            gain.gain.value = 0.15;
+            source.connect(gain);
+            gain.connect(audioCtx.destination);
+            source.start(audioCtx.currentTime + 0.5 + Math.random() * 2);
+            source.onended = () => audioCtx.close();
+        } catch (_e) { }
+    }
+
     setWeather(type: WeatherType): void {
         this.weatherType = type;
+        this.lightningTimer = 0;
+        this.nextLightningTime = 5 + Math.random() * 10;
         this.applyWeather();
     }
 
@@ -147,6 +190,14 @@ export class WeatherSystem {
 
         if (this.weatherType === 'rain' || this.weatherType === 'thunderstorm') {
             this.updateRain(dt, playerX, playerZ);
+            if (this.weatherType === 'thunderstorm') {
+                this.lightningTimer += dt;
+                if (this.lightningTimer >= this.nextLightningTime) {
+                    this.triggerLightning();
+                    this.lightningTimer = 0;
+                    this.nextLightningTime = 5 + Math.random() * 15;
+                }
+            }
         } else if (this.weatherType === 'snow') {
             this.updateSnow(dt, playerX, playerZ);
         }

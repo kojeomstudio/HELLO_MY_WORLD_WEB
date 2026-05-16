@@ -635,6 +635,56 @@ function buildGlasslikeFramedOptional(
     buildGlasslikeFramed(ctx, wx, wy, wz, blockId, color, new THREE.Color('#8B8B8B'));
 }
 
+function buildNodebox(ctx: BuildCtx, wx: number, wy: number, wz: number, blockDef: any, color: THREE.Color): void {
+    const boxes = blockDef.nodeBoxes;
+    if (!boxes || !Array.isArray(boxes) || boxes.length === 0) {
+        const lm = getBlockLight(ctx, wx, wy, wz);
+        pushBox(ctx, wx, wy, wz, 0, 0, 0, 1, 1, 1, color, lm);
+        return;
+    }
+    for (const box of boxes) {
+        const lm = getBlockLight(ctx, wx, wy, wz);
+        pushBox(ctx, wx, wy, wz, box.x1, box.y1, box.z1, box.x2, box.y2, box.z2, color, lm);
+    }
+}
+
+function buildFlowingLiquid(ctx: BuildCtx, wx: number, wy: number, wz: number, param2: number, color: THREE.Color): void {
+    const lm = getBlockLight(ctx, wx, wy, wz);
+    const level = 8 - (param2 & 0x07);
+    const height = level >= 8 ? 1.0 : level / 8.0;
+    const correctedHeight = Math.max(0.1, height);
+
+    pushQuad(ctx, wx, wy, wz,
+        [0, correctedHeight, 0], [1, correctedHeight, 0],
+        [1, correctedHeight, 1], [0, correctedHeight, 1],
+        [0, 1, 0], color, lm, 1.1);
+
+    const aboveId = ctx.getNeighborBlock(wx, wy + 1, wz);
+    if (aboveId === 0 || (blockIdToDef(aboveId)?.liquid !== true)) {
+        pushQuad(ctx, wx, wy, wz,
+            [1, 0, 0], [0, 0, 0],
+            [0, correctedHeight, 0], [1, correctedHeight, 0],
+            [0, 0, -1], color, lm, 0.9);
+        pushQuad(ctx, wx, wy, wz,
+            [0, 0, 1], [1, 0, 1],
+            [1, correctedHeight, 1], [0, correctedHeight, 1],
+            [0, 0, 1], color, lm, 0.9);
+        pushQuad(ctx, wx, wy, wz,
+            [0, 0, 0], [0, 0, 1],
+            [0, correctedHeight, 1], [0, correctedHeight, 0],
+            [-1, 0, 0], color, lm, 0.95);
+        pushQuad(ctx, wx, wy, wz,
+            [1, 0, 1], [1, 0, 0],
+            [1, correctedHeight, 0], [1, correctedHeight, 1],
+            [1, 0, 0], color, lm, 0.95);
+    }
+
+    pushQuad(ctx, wx, wy, wz,
+        [0, 0, 1], [1, 0, 1],
+        [1, 0, 0], [0, 0, 0],
+        [0, -1, 0], color, lm, 0.7);
+}
+
 export class ChunkMesh {
     public mesh: THREE.Mesh | null = null;
     public transparentMesh: THREE.Mesh | null = null;
@@ -1042,6 +1092,12 @@ export class ChunkMesh {
                             break;
                         case 'glasslike_framed_optional':
                             buildGlasslikeFramedOptional(ctx, worldX, worldY, worldZ, blockId, color);
+                            break;
+                        case 'nodebox':
+                            buildNodebox(ctx, worldX, worldY, worldZ, blockDef, color);
+                            break;
+                        case 'flowingliquid':
+                            buildFlowingLiquid(ctx, worldX, worldY, worldZ, param2, color);
                             break;
                     }
 
