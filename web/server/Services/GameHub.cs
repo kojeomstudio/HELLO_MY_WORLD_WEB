@@ -2183,7 +2183,6 @@ public class GameHub : Hub<IGameClient>
         }
         var result = sb.ToString();
         if (result.Length > maxLength) result = result[..maxLength];
-        result = result.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;");
         return result;
     }
 
@@ -2716,7 +2715,7 @@ public class GameHub : Hub<IGameClient>
         if (!CheckRateLimit(Context.ConnectionId, "modstorage", 200)) return null;
         var player = GetAuthenticatedPlayer();
         if (player == null) return null;
-        if (!_gameServer.Privileges.HasPrivilege(player.Name, "server") && !_gameServer.Privileges.HasPrivilege(player.Name, "interact")) return null;
+        if (!_gameServer.Privileges.HasPrivilege(player.Name, "server")) return null;
         if (string.IsNullOrEmpty(modName) || modName.Length > 64) return null;
         if (!IsValidModStorageName(modName)) return null;
         if (string.IsNullOrEmpty(key) || key.Length > 256) return null;

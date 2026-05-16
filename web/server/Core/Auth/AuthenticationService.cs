@@ -20,7 +20,7 @@ public enum AuthResult
 
 public class AuthenticationService
 {
-    private const int Pbkdf2Iterations = 100000;
+    private readonly int _pbkdf2Iterations;
     private const int SaltSize = 16;
     private const int HashSize = 32;
 
@@ -43,18 +43,19 @@ public class AuthenticationService
     private readonly int _maxConnectionsPerMinute;
     private readonly TimeSpan _rateWindow = TimeSpan.FromMinutes(1);
 
-    public AuthenticationService(int maxLockoutAttempts = 5, int lockoutMinutes = 5, int maxConnectionsPerMinute = 10)
+    public AuthenticationService(int maxLockoutAttempts = 5, int lockoutMinutes = 5, int maxConnectionsPerMinute = 10, int pbkdf2Iterations = 100000)
     {
         _maxLockoutAttempts = maxLockoutAttempts;
         _lockoutDuration = TimeSpan.FromMinutes(lockoutMinutes);
         _maxConnectionsPerMinute = maxConnectionsPerMinute;
+        _pbkdf2Iterations = pbkdf2Iterations;
     }
 
-    public static string HashPassword(string password)
+    public static string HashPassword(string password, int iterations = 100000)
     {
         var salt = RandomNumberGenerator.GetBytes(SaltSize);
-        var hash = Rfc2898DeriveBytes.Pbkdf2(password, salt, Pbkdf2Iterations, HashAlgorithmName.SHA256, HashSize);
-        return $"{Pbkdf2Iterations}:{Convert.ToHexString(salt)}:{Convert.ToHexString(hash)}";
+        var hash = Rfc2898DeriveBytes.Pbkdf2(password, salt, iterations, HashAlgorithmName.SHA256, HashSize);
+        return $"{iterations}:{Convert.ToHexString(salt)}:{Convert.ToHexString(hash)}";
     }
 
     public static bool VerifyPassword(string password, string storedHash)

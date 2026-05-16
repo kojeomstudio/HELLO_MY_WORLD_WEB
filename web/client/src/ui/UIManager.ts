@@ -1151,7 +1151,7 @@ export class UIManager {
                 slot.style.background = 'rgba(100,150,255,0.3)';
                 slot.style.borderColor = '#6699ff';
             } else {
-                slot.innerHTML = UIManager.armorSlotNames[i];
+                slot.textContent = UIManager.armorSlotNames[i];
                 slot.style.background = 'rgba(0,0,0,0.5)';
                 slot.style.borderColor = '#555';
             }
