@@ -80,6 +80,7 @@ public class EntityManager
         }
 
         ProcessProjectileCollisions();
+        ProcessEntityEntityCollisions();
 
         var deadEntities = _entities.Values.Where(e => !e.IsAlive).ToList();
         foreach (var entity in deadEntities)
@@ -136,4 +137,53 @@ public class EntityManager
     }
 
     public event Action<PlayerEnt, ProjectileEntity>? ProjectileHitPlayer;
+
+    private void ProcessEntityEntityCollisions()
+    {
+        var mobs = _entities.Values
+            .Where(e => e is MobEntity { IsAlive: true })
+            .Cast<MobEntity>()
+            .ToList();
+
+        if (mobs.Count < 2) return;
+
+        for (int i = 0; i < mobs.Count; i++)
+        {
+            for (int j = i + 1; j < mobs.Count; j++)
+            {
+                var a = mobs[i];
+                var b = mobs[j];
+                var dist = Vector3.Distance(a.Position, b.Position);
+                var minDist = 0.6f * (a.VisualScale + b.VisualScale) * 0.5f;
+
+                if (dist < minDist && dist > 0.001f)
+                {
+                    var pushDir = (a.Position - b.Position).Normalized;
+                    var overlap = minDist - dist;
+                    var pushAmount = overlap * 0.5f;
+
+                    a.Position = a.Position + new Vector3(pushDir.X * pushAmount, 0, pushDir.Z * pushAmount);
+                    b.Position = b.Position - new Vector3(pushDir.X * pushAmount, 0, pushDir.Z * pushAmount);
+                }
+            }
+        }
+
+        var vehicles = _entities.Values
+            .Where(e => e is VehicleEntity { IsAlive: true })
+            .Cast<VehicleEntity>()
+            .ToList();
+
+        foreach (var vehicle in vehicles)
+        {
+            foreach (var mob in mobs)
+            {
+                var dist = Vector3.Distance(vehicle.Position, mob.Position);
+                if (dist < 0.8f && dist > 0.001f)
+                {
+                    var pushDir = (mob.Position - vehicle.Position).Normalized;
+                    mob.Position = mob.Position + new Vector3(pushDir.X * 0.4f, 0, pushDir.Z * 0.4f);
+                }
+            }
+        }
+    }
 }

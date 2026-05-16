@@ -7,10 +7,13 @@ public class ActiveBlockModifier
     public string Name { get; init; } = "";
     public int Interval { get; init; } = 1;
     public float Chance { get; init; } = 1.0f;
+    public string[] NodeNames { get; init; } = Array.Empty<string>();
+    public string[] WithoutNeighbors { get; init; } = Array.Empty<string>();
     public string? RequiredNeighbor { get; init; }
     public int MinY { get; init; } = -31000;
     public int MaxY { get; init; } = 31000;
     public int ActiveBlockRange { get; init; } = 3;
+    public bool CatchUp { get; init; } = false;
     public Func<BlockDefinition, Vector3s, World, bool> Action { get; init; } = (_, _, _) => false;
 }
 
@@ -82,10 +85,49 @@ public class ActiveBlockModifierSystem
                             var blockDef = blockDefs.Get((ushort)block.Type);
                             if (blockDef == null) continue;
 
+                            if (abm.NodeNames.Length > 0)
+                            {
+                                var match = false;
+                                for (int n = 0; n < abm.NodeNames.Length; n++)
+                                {
+                                    if (blockDef.Name == abm.NodeNames[n])
+                                    {
+                                        match = true;
+                                        break;
+                                    }
+                                }
+                                if (!match) continue;
+                            }
+
+                            var worldX = chunkCoord.X * Chunk.Size + x;
+                            var worldZ = chunkCoord.Z * Chunk.Size + z;
+
+                            if (abm.WithoutNeighbors.Length > 0)
+                            {
+                                var hasExcluded = false;
+                                for (int n = 0; n < NeighborOffsets.Length && !hasExcluded; n++)
+                                {
+                                    var nPos = new Vector3s(
+                                        (short)(worldX + NeighborOffsets[n].Dx),
+                                        (short)(worldY + NeighborOffsets[n].Dy),
+                                        (short)(worldZ + NeighborOffsets[n].Dz));
+                                    var nBlock = world.GetBlock(nPos);
+                                    var nDef = blockDefs.Get((ushort)nBlock.Type);
+                                    if (nDef == null) continue;
+                                    for (int w = 0; w < abm.WithoutNeighbors.Length; w++)
+                                    {
+                                        if (nDef.Name == abm.WithoutNeighbors[w])
+                                        {
+                                            hasExcluded = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                                if (hasExcluded) continue;
+                            }
+
                             if (abm.RequiredNeighbor != null)
                             {
-                                var worldX = chunkCoord.X * Chunk.Size + x;
-                                var worldZ = chunkCoord.Z * Chunk.Size + z;
                                 bool found = false;
 
                                 for (int n = 0; n < NeighborOffsets.Length; n++)
@@ -110,9 +152,9 @@ public class ActiveBlockModifierSystem
                                 continue;
 
                             var worldPos = new Vector3s(
-                                (short)(chunkCoord.X * Chunk.Size + x),
+                                (short)(worldX),
                                 (short)(worldY),
-                                (short)(chunkCoord.Z * Chunk.Size + z));
+                                (short)(worldZ));
                             abm.Action(blockDef, worldPos, world);
                         }
                     }

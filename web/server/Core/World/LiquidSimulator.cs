@@ -119,6 +119,11 @@ public class LiquidSimulator
                             continue;
                         }
 
+                        if (block.Type == flowingType && TryRegenerateSource(worldX, worldY, worldZ, sourceType, flowingType))
+                        {
+                            continue;
+                        }
+
                         var currentPos = new Vector3s(worldX, worldY, worldZ);
                         var currentDist = _flowDistances.TryGetValue(currentPos, out var cd) ? cd : (byte)0;
 
@@ -166,6 +171,33 @@ public class LiquidSimulator
         {
             _world.SetBlock(pos, Block.Air);
         }
+    }
+
+    private bool TryRegenerateSource(short wx, short wy, short wz, BlockType sourceType, BlockType flowingType)
+    {
+        var belowPos = new Vector3s(wx, (short)(wy - 1), wz);
+        var belowBlock = _world.GetBlock(belowPos);
+        if (belowBlock.Type == sourceType || belowBlock.Type == flowingType || belowBlock.Type == BlockType.Air)
+            return false;
+
+        int sourceOrFlowingNeighborCount = 0;
+        foreach (var (dx, dz) in HorizontalDirections)
+        {
+            var neighborPos = new Vector3s((short)(wx + dx), wy, (short)(wz + dz));
+            var neighbor = _world.GetBlock(neighborPos);
+            if (neighbor.Type == sourceType || (neighbor.Type == flowingType && neighbor.Param2 >= MaxLiquidLevel - 1))
+            {
+                sourceOrFlowingNeighborCount++;
+            }
+        }
+
+        if (sourceOrFlowingNeighborCount >= 2)
+        {
+            _world.SetBlock(new Vector3s(wx, wy, wz), new Block(sourceType));
+            return true;
+        }
+
+        return false;
     }
 
     private void ProcessWaterLavaInteraction()

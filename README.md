@@ -220,6 +220,11 @@ A web-based voxel game ported from the minetest_sub_project (Luanti/Minetest eng
 - **Entity Riding**: Player-to-vehicle attachment system with offset positioning; players attached to vehicles follow vehicle position
 - **Chunk Compression**: Server-side GZip compression for chunk data transfer (flagged 0x01 header), client-side DecompressionStream decompression — reduces network bandwidth for chunk loading
 - **Inventory Drag-and-Drop**: Mouse drag-and-drop support for inventory slot items with visual floating indicator, slot highlighting, and double-click auto-transfer
+- **Liquid Source Regeneration**: Two adjacent flowing water blocks with solid ground below regenerate into source blocks (infinite water sources)
+- **Inventory Helpers**: ContainsItem, CountItem, RemoveItemById, GetSlotForItem, SwapSlots methods with per-item max stack sizes
+- **ABM Multi-Block Matching**: Active Block Modifiers support multiple block names (NodeNames array) and WithoutNeighbors exclusion filter
+- **Entity-Entity Collision**: Mob-to-mob and vehicle-to-mob push-apart collision resolution
+- **Piston Push/Pull**: Redstone pistons push up to 12 blocks in a chain with unpushable block detection (obsidian, bedrock, chest, furnace), retraction clears arm block
 
 ## Architecture
 

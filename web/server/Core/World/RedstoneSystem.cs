@@ -325,6 +325,11 @@ public class RedstoneSystem
                                 toUpdate.Add((pos, BlockType.RedstoneLamp));
                                 break;
                             case BlockType.Piston when powered && (block.Param2 & 1) == 0:
+                                ProcessPistonExtend(world, pos, block);
+                                toUpdate.Add((pos, BlockType.Piston));
+                                break;
+                            case BlockType.Piston when !powered && (block.Param2 & 1) == 1:
+                                ProcessPistonRetract(world, pos, block);
                                 toUpdate.Add((pos, BlockType.Piston));
                                 break;
                         }
@@ -378,5 +383,63 @@ public class RedstoneSystem
             BlockType.PressurePlate when (block.Param2 & 1) == 1 => MaxPower,
             _ => 0
         };
+    }
+
+    private const int MaxPushDistance = 12;
+
+    private static readonly HashSet<BlockType> UnpushableBlocks = new()
+    {
+        BlockType.Obsidian,
+        BlockType.Bedrock,
+        BlockType.Chest,
+        BlockType.Furnace
+    };
+
+    private void ProcessPistonExtend(World world, Vector3s pos, Block block)
+    {
+        var facing = block.Param1 % 4;
+        var (fdx, fdz) = GetFacingOffset(facing);
+
+        var pushChain = new List<Vector3s>();
+        var checkPos = new Vector3s((short)(pos.X + fdx), pos.Y, (short)(pos.Z + fdz));
+
+        for (int i = 0; i < MaxPushDistance; i++)
+        {
+            var checkBlock = world.GetBlock(checkPos);
+            if (checkBlock.Type == BlockType.Air)
+            {
+                break;
+            }
+            if (UnpushableBlocks.Contains(checkBlock.Type))
+            {
+                return;
+            }
+            pushChain.Add(checkPos);
+            checkPos = new Vector3s((short)(checkPos.X + fdx), checkPos.Y, (short)(checkPos.Z + fdz));
+        }
+
+        for (int i = pushChain.Count - 1; i >= 0; i--)
+        {
+            var fromPos = pushChain[i];
+            var toPos = new Vector3s((short)(fromPos.X + fdx), fromPos.Y, (short)(fromPos.Z + fdz));
+            var fromBlock = world.GetBlock(fromPos);
+            world.SetBlock(toPos, new Block(fromBlock.Type, fromBlock.Param1, fromBlock.Param2, fromBlock.Light));
+        }
+
+        var armPos = new Vector3s((short)(pos.X + fdx), pos.Y, (short)(pos.Z + fdz));
+        world.SetBlock(armPos, new Block(BlockType.Piston, block.Param1, 1, 0));
+    }
+
+    private void ProcessPistonRetract(World world, Vector3s pos, Block block)
+    {
+        var facing = block.Param1 % 4;
+        var (fdx, fdz) = GetFacingOffset(facing);
+        var armPos = new Vector3s((short)(pos.X + fdx), pos.Y, (short)(pos.Z + fdz));
+        var armBlock = world.GetBlock(armPos);
+
+        if (armBlock.Type == BlockType.Piston)
+        {
+            world.SetBlock(armPos, Block.Air);
+        }
     }
 }
