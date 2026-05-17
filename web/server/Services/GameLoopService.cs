@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.SignalR;
 using WebGameServer.Core;
+using WebGameServer.Core.Auth;
 using WebGameServer.Core.Entities;
 using WebGameServer.Core.Game;
 using WebGameServer.Core.Player;
@@ -18,6 +19,7 @@ public class GameLoopService : BackgroundService
     private readonly BlockDefinitionManager _blockDefinitionManager;
     private readonly ServerConfig _config;
     private readonly ServerProfiler _profiler;
+    private readonly AuthenticationService _authService;
 
     private int _tickCount;
     private int _previousEntityCount;
@@ -36,7 +38,8 @@ public class GameLoopService : BackgroundService
         ILogger<GameLoopService> logger,
         BlockDefinitionManager blockDefinitionManager,
         ServerConfig config,
-        ServerProfiler profiler)
+        ServerProfiler profiler,
+        AuthenticationService authService)
     {
         _gameServer = gameServer;
         _entityManager = entityManager;
@@ -45,6 +48,7 @@ public class GameLoopService : BackgroundService
         _blockDefinitionManager = blockDefinitionManager;
         _config = config;
         _profiler = profiler;
+        _authService = authService;
         _lastBackupTime = DateTime.UtcNow;
         _autoSaveIntervalSeconds = config.GameLoop.AutoSaveIntervalSeconds;
         _autoBackupIntervalSeconds = config.GameLoop.AutoBackupIntervalSeconds;
@@ -102,6 +106,11 @@ public class GameLoopService : BackgroundService
             CheckAutoSave();
 
             CheckAutoBackup();
+
+            if (_tickCount % 1200 == 0)
+            {
+                _authService.CleanupStaleEntries();
+            }
 
             TrackTps(now);
             }

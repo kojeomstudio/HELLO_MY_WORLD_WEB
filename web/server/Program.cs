@@ -714,7 +714,7 @@ builder.Services.AddSingleton<ChatCommandManager>(sp =>
             try
             {
                 var playerDb = sp.GetRequiredService<PlayerDatabase>();
-                var hash = AuthenticationService.HashPassword(newPassword);
+                var hash = sp.GetRequiredService<AuthenticationService>().HashPassword(newPassword);
                 playerDb.SetPasswordHash(playerName, hash);
                 return true;
             }
@@ -963,7 +963,7 @@ app.Use(async (context, next) =>
         "script-src 'self'; " +
         $"style-src 'self' 'nonce-{cspNonce}'; " +
         "img-src 'self' data: blob:; " +
-        $"connect-src 'self' wss: {string.Join(' ', serverConfig.CorsOrigins.Where(o => IsValidOrigin(o)))}; " +
+        $"connect-src 'self' {string.Join(' ', serverConfig.CorsOrigins.Where(o => IsValidOrigin(o)).Select(o => o.Replace("http", "ws")).Append("ws://localhost:5266"))}; " +
         "media-src 'self' blob:; " +
         "font-src 'self'; " +
         "object-src 'none'; " +

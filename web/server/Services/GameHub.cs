@@ -323,7 +323,7 @@ public class GameHub : Hub<IGameClient>
 
         if (isNewPlayer && !string.IsNullOrEmpty(password))
         {
-            _playerDb.SetPasswordHash(playerName, AuthenticationService.HashPassword(password));
+            _playerDb.SetPasswordHash(playerName, _authService.HashPassword(password));
         }
 
         await Clients.All.OnPlayerJoined(playerName);

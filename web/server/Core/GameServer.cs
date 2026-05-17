@@ -545,7 +545,7 @@ public class GameServer
         {
             var damageKey = $"{player.Name}:blockdmg";
             var now = DateTime.UtcNow;
-            if (!_lastDamageTime.TryGetValue(damageKey, out var lastDmg) || (now - lastDmg).TotalMilliseconds >= 500)
+            if (!_lastDamageTime.TryGetValue(damageKey, out var lastDmg) || (now - lastDmg).TotalMilliseconds >= _config.PlayerDamage.BlockDamageIntervalMs)
             {
                 _lastDamageTime[damageKey] = now;
                 DamagePlayer(player, standingDef.Damage, standingDef.Name);
@@ -561,7 +561,7 @@ public class GameServer
         {
             var damageKey = $"{player.Name}:lava";
             var now = DateTime.UtcNow;
-            if (!_lastDamageTime.TryGetValue(damageKey, out var lastDmg) || (now - lastDmg).TotalMilliseconds >= 500)
+            if (!_lastDamageTime.TryGetValue(damageKey, out var lastDmg) || (now - lastDmg).TotalMilliseconds >= _config.PlayerDamage.LavaDamageIntervalMs)
             {
                 _lastDamageTime[damageKey] = now;
                 var lavaDamage = standingDef?.Damage ?? 4;
@@ -590,22 +590,22 @@ public class GameServer
 
         if (player.FoodLevel > 0)
         {
-            player.FoodSaturation -= 0.01f;
+            player.FoodSaturation -= _config.PlayerDamage.SaturationDrainPerTick;
             if (player.FoodSaturation <= 0)
             {
                 player.FoodSaturation = 0;
-                player.FoodLevel = Math.Max(0, player.FoodLevel - 0.05f);
+                player.FoodLevel = Math.Max(0, player.FoodLevel - _config.PlayerDamage.FoodDrainPerTick);
             }
         }
 
-        if (player.FoodLevel > 18 && player.Health < player.MaxHealth && player.Health > 0)
+        if (player.FoodLevel > _config.PlayerDamage.HealthRegenThreshold && player.Health < player.MaxHealth && player.Health > 0)
         {
-            HealPlayer(player, 0.2f);
-            player.FoodSaturation = Math.Max(0, player.FoodSaturation - 0.5f);
+            HealPlayer(player, _config.PlayerDamage.HealthRegenPerTick);
+            player.FoodSaturation = Math.Max(0, player.FoodSaturation - _config.PlayerDamage.SaturationCostPerHealTick);
         }
         else if (player.FoodLevel <= 0)
         {
-            DamagePlayer(player, 0.5f, "starvation");
+            DamagePlayer(player, _config.PlayerDamage.StarvationDamagePerTick, "starvation");
         }
 
         var headBlockPos = new Vector3s(
@@ -617,16 +617,16 @@ public class GameServer
 
         if (headDef != null && headDef.Drowning)
         {
-            player.Breath -= 0.05f;
+            player.Breath -= _config.PlayerDamage.DrowningBreathDrain;
             if (player.Breath <= 0)
             {
                 player.Breath = 0;
-                DamagePlayer(player, 1f, "drowning");
+                DamagePlayer(player, _config.PlayerDamage.DrowningDamage, "drowning");
             }
         }
         else
         {
-            player.Breath = Math.Min(player.MaxBreath, player.Breath + 0.2f);
+            player.Breath = Math.Min(player.MaxBreath, player.Breath + _config.PlayerDamage.BreathRecoveryRate);
         }
     }
 

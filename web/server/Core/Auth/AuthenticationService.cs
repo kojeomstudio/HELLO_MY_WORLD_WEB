@@ -51,11 +51,11 @@ public class AuthenticationService
         _pbkdf2Iterations = pbkdf2Iterations;
     }
 
-    public static string HashPassword(string password, int iterations = 100000)
+    public string HashPassword(string password)
     {
         var salt = RandomNumberGenerator.GetBytes(SaltSize);
-        var hash = Rfc2898DeriveBytes.Pbkdf2(password, salt, iterations, HashAlgorithmName.SHA256, HashSize);
-        return $"{iterations}:{Convert.ToHexString(salt)}:{Convert.ToHexString(hash)}";
+        var hash = Rfc2898DeriveBytes.Pbkdf2(password, salt, _pbkdf2Iterations, HashAlgorithmName.SHA256, HashSize);
+        return $"{_pbkdf2Iterations}:{Convert.ToHexString(salt)}:{Convert.ToHexString(hash)}";
     }
 
     public static bool VerifyPassword(string password, string storedHash)
@@ -130,6 +130,23 @@ public class AuthenticationService
     private void ClearLockout(string name)
     {
         _lockouts.TryRemove(name, out _);
+    }
+
+    public void CleanupStaleEntries()
+    {
+        var cutoff = DateTimeOffset.UtcNow - _rateWindow;
+        foreach (var kvp in _connectionRates)
+        {
+            if (kvp.Value.WindowStart < cutoff)
+                _connectionRates.TryRemove(kvp.Key, out _);
+        }
+
+        var lockoutCutoff = DateTimeOffset.UtcNow - _lockoutDuration;
+        foreach (var kvp in _lockouts)
+        {
+            if (kvp.Value.LockoutStart < lockoutCutoff)
+                _lockouts.TryRemove(kvp.Key, out _);
+        }
     }
 
     public bool IsConnectionRateLimited(string ipAddress)

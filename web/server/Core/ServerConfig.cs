@@ -26,6 +26,8 @@ public class ServerConfig
     public RollbackSettings Rollback { get; set; } = new();
     public AreaProtectionSettings AreaProtection { get; set; } = new();
     public AntiCheatSettings AntiCheat { get; set; } = new();
+    public PlayerDamageSettings PlayerDamage { get; set; } = new();
+    public GameplaySettings Gameplay { get; set; } = new();
 }
 
 public class LiquidSettings
@@ -226,4 +228,31 @@ public class AntiCheatSettings
     public float PositionCorrectionThreshold { get; set; } = 2.0f;
     public int MaxViolationsBeforeCorrection { get; set; } = 3;
     public float TeleportDistanceThreshold { get; set; } = 50.0f;
+}
+
+public class PlayerDamageSettings
+{
+    public int LavaDamageIntervalMs { get; set; } = 500;
+    public int BlockDamageIntervalMs { get; set; } = 500;
+    public float SaturationDrainPerTick { get; set; } = 0.01f;
+    public float FoodDrainPerTick { get; set; } = 0.05f;
+    public int HealthRegenThreshold { get; set; } = 18;
+    public float HealthRegenPerTick { get; set; } = 0.2f;
+    public float SaturationCostPerHealTick { get; set; } = 0.5f;
+    public float StarvationDamagePerTick { get; set; } = 0.5f;
+    public float DrowningBreathDrain { get; set; } = 0.05f;
+    public float DrowningDamage { get; set; } = 1.0f;
+    public float BreathRecoveryRate { get; set; } = 0.2f;
+    public float VoidDeathY { get; set; } = -64;
+    public float RespawnY { get; set; } = 80;
+}
+
+public class GameplaySettings
+{
+    public float ExperienceFormulaBase { get; set; } = 10;
+    public float ExperienceFormulaPerLevel { get; set; } = 5;
+    public float RaycastMaxDistance { get; set; } = 8.0f;
+    public float BlockInteractDistance { get; set; } = 6.0f;
+    public float PositionBroadcastRange { get; set; } = 64;
+    public float ChunkRequestDistanceLimit { get; set; } = 256;
 }
