@@ -151,7 +151,7 @@ export class GameClient {
                 this.connection = null;
             }
             this.clientState = ClientState.Disconnected;
-            this.uiManager.addChatMessage('Server', `Connection failed: ${err}`);
+            this.uiManager.addChatMessage('Server', 'Connection failed. Please try again.');
             this.showLoginScreen();
         }
     }

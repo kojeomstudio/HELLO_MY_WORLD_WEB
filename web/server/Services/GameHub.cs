@@ -259,14 +259,15 @@ public class GameHub : Hub<IGameClient>
             {
                 var failKey = $"{ipAddress}:{playerName.ToLowerInvariant()}";
                 _accountFailures.AddOrUpdate(failKey,
-                    (1, DateTime.UtcNow),
-                    (_, old) => (old.FailCount + 1, old.LockoutEnd));
-
-                var (_, lockoutEnd) = _accountFailures.TryGetValue(failKey, out var f) ? (true, f.LockoutEnd) : (true, DateTime.UtcNow);
-                if (f.FailCount >= _config.Auth.AccountLockoutAttempts)
-                {
-                    _accountFailures[failKey] = (f.FailCount, DateTime.UtcNow.AddMinutes(_config.Auth.AccountLockoutMinutes));
-                }
+                    (1, DateTime.MinValue),
+                    (_, old) =>
+                    {
+                        var newCount = old.FailCount + 1;
+                        var newLockout = newCount >= _config.Auth.AccountLockoutAttempts
+                            ? DateTime.UtcNow.AddMinutes(_config.Auth.AccountLockoutMinutes)
+                            : old.LockoutEnd;
+                        return (newCount, newLockout);
+                    });
             }
 
             var msg = authResult switch

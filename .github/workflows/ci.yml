@@ -47,6 +47,9 @@ jobs:
       - name: Build client
         run: npm run build --prefix web/client
 
+      - name: Build server
+        run: dotnet build web/server/WebGameServer.csproj --configuration Release
+
   client-typecheck:
     name: Client Type Check
     runs-on: ubuntu-latest
@@ -249,7 +252,7 @@ jobs:
     name: Protocol Integration Test
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [server-build, client-build]
+    needs: [server-build, client-typecheck]
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
